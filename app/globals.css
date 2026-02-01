@@ -336,6 +336,72 @@ body {
   box-shadow: 0 10px 20px rgba(248,113,113,0.25);
 }
 
+.fav-button {
+  padding: 4px;
+  margin-right: 4px;
+  color: var(--muted);
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  width: auto;
+  height: auto;
+}
+.fav-button:hover {
+  color: var(--accent);
+}
+.fav-button.active {
+  color: var(--accent);
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  width: fit-content;
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 640px) {
+  .tabs {
+    position: sticky;
+    top: 60px; /* Navbar height (12px*2 + 24px) */
+    z-index: 40;
+    width: calc(100% + 32px);
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.9);
+    border-radius: 0;
+    margin: 0 -16px 16px -16px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(16px);
+  }
+}
+
+.tab {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

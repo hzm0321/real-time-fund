@@ -49,6 +49,14 @@ function ChevronIcon(props) {
   );
 }
 
+function StarIcon({ filled, ...props }) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={filled ? "var(--accent)" : "none"}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function Stat({ label, value, delta }) {
   const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
   return (
@@ -82,6 +90,24 @@ export default function HomePage() {
   // 收起/展开状态
   const [collapsedCodes, setCollapsedCodes] = useState(new Set());
 
+  // 自选状态
+  const [favorites, setFavorites] = useState(new Set());
+  const [currentTab, setCurrentTab] = useState('all');
+
+  const toggleFavorite = (code) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      localStorage.setItem('favorites', JSON.stringify(Array.from(next)));
+      if (next.size === 0) setCurrentTab('all');
+      return next;
+    });
+  };
+
   const toggleCollapse = (code) => {
     setCollapsedCodes(prev => {
       const next = new Set(prev);
@@ -112,6 +138,11 @@ export default function HomePage() {
       const savedCollapsed = JSON.parse(localStorage.getItem('collapsedCodes') || '[]');
       if (Array.isArray(savedCollapsed)) {
         setCollapsedCodes(new Set(savedCollapsed));
+      }
+      // 加载自选状态
+      const savedFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+      if (Array.isArray(savedFavorites)) {
+        setFavorites(new Set(savedFavorites));
       }
     } catch {}
   }, []);
@@ -319,6 +350,16 @@ export default function HomePage() {
       localStorage.setItem('collapsedCodes', JSON.stringify(Array.from(nextSet)));
       return nextSet;
     });
+
+    // 同步删除自选状态
+    setFavorites(prev => {
+      if (!prev.has(removeCode)) return prev;
+      const nextSet = new Set(prev);
+      nextSet.delete(removeCode);
+      localStorage.setItem('favorites', JSON.stringify(Array.from(nextSet)));
+      if (nextSet.size === 0) setCurrentTab('all');
+      return nextSet;
+    });
   };
 
   const manualRefresh = async () => {
@@ -404,15 +445,44 @@ export default function HomePage() {
         </div>
 
         <div className="col-12">
+          {funds.length > 0 && favorites.size > 0 && (
+            <div className="tabs" style={{ marginBottom: 16 }}>
+              <button 
+                className={`tab ${currentTab === 'all' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('all')}
+              >
+                全部 ({funds.length})
+              </button>
+              <button 
+                className={`tab ${currentTab === 'fav' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('fav')}
+              >
+                自选 ({favorites.size})
+              </button>
+            </div>
+          )}
+
           {funds.length === 0 ? (
             <div className="glass card empty">尚未添加基金</div>
           ) : (
             <div className="grid">
-              {funds.map((f) => (
+              {funds
+                .filter(f => currentTab === 'all' || favorites.has(f.code))
+                .map((f) => (
                 <div key={f.code} className="col-6">
                   <div className="glass card">
                     <div className="row" style={{ marginBottom: 10 }}>
                       <div className="title">
+                        <button 
+                          className={`icon-button fav-button ${favorites.has(f.code) ? 'active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(f.code);
+                          }}
+                          title={favorites.has(f.code) ? "取消自选" : "添加自选"}
+                        >
+                          <StarIcon width="18" height="18" filled={favorites.has(f.code)} />
+                        </button>
                         <span>{f.name}</span>
                         <span className="muted">#{f.code}</span>
                       </div>
