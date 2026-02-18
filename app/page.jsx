@@ -4784,6 +4784,14 @@ export default function HomePage() {
                                         </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                          <span className="label">昨日盈亏</span>
+                                          <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                            {typeof profit.profitYesterday === 'number'
+                                              ? `${profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥${Math.abs(profit.profitYesterday).toFixed(2)}`
+                                              : '—'}
+                                          </span>
+                                        </div>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
                                           <span className="label">当日盈亏</span>
                                           <span className={`value ${profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''}`}>
                                             {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}¥{Math.abs(profit.profitToday).toFixed(2)}
