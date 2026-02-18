@@ -2213,6 +2213,7 @@ export default function HomePage() {
         yesterdayRate = latestRate;
       }
     }
+    const yesterdayRate = Number(fund.yesterdayZzl);
     if (Number.isFinite(yesterdayRate)) {
       profitYesterday = amount - (amount / (1 + yesterdayRate / 100));
     }
@@ -4773,6 +4774,7 @@ export default function HomePage() {
                                           <span className="value">¥{profit.amount.toFixed(2)}</span>
                                         </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
                                           <span className="label">昨日盈亏</span>
                                           <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
                                             {typeof profit.profitYesterday === 'number'
@@ -4781,6 +4783,7 @@ export default function HomePage() {
                                           </span>
                                         </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
                                           <span className="label">当日盈亏</span>
                                           <span className={`value ${profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''}`}>
                                             {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}¥{Math.abs(profit.profitToday).toFixed(2)}
