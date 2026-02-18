@@ -4488,7 +4488,7 @@ export default function HomePage() {
                                   if (!shouldHideChange) {
                                     // 如果涨跌幅列显示（即非交易时段或今日净值已更新），则显示单位净值和真实涨跌幅
                                     return (
-                                      <>
+                                      <div style={{ display: 'contents' }}>
                                         <div className="table-cell text-right value-cell">
                                           <span style={{ fontWeight: 700 }}>{f.dwjz ?? '—'}</span>
                                         </div>
@@ -4497,7 +4497,7 @@ export default function HomePage() {
                                             {f.zzl !== undefined ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : ''}
                                           </span>
                                         </div>
-                                      </>
+                                      </div>
                                     );
                                   } else {
                                     // 否则显示估值净值和估值涨跌幅
@@ -4783,6 +4783,14 @@ export default function HomePage() {
                                           </span>
                                         </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                          <span className="label">昨日盈亏</span>
+                                          <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                            {typeof profit.profitYesterday === 'number'
+                                              ? `${profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥${Math.abs(profit.profitYesterday).toFixed(2)}`
+                                              : '—'}
+                                          </span>
+                                        </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
                                           <span className="label">昨日盈亏</span>
                                           <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
