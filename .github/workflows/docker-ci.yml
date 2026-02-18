@@ -22,6 +22,8 @@ jobs:
           fi
       - name: Create .env for Docker/Compose args
         run: |
+      - name: Create .env for Docker/Compose args
+        run: |
           cat << 'EOF' > .env
           NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -87,6 +89,7 @@ jobs:
 
       - name: Docker Compose up
         run: |
+          docker compose up -d --build
           docker compose --env-file .env up -d --build
           echo "Waiting for app service to become ready..."
           for i in {1..18}; do

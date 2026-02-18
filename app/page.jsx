@@ -2206,6 +2206,13 @@ export default function HomePage() {
     // 持仓金额
     const amount = holding.share * currentNav;
 
+    let yesterdayRate = Number(fund.yesterdayZzl);
+    if (!Number.isFinite(yesterdayRate)) {
+      const latestRate = Number(fund.zzl);
+      if (fund.jzrq && fund.jzrq !== todayStr && Number.isFinite(latestRate)) {
+        yesterdayRate = latestRate;
+      }
+    }
     const yesterdayRate = Number(fund.yesterdayZzl);
     if (Number.isFinite(yesterdayRate)) {
       profitYesterday = amount - (amount / (1 + yesterdayRate / 100));
@@ -4741,7 +4748,7 @@ export default function HomePage() {
 
                                     if (!profit) {
                                       return (
-                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
                                           <span className="label">持仓金额</span>
                                           <div
                                             className="value muted"
@@ -4758,13 +4765,31 @@ export default function HomePage() {
                                       <>
                                         <div
                                           className="stat"
-                                          style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
+                                          style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}
                                           onClick={() => setActionModal({ open: true, fund: f })}
                                         >
                                           <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                             持仓金额 <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />
                                           </span>
                                           <span className="value">¥{profit.amount.toFixed(2)}</span>
+                                        </div>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                          <span className="label">昨日盈亏</span>
+                                          <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                            {typeof profit.profitYesterday === 'number'
+                                              ? `${profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥${Math.abs(profit.profitYesterday).toFixed(2)}`
+                                              : '—'}
+                                          </span>
+                                        </div>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                          <span className="label">昨日盈亏</span>
+                                          <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                            {typeof profit.profitYesterday === 'number'
+                                              ? `${profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥${Math.abs(profit.profitYesterday).toFixed(2)}`
+                                              : '—'}
+                                          </span>
                                         </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
                                           <span className="label">昨日盈亏</span>
@@ -4787,7 +4812,7 @@ export default function HomePage() {
                                               e.stopPropagation();
                                               setPercentModes(prev => ({ ...prev, [f.code]: !prev[f.code] }));
                                             }}
-                                            style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
+                                            style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}
                                             title="点击切换金额/百分比"
                                           >
                                             <span className="label">持有收益{percentModes[f.code] ? '(%)' : ''}</span>
