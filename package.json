@@ -1,0 +1,28 @@
+{
+  "name": "real-time-fund",
+  "version": "0.1.5",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@dicebear/collection": "^9.3.1",
+    "@dicebear/core": "^9.3.1",
+    "@supabase/supabase-js": "^2.78.0",
+    "chart.js": "^4.5.1",
+    "dayjs": "^1.11.19",
+    "framer-motion": "^12.29.2",
+    "next": "^16.1.5",
+    "react": "18.3.1",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "18.3.1"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "devDependencies": {
+    "babel-plugin-react-compiler": "^1.0.0"
+  }
+}
