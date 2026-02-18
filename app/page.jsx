@@ -2206,13 +2206,6 @@ export default function HomePage() {
     // 持仓金额
     const amount = holding.share * currentNav;
 
-    let yesterdayRate = Number(fund.yesterdayZzl);
-    if (!Number.isFinite(yesterdayRate)) {
-      const latestRate = Number(fund.zzl);
-      if (fund.jzrq && fund.jzrq !== todayStr && Number.isFinite(latestRate)) {
-        yesterdayRate = latestRate;
-      }
-    }
     const yesterdayRate = Number(fund.yesterdayZzl);
     if (Number.isFinite(yesterdayRate)) {
       profitYesterday = amount - (amount / (1 + yesterdayRate / 100));
@@ -4517,7 +4510,7 @@ export default function HomePage() {
                                       );
                                     }
                                     return (
-                                      <>
+                                      <div style={{ display: 'contents' }}>
                                         <div className="table-cell text-right value-cell">
                                           <span style={{ fontWeight: 700 }}>{f.estPricedCoverage > 0.05 ? f.estGsz.toFixed(4) : (f.gsz ?? '—')}</span>
                                         </div>
@@ -4526,7 +4519,7 @@ export default function HomePage() {
                                             {f.estPricedCoverage > 0.05 ? `${f.estGszzl > 0 ? '+' : ''}${f.estGszzl.toFixed(2)}%` : (typeof f.gszzl === 'number' ? `${f.gszzl > 0 ? '+' : ''}${f.gszzl.toFixed(2)}%` : f.gszzl ?? '—')}
                                           </span>
                                         </div>
-                                      </>
+                                      </div>
                                     );
                                   }
                                 })()}
@@ -4762,7 +4755,7 @@ export default function HomePage() {
                                     }
 
                                     return (
-                                      <>
+                                      <div style={{ display: 'contents' }}>
                                         <div
                                           className="stat"
                                           style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}
@@ -4783,6 +4776,14 @@ export default function HomePage() {
                                           </span>
                                         </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                          <span className="label">昨日盈亏</span>
+                                          <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                            {typeof profit.profitYesterday === 'number'
+                                              ? `${profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥${Math.abs(profit.profitYesterday).toFixed(2)}`
+                                              : '—'}
+                                          </span>
+                                        </div>
                                         <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
                                           <span className="label">昨日盈亏</span>
                                           <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
@@ -4825,7 +4826,7 @@ export default function HomePage() {
                                             </span>
                                           </div>
                                         )}
-                                      </>
+                                      </div>
                                     );
                                   })()}
                                 </div>
