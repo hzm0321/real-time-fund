@@ -14,26 +14,50 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Create .env.local
+      - name: Verify no unresolved merge markers
         run: |
-          cat << 'EOF' > .env.local
+          if rg -n "^(<<<<<<<|=======|>>>>>>>)" app; then
+            echo "Unresolved merge markers found in app/ files"
+            exit 1
+          fi
+      - name: Create .env for Docker/Compose args
+        run: |
+          cat << 'EOF' > .env
           NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
           EOF
 
       - name: Build Dockerfile image
-        run: docker build -t real-time-fund .
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            --build-arg NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY="$NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY" \
+            -t real-time-fund .
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: ${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
 
       - name: Run Dockerfile container
         run: |
           docker run -d --name fund -p 3000:3000 real-time-fund
-          echo "Waiting 10 seconds for the container to start..."
-          sleep 10
+          echo "Waiting for the container to become ready..."
+          for i in {1..18}; do
+            if curl -fsS http://localhost:3000 >/dev/null; then
+              echo "Service is ready."
+              exit 0
+            fi
+            echo "Attempt $i/18: service not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "Service did not become ready in time."
+          docker logs fund
+          exit 1
 
       - name: Test service
-        run: |
-          curl -f http://localhost:3000 || (docker logs fund && exit 1)
+        run: curl -f http://localhost:3000 || (docker logs fund && exit 1)
 
       - name: Cleanup
         run: |
@@ -47,9 +71,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Create .env.local
+      - name: Verify no unresolved merge markers
         run: |
-          cat << 'EOF' > .env.local
+          if rg -n "^(<<<<<<<|=======|>>>>>>>)" app; then
+            echo "Unresolved merge markers found in app/ files"
+            exit 1
+          fi
+      - name: Create .env for Docker/Compose args
+        run: |
+          cat << 'EOF' > .env
           NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
@@ -57,9 +87,19 @@ jobs:
 
       - name: Docker Compose up
         run: |
-          docker compose up -d --build
-          echo "Waiting 10 seconds for services to start..."
-          sleep 10
+          docker compose --env-file .env up -d --build
+          echo "Waiting for app service to become ready..."
+          for i in {1..18}; do
+            if curl -fsS http://localhost:3000 >/dev/null; then
+              echo "App service is ready."
+              exit 0
+            fi
+            echo "Attempt $i/18: app service not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "App service did not become ready in time."
+          docker compose logs app
+          exit 1
 
       - name: Test app service
         run: |
