@@ -1753,6 +1753,7 @@ function GroupSummary({ funds, holdings, groupName, getProfit, stickyTop }) {
 
   const summary = useMemo(() => {
     let totalAsset = 0;
+    let totalProfitYesterday = 0;
     let totalProfitToday = 0;
     let totalHoldingReturn = 0;
     let totalCost = 0;
@@ -1765,7 +1766,8 @@ function GroupSummary({ funds, holdings, groupName, getProfit, stickyTop }) {
       if (profit) {
         hasHolding = true;
         totalAsset += profit.amount;
-        totalProfitToday += profit.profitToday;
+        totalProfitToday += (typeof profit.profitToday === 'number' ? profit.profitToday : 0);
+        totalProfitYesterday += (typeof profit.profitYesterday === 'number' ? profit.profitYesterday : 0);
         if (profit.profitTotal !== null) {
           totalHoldingReturn += profit.profitTotal;
           if (holding && typeof holding.cost === 'number' && typeof holding.share === 'number') {
@@ -1777,7 +1779,7 @@ function GroupSummary({ funds, holdings, groupName, getProfit, stickyTop }) {
 
     const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
 
-    return { totalAsset, totalProfitToday, totalHoldingReturn, hasHolding, returnRate };
+    return { totalAsset, totalProfitYesterday, totalProfitToday, totalHoldingReturn, hasHolding, returnRate };
   }, [funds, holdings, getProfit]);
 
   useLayoutEffect(() => {
@@ -1794,7 +1796,7 @@ function GroupSummary({ funds, holdings, groupName, getProfit, stickyTop }) {
       // 这里的逻辑可以优化：如果当前远小于阈值，可以尝试增大，但为了稳定性，主要处理缩小的场景
       // 或者：如果高度非常小（例如远小于80），可以尝试+1，但要小心死循环
     }
-  }, [winW, summary.totalAsset, summary.totalProfitToday, summary.totalHoldingReturn, summary.returnRate, showPercent, assetSize, metricSize]); // 添加 assetSize, metricSize 到依赖，确保逐步缩小生效
+  }, [winW, summary.totalAsset, summary.totalProfitYesterday, summary.totalProfitToday, summary.totalHoldingReturn, summary.returnRate, showPercent, assetSize, metricSize]); // 添加 assetSize, metricSize 到依赖，确保逐步缩小生效
 
   if (!summary.hasHolding) return null;
 
@@ -1841,6 +1843,22 @@ function GroupSummary({ funds, holdings, groupName, getProfit, stickyTop }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 24 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div className="muted" style={{ fontSize: '12px', marginBottom: 4 }}>昨日收益</div>
+            <div
+              className={summary.totalProfitYesterday > 0 ? 'up' : summary.totalProfitYesterday < 0 ? 'down' : ''}
+              style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}
+            >
+              {isMasked ? (
+                <span style={{ fontSize: metricSize }}>******</span>
+              ) : (
+                <>
+                  <span style={{ marginRight: 1 }}>{summary.totalProfitYesterday > 0 ? '+' : summary.totalProfitYesterday < 0 ? '-' : ''}</span>
+                  <CountUp value={Math.abs(summary.totalProfitYesterday)} style={{ fontSize: metricSize }} />
+                </>
+              )}
+            </div>
+          </div>
           <div style={{ textAlign: 'right' }}>
             <div className="muted" style={{ fontSize: '12px', marginBottom: 4 }}>当日收益</div>
             <div
@@ -2152,6 +2170,7 @@ export default function HomePage() {
 
     let currentNav;
     let profitToday;
+    let profitYesterday = null;
 
     if (!useValuation) {
       // 使用确权净值 (dwjz)
@@ -2187,6 +2206,17 @@ export default function HomePage() {
     // 持仓金额
     const amount = holding.share * currentNav;
 
+    let yesterdayRate = Number(fund.yesterdayZzl);
+    if (!Number.isFinite(yesterdayRate)) {
+      const latestRate = Number(fund.zzl);
+      if (fund.jzrq && fund.jzrq !== todayStr && Number.isFinite(latestRate)) {
+        yesterdayRate = latestRate;
+      }
+    }
+    if (Number.isFinite(yesterdayRate)) {
+      profitYesterday = amount - (amount / (1 + yesterdayRate / 100));
+    }
+
     // 总收益 = (当前净值 - 成本价) * 份额
     const profitTotal = typeof holding.cost === 'number'
       ? (currentNav - holding.cost) * holding.share
@@ -2195,6 +2225,7 @@ export default function HomePage() {
     return {
       amount,
       profitToday,
+      profitYesterday,
       profitTotal
     };
   };
@@ -4332,6 +4363,7 @@ export default function HomePage() {
                         <div className="table-header-cell text-right">涨跌幅</div>
                         <div className="table-header-cell text-right">估值时间</div>
                         <div className="table-header-cell text-right">持仓金额</div>
+                        <div className="table-header-cell text-right">昨日盈亏</div>
                         <div className="table-header-cell text-right">当日盈亏</div>
                         <div className="table-header-cell text-right">持有收益</div>
                         <div className="table-header-cell text-center">操作</div>
@@ -4538,6 +4570,25 @@ export default function HomePage() {
                                 {(() => {
                                   const holding = holdings[f.code];
                                   const profit = getHoldingProfit(f, holding);
+                                  const yesterdayValue = profit ? profit.profitYesterday : null;
+                                  const hasYesterday = yesterdayValue !== null;
+
+                                  return (
+                                    <div className="table-cell text-right profit-cell">
+                                      <span
+                                        className={hasYesterday ? (yesterdayValue > 0 ? 'up' : yesterdayValue < 0 ? 'down' : '') : 'muted'}
+                                        style={{ fontWeight: 700 }}
+                                      >
+                                        {hasYesterday
+                                          ? `${yesterdayValue > 0 ? '+' : yesterdayValue < 0 ? '-' : ''}¥${Math.abs(yesterdayValue).toFixed(2)}`
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
+                                {(() => {
+                                  const holding = holdings[f.code];
+                                  const profit = getHoldingProfit(f, holding);
                                   const profitValue = profit ? profit.profitToday : null;
                                   const hasProfit = profitValue !== null;
 
@@ -4549,7 +4600,7 @@ export default function HomePage() {
                                       >
                                         {hasProfit
                                           ? `${profitValue > 0 ? '+' : profitValue < 0 ? '-' : ''}¥${Math.abs(profitValue).toFixed(2)}`
-                                          : ''}
+                                          : '—'}
                                       </span>
                                     </div>
                                   );
@@ -4696,7 +4747,7 @@ export default function HomePage() {
 
                                     if (!profit) {
                                       return (
-                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
                                           <span className="label">持仓金额</span>
                                           <div
                                             className="value muted"
@@ -4713,7 +4764,7 @@ export default function HomePage() {
                                       <>
                                         <div
                                           className="stat"
-                                          style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
+                                          style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}
                                           onClick={() => setActionModal({ open: true, fund: f })}
                                         >
                                           <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -4721,7 +4772,15 @@ export default function HomePage() {
                                           </span>
                                           <span className="value">¥{profit.amount.toFixed(2)}</span>
                                         </div>
-                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
+                                          <span className="label">昨日盈亏</span>
+                                          <span className={`value ${profit.profitYesterday > 0 ? 'up' : profit.profitYesterday < 0 ? 'down' : ''}`}>
+                                            {typeof profit.profitYesterday === 'number'
+                                              ? `${profit.profitYesterday > 0 ? '+' : profit.profitYesterday < 0 ? '-' : ''}¥${Math.abs(profit.profitYesterday).toFixed(2)}`
+                                              : '—'}
+                                          </span>
+                                        </div>
+                                        <div className="stat" style={{ flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}>
                                           <span className="label">当日盈亏</span>
                                           <span className={`value ${profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''}`}>
                                             {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}¥{Math.abs(profit.profitToday).toFixed(2)}
@@ -4734,7 +4793,7 @@ export default function HomePage() {
                                               e.stopPropagation();
                                               setPercentModes(prev => ({ ...prev, [f.code]: !prev[f.code] }));
                                             }}
-                                            style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
+                                            style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, alignItems: 'center', textAlign: 'center' }}
                                             title="点击切换金额/百分比"
                                           >
                                             <span className="label">持有收益{percentModes[f.code] ? '(%)' : ''}</span>

@@ -28,12 +28,21 @@ jobs:
       - name: Run Dockerfile container
         run: |
           docker run -d --name fund -p 3000:3000 real-time-fund
-          echo "Waiting 10 seconds for the container to start..."
-          sleep 10
+          echo "Waiting for the container to become ready..."
+          for i in {1..18}; do
+            if curl -fsS http://localhost:3000 >/dev/null; then
+              echo "Service is ready."
+              exit 0
+            fi
+            echo "Attempt $i/18: service not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "Service did not become ready in time."
+          docker logs fund
+          exit 1
 
       - name: Test service
-        run: |
-          curl -f http://localhost:3000 || (docker logs fund && exit 1)
+        run: curl -f http://localhost:3000 || (docker logs fund && exit 1)
 
       - name: Cleanup
         run: |
@@ -58,8 +67,18 @@ jobs:
       - name: Docker Compose up
         run: |
           docker compose up -d --build
-          echo "Waiting 10 seconds for services to start..."
-          sleep 10
+          echo "Waiting for app service to become ready..."
+          for i in {1..18}; do
+            if curl -fsS http://localhost:3000 >/dev/null; then
+              echo "App service is ready."
+              exit 0
+            fi
+            echo "Attempt $i/18: app service not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "App service did not become ready in time."
+          docker compose logs app
+          exit 1
 
       - name: Test app service
         run: |
