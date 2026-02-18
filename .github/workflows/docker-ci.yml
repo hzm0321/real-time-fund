@@ -1,0 +1,69 @@
+name: Docker CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  dockerfile-check:
+    name: Build & Test Dockerfile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Create .env.local
+        run: |
+          cat << 'EOF' > .env.local
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
+          EOF
+
+      - name: Build Dockerfile image
+        run: docker build -t real-time-fund .
+
+      - name: Run Dockerfile container
+        run: |
+          docker run -d --name fund -p 3000:3000 real-time-fund
+          echo "Waiting 10 seconds for the container to start..."
+          sleep 10
+
+      - name: Test service
+        run: |
+          curl -f http://localhost:3000 || (docker logs fund && exit 1)
+
+      - name: Cleanup
+        run: |
+          docker stop fund
+          docker rm fund
+
+  docker-compose-check:
+    name: Build & Test Docker Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Create .env.local
+        run: |
+          cat << 'EOF' > .env.local
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
+          EOF
+
+      - name: Docker Compose up
+        run: |
+          docker compose up -d --build
+          echo "Waiting 10 seconds for services to start..."
+          sleep 10
+
+      - name: Test app service
+        run: |
+          curl -f http://localhost:3000 || (docker compose logs app && exit 1)
+
+      - name: Cleanup
+        run: docker compose down
