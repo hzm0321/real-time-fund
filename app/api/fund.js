@@ -65,6 +65,40 @@ export const fetchFundNetValue = async (code, date) => {
   }
 };
 
+const fetchPreviousTradingChangeRate = async (code, latestNavDate) => {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !latestNavDate) return null;
+
+  const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${code}&page=1&per=2&edate=${latestNavDate}`;
+  try {
+    await loadScript(url);
+    const content = window.apidata?.content;
+    if (!content || content.includes('暂无数据')) return null;
+
+    const rows = content.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+    const parsed = rows
+      .map((row) => {
+        const cells = row.match(/<td[^>]*>(.*?)<\/td>/gi) || [];
+        if (cells.length < 4) return null;
+        const date = cells[0].replace(/<[^>]+>/g, '').trim();
+        const changeText = cells[3].replace(/<[^>]+>/g, '').trim();
+        const rate = Number(changeText.replace('%', ''));
+        if (!date || !Number.isFinite(rate)) return null;
+        return { date, rate };
+      })
+      .filter(Boolean);
+
+    if (!parsed.length) return null;
+
+    const todayStr = nowInTz().format('YYYY-MM-DD');
+    if (latestNavDate === todayStr && parsed.length >= 2) {
+      return parsed[1].rate;
+    }
+    return parsed[0].rate;
+  } catch (e) {
+    return null;
+  }
+};
+
 export const fetchSmartFundNetValue = async (code, startDate) => {
   const today = nowInTz().startOf('day');
   let current = toTz(startDate).startOf('day');
@@ -133,17 +167,20 @@ export const fetchFundDataFallback = async (c) => {
         const zzl = parseFloat(p[7]);
         const jzrq = p[8] ? p[8].slice(0, 10) : '';
         if (dwjz) {
-          resolve({
-            code: c,
-            name: name,
-            dwjz: dwjz,
-            gsz: null,
-            gztime: null,
-            jzrq: jzrq,
-            gszzl: null,
-            zzl: !isNaN(zzl) ? zzl : null,
-            noValuation: true,
-            holdings: []
+          fetchPreviousTradingChangeRate(c, jzrq).then((yesterdayZzl) => {
+            resolve({
+              code: c,
+              name: name,
+              dwjz: dwjz,
+              gsz: null,
+              gztime: null,
+              jzrq: jzrq,
+              gszzl: null,
+              zzl: !isNaN(zzl) ? zzl : null,
+              yesterdayZzl,
+              noValuation: true,
+              holdings: []
+            });
           });
         } else {
           reject(new Error('未能获取到基金数据'));
@@ -314,7 +351,7 @@ export const fetchFundData = async (c) => {
           resolveH(holdings);
         }).catch(() => resolveH([]));
       });
-      Promise.all([tencentPromise, holdingsPromise]).then(([tData, holdings]) => {
+      Promise.all([tencentPromise, holdingsPromise]).then(async ([tData, holdings]) => {
         if (tData) {
           if (tData.jzrq && (!gzData.jzrq || tData.jzrq >= gzData.jzrq)) {
             gzData.dwjz = tData.dwjz;
@@ -322,7 +359,8 @@ export const fetchFundData = async (c) => {
             gzData.zzl = tData.zzl;
           }
         }
-        resolve({ ...gzData, holdings });
+        const yesterdayZzl = await fetchPreviousTradingChangeRate(c, gzData.jzrq);
+        resolve({ ...gzData, yesterdayZzl, holdings });
       });
     };
     scriptGz.onerror = () => {
