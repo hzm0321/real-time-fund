@@ -38,7 +38,8 @@ const createNoopSupabase = () => ({
     },
     from: () => createNoopTable(),
     channel: () => createNoopChannel(),
-    removeChannel: () => { }
+    removeChannel: () => { },
+    rpc: async () => ({ data: null, error: { message: 'Supabase not configured' } })
 });
 
 export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey, {

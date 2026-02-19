@@ -31,3 +31,22 @@ on public.user_configs
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+-- 增量更新函数
+create or replace function public.update_user_config_partial(payload jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as
+$$
+begin
+update public.user_configs
+set data = ((coalesce(data::jsonb, '{}'::jsonb) || payload)::json),
+    updated_at = now()
+where user_id = auth.uid();
+end;
+$$;
+
+grant execute on function public.update_user_config_partial(jsonb) to authenticated;
+grant execute on function public.update_user_config_partial(jsonb) to service_role;

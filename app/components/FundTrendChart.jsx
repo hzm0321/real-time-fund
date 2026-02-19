@@ -29,7 +29,7 @@ ChartJS.register(
   Filler
 );
 
-export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
+export default function FundTrendChart({ code, isExpanded, onToggleExpand, holdingCost, holdingDate }) {
   const [range, setRange] = useState('1m');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -88,34 +88,101 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
   const downColor = '#34d399'; // --success
   const lineColor = change >= 0 ? upColor : downColor;
   
+  const costMarker = useMemo(() => {
+    if (
+      typeof holdingCost !== 'number' || Number.isNaN(holdingCost) ||
+      !holdingDate ||
+      data.length < 2
+    ) {
+      return null;
+    }
+
+    const targetDate = new Date(`${holdingDate}T00:00:00`);
+    if (Number.isNaN(targetDate.getTime())) return null;
+
+    const datedPoints = data
+      .map((d, index) => {
+        const pointDate = new Date(`${d.date}T00:00:00`);
+        return Number.isNaN(pointDate.getTime()) ? null : { index, pointDate, date: d.date };
+      })
+      .filter(Boolean);
+
+    if (!datedPoints.length) return null;
+
+    const startDate = datedPoints[0].pointDate;
+    const endDate = datedPoints[datedPoints.length - 1].pointDate;
+    if (targetDate < startDate || targetDate > endDate) return null;
+
+    let nearest = datedPoints[0];
+    let minDiff = Math.abs(datedPoints[0].pointDate.getTime() - targetDate.getTime());
+
+    for (let i = 1; i < datedPoints.length; i += 1) {
+      const diff = Math.abs(datedPoints[i].pointDate.getTime() - targetDate.getTime());
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearest = datedPoints[i];
+      }
+    }
+
+    return {
+      index: nearest.index,
+      date: nearest.date,
+      holdingDate,
+    };
+  }, [data, holdingCost, holdingDate]);
+
   const chartData = useMemo(() => {
     // Calculate percentage change based on the first data point
     const firstValue = data.length > 0 ? data[0].value : 1;
     const percentageData = data.map(d => ((d.value - firstValue) / firstValue) * 100);
+    const unitValues = data.map(d => d.value);
+    const costPercent = (typeof holdingCost === 'number' && !Number.isNaN(holdingCost))
+      ? ((holdingCost - firstValue) / firstValue) * 100
+      : null;
+
+    const datasets = [
+      {
+        label: '涨跌幅',
+        data: percentageData,
+        rawValues: unitValues,
+        borderColor: lineColor,
+        backgroundColor: (context) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+          gradient.addColorStop(0, `${lineColor}33`); // 20% opacity
+          gradient.addColorStop(1, `${lineColor}00`); // 0% opacity
+          return gradient;
+        },
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        fill: true,
+        tension: 0.2
+      }
+    ];
+
+    if (costMarker) {
+      datasets.push({
+        label: '持仓成本价点位',
+        data: data.map((_, idx) => (idx === costMarker.index ? costPercent : null)),
+        rawValues: data.map((_, idx) => (idx === costMarker.index ? holdingCost : null)),
+        borderWidth: 0,
+        pointRadius: (ctx) => (ctx.dataIndex === costMarker.index ? 6 : 0),
+        pointHoverRadius: (ctx) => (ctx.dataIndex === costMarker.index ? 7 : 0),
+        pointBackgroundColor: '#fbbf24',
+        pointBorderColor: '#111827',
+        pointBorderWidth: 2,
+        showLine: false,
+        fill: false,
+        order: -1
+      });
+    }
 
     return {
       labels: data.map(d => d.date),
-      datasets: [
-        {
-          label: '涨跌幅',
-          data: percentageData,
-          borderColor: lineColor,
-          backgroundColor: (context) => {
-            const ctx = context.chart.ctx;
-            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-            gradient.addColorStop(0, `${lineColor}33`); // 20% opacity
-            gradient.addColorStop(1, `${lineColor}00`); // 0% opacity
-            return gradient;
-          },
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          fill: true,
-          tension: 0.2
-        }
-      ]
+      datasets
     };
-  }, [data, lineColor]);
+  }, [data, lineColor, costMarker, holdingCost]);
 
   const options = useMemo(() => {
     return {
@@ -226,15 +293,15 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
         // 获取数据点
         // 优先使用 chart.data 中的数据，避免闭包过时问题
         // activePoint.index 是当前数据集中的索引
-        const datasetIndex = activePoint.datasetIndex;
         const index = activePoint.index;
+        const displayDatasetIndex = 0;
         
         const labels = chart.data.labels;
         const datasets = chart.data.datasets;
 
-        if (labels && datasets && datasets[datasetIndex] && datasets[datasetIndex].data) {
+        if (labels && datasets && datasets[displayDatasetIndex] && datasets[displayDatasetIndex].data) {
            const dateStr = labels[index];
-           const value = datasets[datasetIndex].data[index];
+           const value = datasets[displayDatasetIndex].data[index];
 
            if (dateStr !== undefined && value !== undefined) {
                // X axis label (date)
@@ -252,13 +319,37 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
                ctx.fillStyle = '#0f172a'; // --background
                ctx.textAlign = 'center';
                ctx.fillText(valueStr, rightX - valWidth / 2, y);
+
+               // Unit NAV label for the same point
+               const rawValue = datasets[displayDatasetIndex].rawValues?.[index];
+               if (typeof rawValue === 'number') {
+                 const navStr = `净值 ${rawValue.toFixed(4)}`;
+                 const navWidth = ctx.measureText(navStr).width + 10;
+                 const navX = Math.max(leftX + navWidth / 2, Math.min(rightX - navWidth / 2, x));
+                 const navY = Math.max(topY + 10, y - 18);
+                 ctx.fillStyle = '#22d3ee';
+                 ctx.fillRect(navX - navWidth / 2, navY - 8, navWidth, 16);
+                 ctx.fillStyle = '#0f172a';
+                 ctx.fillText(navStr, navX, navY);
+               }
+
+               if (costMarker && index === costMarker.index) {
+                 const costStr = `成本 ${holdingCost.toFixed(4)} (建仓日 ${costMarker.holdingDate})`;
+                 const costWidth = ctx.measureText(costStr).width + 10;
+                 const costX = Math.max(leftX + costWidth / 2, Math.min(rightX - costWidth / 2, x));
+                 const costY = Math.min(bottomY - 10, y + 18);
+                 ctx.fillStyle = '#fbbf24';
+                 ctx.fillRect(costX - costWidth / 2, costY - 8, costWidth, 16);
+                 ctx.fillStyle = '#111827';
+                 ctx.fillText(costStr, costX, costY);
+               }
            }
         }
 
         ctx.restore();
       }
     }
-  }], []); // 移除 data 依赖，因为我们直接从 chart 实例读取数据
+  }], [costMarker, holdingCost]);
   
   return (
     <div style={{ marginTop: 16 }} onClick={(e) => e.stopPropagation()}>
@@ -301,6 +392,12 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
             style={{ overflow: 'hidden' }}
           >
             <div style={{ position: 'relative', height: 180, width: '100%' }}>
+              {costMarker && (
+                <div style={{ position: 'absolute', left: 0, top: -2, zIndex: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#fbbf24', border: '2px solid #111827', display: 'inline-block' }} />
+                  <span className="muted" style={{ fontSize: '10px' }}>持仓成本价点位</span>
+                </div>
+              )}
               {loading && (
                 <div style={{ 
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
