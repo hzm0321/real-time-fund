@@ -1568,7 +1568,6 @@ export default function HomePage() {
         setLoginError('');
       }
       // 仅在明确的登录动作（SIGNED_IN）时检查冲突；INITIAL_SESSION（刷新页面等）不检查，直接以云端为准
-      debugger
       fetchCloudConfig(session.user.id, isExplicitLogin);
     };
 
@@ -2405,7 +2404,6 @@ export default function HomePage() {
         if (localComparable !== cloudComparable) {
           // 如果数据不一致
           if (checkConflict) {
-            debugger
             // 只有明确要求检查冲突时才提示（例如刚登录时）
             setCloudConfigModal({ open: true, userId, type: 'conflict', cloudData: data.data });
             return;

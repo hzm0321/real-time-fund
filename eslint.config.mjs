@@ -12,7 +12,8 @@ const config = [
   ...nextCoreWebVitals,
   {
     rules: {
-      'react-hooks/set-state-in-effect': 'off'
+      'react-hooks/set-state-in-effect': 'off',
+      'no-debugger': 'error'
     }
   }
 ];
