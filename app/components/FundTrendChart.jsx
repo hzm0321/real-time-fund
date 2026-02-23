@@ -139,7 +139,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           type: 'line', // Use line type with showLine: false to simulate scatter on Category scale
           label: '买入',
           data: buyPoints,
-          borderColor: '#ef4444', // Red
+          borderColor: '#ffffff',
+          borderWidth: 1,
           backgroundColor: '#ef4444',
           pointStyle: 'circle',
           pointRadius: 2.5,
@@ -151,7 +152,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           type: 'line',
           label: '卖出',
           data: sellPoints,
-          borderColor: '#22c55e', // Green
+          borderColor: '#ffffff',
+          borderWidth: 1,
           backgroundColor: '#22c55e',
           pointStyle: 'circle',
           pointRadius: 2.5,
@@ -243,11 +245,11 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           const labelWidth = ctx.measureText(text).width + 12;
           
           // Draw label above the point
-          ctx.globalAlpha = 0.8;
+          ctx.globalAlpha = 0.7;
           ctx.fillStyle = bgColor;
           ctx.fillRect(x - labelWidth/2, y - 24, labelWidth, 18);
           
-          ctx.globalAlpha = 1.0;
+          ctx.globalAlpha = 0.7;
           ctx.fillStyle = textColor;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -272,7 +274,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
       if (datasets[2] && datasets[2].data) {
           const firstSellIndex = datasets[2].data.findIndex(v => v !== null && v !== undefined);
           if (firstSellIndex !== -1) {
-              drawPointLabel(2, firstSellIndex, '卖出', primaryColor);
+              drawPointLabel(2, firstSellIndex, '卖出', '#22c55e');
           }
       }
 
@@ -355,8 +357,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             if (dsIndex > 0 && datasets[dsIndex]) {
                 const label = datasets[dsIndex].label;
                 // Determine background color based on dataset index
-                // 1 = Buy (Red), 2 = Sell (Theme Color)
-                const bgColor = dsIndex === 1 ? '#ef4444' : primaryColor;
+                // 1 = Buy (Red), 2 = Sell (Green)
+                const bgColor = dsIndex === 1 ? '#ef4444' : '#22c55e';
                 
                 // If collision, offset Buy label upwards
                 let yOffset = 0;
