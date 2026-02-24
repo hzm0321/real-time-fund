@@ -2,7 +2,7 @@
 
 一个基于 Next.js 开发的纯前端基金估值与重仓股实时追踪工具。采用玻璃拟态设计（Glassmorphism），支持移动端适配。
 预览地址：  
-1. [https://hzm0321.github.io/real-time-fund/](https://hzm0321.github.io/real-time-fund/)
+1. [https://jiangjarwei.github.io/](https://jiangjarwei.github.io/)
 2. [https://fund.cc.cd/](https://fund.cc.cd/) （加速国内访问）
 
 ## ✨ 特性
