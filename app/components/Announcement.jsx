@@ -63,9 +63,9 @@ export default function Announcement() {
               <span>公告</span>
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px' }}>
-               马年新年快乐！
-              <p> 祝江江天天开心</p>
-              <p> 马上有钱</p>
+               马年快乐！
+              <p> 江江马上有钱！</p>
+              <p> 天天开心 \(^o^)/~</p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
