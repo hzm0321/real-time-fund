@@ -77,6 +77,13 @@ export function RefreshIcon(props) {
   );
 }
 
+export function ResetIcon(props) {
+  return (
+    <svg t="1772152323013" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4796" width="16" height="16"><path fill="currentColor" d="M864 512a352 352 0 0 0-600.96-248.96c-15.744 15.872-40.704 42.88-63.232 67.648H320a32 32 0 1 1 0 64H128a31.872 31.872 0 0 1-32-32v-192a32 32 0 1 1 64 0v108.672c20.544-22.528 42.688-46.4 57.856-61.504a416 416 0 1 1 0 588.288 32 32 0 1 1 45.248-45.248A352 352 0 0 0 864 512z" p-id="4797"></path>
+    </svg>
+  );
+}
+
 export function ChevronIcon(props) {
   return (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">

@@ -1,10 +1,11 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { TrashIcon } from './Icons';
 
 export default function ConfirmModal({ title, message, onConfirm, onCancel, confirmText = "确定删除" }) {
-  return (
+  const content = (
     <motion.div
       className="modal-overlay"
       role="dialog"
@@ -40,4 +41,6 @@ export default function ConfirmModal({ title, message, onConfirm, onCancel, conf
       </motion.div>
     </motion.div>
   );
+  if (typeof document === 'undefined') return null;
+  return createPortal(content, document.body);
 }

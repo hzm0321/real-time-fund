@@ -53,7 +53,8 @@ body::before {
 }
 
 .container {
-  max-width: 1120px;
+  max-width: 90%;
+  width: 1200px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -481,7 +482,9 @@ input[type="number"] {
   }
 
   .container {
-    padding: 16px;
+    padding: 12px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .grid {
@@ -644,6 +647,13 @@ input[type="number"] {
   border-color: var(--accent);
 }
 
+/* 不需要 hover 高亮的图标按钮（例如 PC 表格模式中的“编辑持仓”） */
+.icon-button.no-hover:hover {
+  color: inherit;
+  transform: none;
+  border-color: var(--border);
+}
+
 .icon-button:active {
   transform: translateY(0);
 }
@@ -709,22 +719,190 @@ input[type="number"] {
   grid-column: span 12;
 }
 
+/* PC 列表：左右分块，左侧可横向滚动，右侧操作列固定不参与滚动 */
+.table-pc-wrap {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  min-width: 0;
+}
+
+.table-scroll-area {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  /* 横向滚动条样式与项目整体规范一致：深色背景、边框色、圆角、hover 高亮 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg);
+}
+
+.table-scroll-area::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-scroll-area::-webkit-scrollbar-track {
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.table-scroll-area::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+.table-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.table-scroll-area::-webkit-scrollbar-thumb:active {
+  background: var(--primary);
+}
+
+/* 纵向滚动条通用样式（与项目整体规范一致，供弹窗、列表等使用） */
+.scrollbar-y-styled {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg);
+}
+
+.scrollbar-y-styled::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-y-styled::-webkit-scrollbar-track {
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.scrollbar-y-styled::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+.scrollbar-y-styled::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.scrollbar-y-styled::-webkit-scrollbar-thumb:active {
+  background: var(--primary);
+}
+
+/* 固定像素列宽，避免初始在视口外的列滚入后布局错误、内容不展示；不依赖 fr/内容测量 */
+.table-scroll-area-inner {
+  /*width: 1192px;*/
+  min-width: 900px;
+}
+
+/* 基金名称 净值 涨跌幅 估值涨跌幅 估值时间 持仓金额 当日收益 持有收益（三列同宽） */
+.table-header-row-scroll,
+.table-row-scroll {
+  display: grid;
+  grid-template-columns: 220px 100px 100px 100px 140px 140px 140px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.table-header-row-scroll {
+  padding: 16px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border);
+}
+
+.table-header-row-scroll .table-header-cell {
+  white-space: nowrap;
+}
+
+/* 表格行内容不换行，单行显示 */
+.table-row-scroll .table-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* 当日收益、持有收益列：约束内容不溢出到相邻列，过长显示省略号 */
+.table-row-scroll .profit-cell,
+.table-row-scroll .holding-cell {
+  min-width: 0;
+}
+.table-row-scroll .profit-cell > *,
+.table-row-scroll .holding-cell > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-row-scroll .name-cell .name-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-row-scroll {
+  padding: 12px 24px !important;
+  min-height: 52px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-row-scroll:hover,
+.table-row-scroll.row-hovered {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.table-fixed-row.row-hovered {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.table-fixed-col {
+  width: 60px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+}
+
+.table-header-cell-fixed {
+  padding: 16px 12px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-fixed-row {
+  min-height: 59px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-bottom: none;
+}
+
+.table-fixed-row .table-cell {
+  border: none;
+}
+
 .table-row-wrapper {
   width: 100%;
 }
 
 .table-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr 1.2fr 1.2fr 60px;
+  grid-template-columns: 2.2fr 0.8fr 1fr 1fr 1.2fr 1.2fr 1.2fr 0.5fr;
   align-items: center;
   gap: 12px;
-  padding: 12px 24px !important;
+  padding: 12px 14px !important;
   border-bottom: 1px solid var(--border);
-  transition: background-color 0.2s ease;
 }
 
 .table-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: #2a394b;
 }
 
 .table-row:last-child {
@@ -733,10 +911,10 @@ input[type="number"] {
 
 .table-header-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr 1.2fr 1.2fr 60px;
+  grid-template-columns: 2.2fr 0.8fr 1fr 1fr 1.2fr 1.2fr 1.2fr 0.5fr;
   gap: 12px;
-  padding: 16px 24px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 16px 14px;
+  background: #2a394b;
   border-bottom: 1px solid var(--border);
 }
 

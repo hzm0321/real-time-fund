@@ -345,6 +345,7 @@ export default function DcaModal({ fund, plan, onClose, onConfirm }) {
                 扣款日 <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <div
+                className="scrollbar-y-styled"
                 style={{
                   display: 'flex',
                   flexWrap: 'wrap',

@@ -43,6 +43,7 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { recordValuation, getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
 import { fetchFundData, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds, extractFundNamesWithLLM } from './api/fund';
 import packageJson from '../package.json';
+import PcFundTable from './components/PcFundTable';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -447,6 +448,7 @@ export default function HomePage() {
   const todayStr = formatDate();
 
   const [isMobile, setIsMobile] = useState(false);
+  const [hoveredPcRowCode, setHoveredPcRowCode] = useState(null); // PC 列表行悬浮高亮
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -559,7 +561,7 @@ export default function HomePage() {
   }, []);
 
   // 计算持仓收益
-  const getHoldingProfit = (fund, holding) => {
+  const getHoldingProfit = useCallback((fund, holding) => {
     if (!holding || !isNumber(holding.share)) return null;
 
     const hasTodayData = fund.jzrq === todayStr;
@@ -633,35 +635,128 @@ export default function HomePage() {
       profitToday,
       profitTotal
     };
-  };
+  }, [isTradingDay, todayStr]);
 
 
   // 过滤和排序后的基金列表
-  const displayFunds = funds
-    .filter(f => {
-      if (currentTab === 'all') return true;
-      if (currentTab === 'fav') return favorites.has(f.code);
-      const group = groups.find(g => g.id === currentTab);
-      return group ? group.codes.includes(f.code) : true;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'yield') {
-        const valA = isNumber(a.estGszzl) ? a.estGszzl : (a.gszzl ?? a.zzl ?? 0);
-        const valB = isNumber(b.estGszzl) ? b.estGszzl : (b.gszzl ?? a.zzl ?? 0);
-        return sortOrder === 'asc' ? valA - valB : valB - valA;
-      }
-      if (sortBy === 'holding') {
-        const pa = getHoldingProfit(a, holdings[a.code]);
-        const pb = getHoldingProfit(b, holdings[b.code]);
-        const valA = pa?.profitTotal ?? Number.NEGATIVE_INFINITY;
-        const valB = pb?.profitTotal ?? Number.NEGATIVE_INFINITY;
-        return sortOrder === 'asc' ? valA - valB : valB - valA;
-      }
-      if (sortBy === 'name') {
-        return sortOrder === 'asc' ? a.name.localeCompare(b.name, 'zh-CN') : b.name.localeCompare(a.name, 'zh-CN');
-      }
-      return 0;
-    });
+  const displayFunds = useMemo(
+    () => funds
+      .filter(f => {
+        if (currentTab === 'all') return true;
+        if (currentTab === 'fav') return favorites.has(f.code);
+        const group = groups.find(g => g.id === currentTab);
+        return group ? group.codes.includes(f.code) : true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'yield') {
+          const valA = isNumber(a.estGszzl) ? a.estGszzl : (a.gszzl ?? a.zzl ?? 0);
+          const valB = isNumber(b.estGszzl) ? b.estGszzl : (b.gszzl ?? a.zzl ?? 0);
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'holding') {
+          const pa = getHoldingProfit(a, holdings[a.code]);
+          const pb = getHoldingProfit(b, holdings[b.code]);
+          const valA = pa?.profitTotal ?? Number.NEGATIVE_INFINITY;
+          const valB = pb?.profitTotal ?? Number.NEGATIVE_INFINITY;
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'name') {
+          return sortOrder === 'asc' ? a.name.localeCompare(b.name, 'zh-CN') : b.name.localeCompare(a.name, 'zh-CN');
+        }
+        return 0;
+      }),
+    [funds, currentTab, favorites, groups, sortBy, sortOrder, holdings, getHoldingProfit],
+  );
+
+  // PC 端表格数据（用于 PcFundTable）
+  const pcFundTableData = useMemo(
+    () =>
+      displayFunds.map((f) => {
+        const hasTodayData = f.jzrq === todayStr;
+        const shouldHideChange = isTradingDay && !hasTodayData;
+        const navOrEstimate = !shouldHideChange
+          ? (f.dwjz ?? '—')
+          : (f.noValuation
+            ? (f.dwjz ?? '—')
+            : (f.estPricedCoverage > 0.05
+              ? (f.estGsz != null ? Number(f.estGsz).toFixed(4) : '—')
+              : (f.gsz ?? '—')));
+
+        const yesterdayChangePercent =
+          f.zzl != null && f.zzl !== ''
+            ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%`
+            : '—';
+        const yesterdayChangeValue =
+          f.zzl != null && f.zzl !== '' ? Number(f.zzl) : null;
+        const yesterdayDate = f.jzrq || '-';
+
+        const estimateChangePercent = f.noValuation
+          ? '—'
+          : (f.estPricedCoverage > 0.05
+            ? (f.estGszzl != null
+              ? `${f.estGszzl > 0 ? '+' : ''}${Number(f.estGszzl).toFixed(2)}%`
+              : '—')
+            : (isNumber(f.gszzl)
+              ? `${f.gszzl > 0 ? '+' : ''}${Number(f.gszzl).toFixed(2)}%`
+              : (f.gszzl ?? '—')));
+        const estimateChangeValue = f.noValuation
+          ? null
+          : (f.estPricedCoverage > 0.05
+            ? (isNumber(f.estGszzl) ? Number(f.estGszzl) : null)
+            : (isNumber(f.gszzl) ? Number(f.gszzl) : null));
+        const estimateTime = f.noValuation ? (f.jzrq || '-') : (f.gztime || f.time || '-');
+
+        const holding = holdings[f.code];
+        const profit = getHoldingProfit(f, holding);
+        const amount = profit ? profit.amount : null;
+        const holdingAmount =
+          amount == null ? '未设置' : `¥${amount.toFixed(2)}`;
+        const holdingAmountValue = amount;
+
+        const profitToday = profit ? profit.profitToday : null;
+        const todayProfit =
+          profitToday == null
+            ? ''
+            : `${profitToday > 0 ? '+' : profitToday < 0 ? '-' : ''}¥${Math.abs(profitToday).toFixed(2)}`;
+        const todayProfitValue = profitToday;
+
+        const total = profit ? profit.profitTotal : null;
+        const principal =
+          holding && isNumber(holding.cost) && isNumber(holding.share)
+            ? holding.cost * holding.share
+            : 0;
+        const asPercent = !!percentModes[f.code];
+        const holdingProfit =
+          total == null
+            ? ''
+            : (asPercent && principal > 0
+              ? `${total > 0 ? '+' : total < 0 ? '-' : ''}${Math.abs((total / principal) * 100).toFixed(2)}%`
+              : `${total > 0 ? '+' : total < 0 ? '-' : ''}¥${Math.abs(total).toFixed(2)}`);
+        const holdingProfitValue = total;
+
+        return {
+          rawFund: f,
+          code: f.code,
+          fundName: f.name,
+          isUpdated: f.jzrq === todayStr,
+          navOrEstimate,
+          yesterdayChangePercent,
+          yesterdayChangeValue,
+          yesterdayDate,
+          estimateChangePercent,
+          estimateChangeValue,
+          estimateChangeMuted: f.noValuation,
+          estimateTime,
+          holdingAmount,
+          holdingAmountValue,
+          todayProfit,
+          todayProfitValue,
+          holdingProfit,
+          holdingProfitValue,
+        };
+      }),
+    [displayFunds, holdings, isTradingDay, todayStr, getHoldingProfit, percentModes],
+  );
 
   // 自动滚动选中 Tab 到可视区域
   useEffect(() => {
@@ -824,24 +919,7 @@ export default function HomePage() {
 
   const handleAddHistory = (data) => {
     const fundCode = data.fundCode;
-    const current = holdings[fundCode] || { share: 0, cost: 0 };
-    const isBuy = data.type === 'buy';
-
-    let newShare, newCost;
-
-    if (isBuy) {
-      newShare = current.share + data.share;
-      // 加权平均成本
-      const buyCost = data.amount; // amount is total cost
-      newCost = (current.cost * current.share + buyCost) / newShare;
-    } else {
-      newShare = Math.max(0, current.share - data.share);
-      newCost = current.cost;
-      if (newShare === 0) newCost = 0;
-    }
-
-    handleSaveHolding(fundCode, { share: newShare, cost: newCost });
-
+    // 添加历史记录仅作补录展示，不修改真实持仓金额与份额
     setTransactions(prev => {
       const current = prev[fundCode] || [];
       const record = {
@@ -853,8 +931,9 @@ export default function HomePage() {
         date: data.date,
         isAfter3pm: false, // 历史记录通常不需要此标记，或者默认为 false
         isDca: false,
+        isHistoryOnly: true, // 仅记录，不参与持仓计算
         timestamp: data.timestamp || Date.now()
-      };
+      }
       // 按时间倒序排列
       const next = [record, ...current].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       const nextState = { ...prev, [fundCode]: next };
@@ -3654,7 +3733,49 @@ export default function HomePage() {
                   className={viewMode === 'card' ? 'grid' : 'table-container glass'}
                 >
                   <div className={viewMode === 'card' ? 'grid col-12' : ''} style={viewMode === 'card' ? { gridColumn: 'span 12', gap: 16 } : {}}>
-                    {viewMode === 'list' && (
+                    {/* PC 列表：使用 PcFundTable + 右侧冻结操作列 */}
+                    {viewMode === 'list' && !isMobile && (
+                        <div className="table-pc-wrap">
+                          <div className="table-scroll-area">
+                            <div className="table-scroll-area-inner">
+                              <PcFundTable
+                                data={pcFundTableData}
+                                refreshing={refreshing}
+                                currentTab={currentTab}
+                                favorites={favorites}
+                                onRemoveFund={(row) => {
+                                  if (refreshing) return;
+                                  if (!row || !row.code) return;
+                                  requestRemoveFund({ code: row.code, name: row.fundName });
+                                }}
+                                onToggleFavorite={(row) => {
+                                  if (!row || !row.code) return;
+                                  toggleFavorite(row.code);
+                                }}
+                                onRemoveFromGroup={(row) => {
+                                  if (!row || !row.code) return;
+                                  removeFundFromCurrentGroup(row.code);
+                                }}
+                                onHoldingAmountClick={(row, meta) => {
+                                  if (!row || !row.code) return;
+                                  const fund = row.rawFund || { code: row.code, name: row.fundName };
+                                  if (meta?.hasHolding) {
+                                    setActionModal({ open: true, fund });
+                                  } else {
+                                    setHoldingModal({ open: true, fund });
+                                  }
+                                }}
+                                onHoldingProfitClick={(row) => {
+                                  if (!row || !row.code) return;
+                                  if (row.holdingProfitValue == null) return;
+                                  setPercentModes(prev => ({ ...prev, [row.code]: !prev[row.code] }));
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                    )}
+                    {viewMode === 'list' && isMobile && (
                       <div className="table-header-row">
                         <div className="table-header-cell">基金名称</div>
                         <div className="table-header-cell text-right">净值/估值</div>
@@ -3667,7 +3788,8 @@ export default function HomePage() {
                       </div>
                     )}
                     <AnimatePresence mode="popLayout">
-                      {displayFunds.map((f) => (
+                      {displayFunds.map((f) =>
+                        (viewMode === 'list' && !isMobile) ? null : (
                         <motion.div
                           layout="position"
                           key={f.code}
@@ -3993,20 +4115,25 @@ export default function HomePage() {
                                       {(() => {
                                         const hasTodayData = f.jzrq === todayStr;
                                         let isYesterdayChange = false;
-                                        if (!hasTodayData && isString(f.gztime) && isString(f.jzrq)) {
-                                          const gzDate = toTz(f.gztime).startOf('day');
+                                        let isPreviousTradingDay = false;
+                                        if (!hasTodayData && isString(f.jzrq)) {
+                                          const today = toTz(todayStr).startOf('day');
                                           const jzDate = toTz(f.jzrq).startOf('day');
-                                          if (gzDate.clone().subtract(1, 'day').isSame(jzDate, 'day')) {
+                                          const yesterday = today.clone().subtract(1, 'day');
+                                          if (jzDate.isSame(yesterday, 'day')) {
                                             isYesterdayChange = true;
+                                          } else if (jzDate.isBefore(yesterday, 'day')) {
+                                            isPreviousTradingDay = true;
                                           }
                                         }
-                                        const shouldHideChange = isTradingDay && !hasTodayData && !isYesterdayChange;
+                                        const shouldHideChange = isTradingDay && !hasTodayData && !isYesterdayChange && !isPreviousTradingDay;
 
                                         if (shouldHideChange) return null;
 
+                                        const changeLabel = hasTodayData ? '涨跌幅' : (isYesterdayChange ? '昨日涨跌幅' : (isPreviousTradingDay ? '上一交易日涨跌幅' : '涨跌幅'));
                                         return (
                                           <Stat
-                                            label={isYesterdayChange ? '昨日涨跌幅' : '涨跌幅'}
+                                            label={changeLabel}
                                             value={f.zzl !== undefined ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : ''}
                                             delta={f.zzl}
                                           />
@@ -4160,7 +4287,8 @@ export default function HomePage() {
                             )}
                           </motion.div>
                         </motion.div>
-                      ))}
+                        )
+                      )}
                     </AnimatePresence>
                   </div>
                 </motion.div>
@@ -4588,4 +4716,3 @@ export default function HomePage() {
     </div>
   );
 }
-
