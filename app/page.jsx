@@ -3379,7 +3379,7 @@ export default function HomePage() {
               <path d="M5 14c2-4 7-6 14-5" stroke="var(--primary)" strokeWidth="2" />
             </svg>
           </div>
-          <span>基估宝</span>
+          <span>大大隻LALA基金宝</span>
         </div>
         <div className={`glass add-fund-section navbar-add-fund ${(isSearchFocused || selectedFunds.length > 0) ? 'search-focused' : ''}`} role="region" aria-label="添加基金">
           <div className="search-container" ref={dropdownRef}>
