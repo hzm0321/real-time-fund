@@ -1,14 +1,75 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import ConfirmModal from './ConfirmModal';
-import { ExitIcon, ResetIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+import { DragIcon, ExitIcon, ResetIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+
+const SortableRowContext = createContext({
+  setActivatorNodeRef: null,
+  listeners: null,
+});
+
+function SortableRow({ row, children, isTableDragging, disabled }) {
+  const {
+    attributes,
+    listeners,
+    transform,
+    transition,
+    setNodeRef,
+    setActivatorNodeRef,
+    isDragging,
+  } = useSortable({ id: row.original.code, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging ? { position: 'relative', zIndex: 9999, opacity: 0.8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}),
+  };
+
+  const contextValue = useMemo(
+    () => ({ setActivatorNodeRef, listeners }),
+    [setActivatorNodeRef, listeners]
+  );
+
+  return (
+    <SortableRowContext.Provider value={contextValue}>
+      <motion.div
+        ref={setNodeRef}
+        className="table-row-wrapper"
+        layout={isTableDragging ? undefined : "position"}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        style={{ ...style, position: 'relative' }}
+        {...attributes}
+      >
+        {children}
+      </motion.div>
+    </SortableRowContext.Provider>
+  );
+}
 
 /**
  * PC 端基金列表表格组件（基于 @tanstack/react-table）
@@ -45,7 +106,39 @@ export default function PcFundTable({
   onHoldingAmountClick,
   onHoldingProfitClick,
   refreshing = false,
+  sortBy = 'default',
+  onReorder,
 }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  const [activeId, setActiveId] = useState(null);
+
+  const handleDragStart = (event) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (active && over && active.id !== over.id) {
+      const oldIndex = data.findIndex(item => item.code === active.id);
+      const newIndex = data.findIndex(item => item.code === over.id);
+      if (oldIndex !== -1 && newIndex !== -1 && onReorder) {
+        onReorder(oldIndex, newIndex);
+      }
+    }
+    setActiveId(null);
+  };
   const getStoredColumnSizing = () => {
     if (typeof window === 'undefined') return {};
     try {
@@ -108,6 +201,68 @@ export default function PcFundTable({
     onHoldingAmountClick,
     onHoldingProfitClick,
   ]);
+
+  const FundNameCell = ({ info }) => {
+    const original = info.row.original || {};
+    const code = original.code;
+    const isUpdated = original.isUpdated;
+    const isFavorites = favorites?.has?.(code);
+    const isGroupTab = currentTab && currentTab !== 'all' && currentTab !== 'fav';
+    const rowContext = useContext(SortableRowContext);
+
+    return (
+      <div className="name-cell-content" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {sortBy === 'default' && (
+          <button
+            className="icon-button drag-handle"
+            ref={rowContext?.setActivatorNodeRef}
+            {...rowContext?.listeners}
+            style={{ cursor: 'grab', padding: 2, margin: '-2px -4px -2px 0', color: 'var(--muted)', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="拖拽排序"
+            onClick={(e) => e.stopPropagation?.()}
+          >
+            <DragIcon width="16" height="16" />
+          </button>
+        )}
+        {isGroupTab ? (
+          <button
+            className="icon-button fav-button"
+            onClick={(e) => {
+              e.stopPropagation?.();
+              onRemoveFromGroupRef.current?.(original);
+            }}
+            title="从小分组移除"
+          >
+            <ExitIcon width="18" height="18" style={{ transform: 'rotate(180deg)' }} />
+          </button>
+        ) : (
+          <button
+            className={`icon-button fav-button ${isFavorites ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation?.();
+              onToggleFavoriteRef.current?.(original);
+            }}
+            title={isFavorites ? '取消自选' : '添加自选'}
+          >
+            <StarIcon width="18" height="18" filled={isFavorites} />
+          </button>
+        )}
+        <div className="title-text">
+          <span
+            className={`name-text`}
+            title={isUpdated ? '今日净值已更新' : ''}
+          >
+            {info.getValue() ?? '—'}
+          </span>
+          {code ? <span className="muted code-text">
+            #{code}
+            {isUpdated && <span className="updated-indicator">✓</span>}
+          </span> : null}
+        </div>
+      </div>
+    );
+  };
+
   const columns = useMemo(
     () => [
       {
@@ -116,49 +271,7 @@ export default function PcFundTable({
         size: 265,
         minSize: 140,
         enablePinning: true,
-        cell: (info) => {
-          const original = info.row.original || {};
-          const code = original.code;
-          const isUpdated = original.isUpdated;
-          const isFavorites = favorites?.has?.(code);
-          const isGroupTab = currentTab && currentTab !== 'all' && currentTab !== 'fav';
-          return (
-            <div className="name-cell-content" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {isGroupTab ? (
-                <button
-                  className="icon-button fav-button"
-                  onClick={(e) => {
-                    e.stopPropagation?.();
-                    onRemoveFromGroupRef.current?.(original);
-                  }}
-                  title="从当前分组移除"
-                >
-                  <ExitIcon width="18" height="18" style={{ transform: 'rotate(180deg)' }} />
-                </button>
-              ) : (
-                <button
-                  className={`icon-button fav-button ${isFavorites ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation?.();
-                    onToggleFavoriteRef.current?.(original);
-                  }}
-                  title={isFavorites ? '取消自选' : '添加自选'}
-                >
-                  <StarIcon width="18" height="18" filled={isFavorites} />
-                </button>
-              )}
-              <div className="title-text">
-                <span
-                  className={`name-text ${isUpdated ? 'updated' : ''}`}
-                  title={isUpdated ? '今日净值已更新' : ''}
-                >
-                  {info.getValue() ?? '—'}
-                </span>
-                {code ? <span className="muted code-text">#{code}</span> : null}
-              </div>
-            </div>
-          );
-        },
+        cell: (info) => <FundNameCell info={info} />,
         meta: {
           align: 'left',
           cellClassName: 'name-cell',
@@ -188,11 +301,11 @@ export default function PcFundTable({
           const date = original.yesterdayDate ?? '-';
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <span className={cls} style={{ fontWeight: 700 }}>
                 {info.getValue() ?? '—'}
               </span>
-              <span className="muted" style={{ fontSize: '12px' }}>
+              <span className="muted" style={{ fontSize: '11px' }}>
                 {date}
               </span>
             </div>
@@ -215,11 +328,11 @@ export default function PcFundTable({
           const time = original.estimateTime ?? '-';
           const cls = isMuted ? 'muted' : value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <span className={cls} style={{ fontWeight: 700 }}>
                 {info.getValue() ?? '—'}
               </span>
-              <span className="muted" style={{ fontSize: '12px' }}>
+              <span className="muted" style={{ fontSize: '11px' }}>
                 {time}
               </span>
             </div>
@@ -247,12 +360,12 @@ export default function PcFundTable({
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '12px', cursor: 'pointer' }}
                 onClick={(e) => {
                   e.stopPropagation?.();
-                    onHoldingAmountClickRef.current?.(original, { hasHolding: false });
+                  onHoldingAmountClickRef.current?.(original, { hasHolding: false });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                      onHoldingAmountClickRef.current?.(original, { hasHolding: false });
+                    onHoldingAmountClickRef.current?.(original, { hasHolding: false });
                   }
                 }}
               >
@@ -355,7 +468,7 @@ export default function PcFundTable({
               title="重置列宽"
               style={{ border: 'none', width: '24px', height: '24px', backgroundColor: 'transparent', color: 'var(--text)' }}
             >
-              <ResetIcon width="14" height="14"  />
+              <ResetIcon width="14" height="14" />
             </button>
           </div>
         ),
@@ -399,7 +512,7 @@ export default function PcFundTable({
         },
       },
     ],
-    [currentTab, favorites, refreshing],
+    [currentTab, favorites, refreshing, sortBy],
   );
 
   const table = useReactTable({
@@ -551,15 +664,14 @@ export default function PcFundTable({
                 {header.isPlaceholder
                   ? null
                   : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
+                    header.column.columnDef.header,
+                    header.getContext(),
+                  )}
                 <div
                   onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
                   onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  className={`resizer ${
-                    header.column.getIsResizing() ? 'isResizing' : ''
-                  } ${header.column.getCanResize() ? '' : 'disabled'}`}
+                  className={`resizer ${header.column.getIsResizing() ? 'isResizing' : ''
+                    } ${header.column.getCanResize() ? '' : 'disabled'}`}
                 />
               </div>
             );
@@ -568,56 +680,61 @@ export default function PcFundTable({
       )}
 
       {/* 表体 */}
-      <AnimatePresence mode="popLayout">
-        {table.getRowModel().rows.map((row) => (
-          <motion.div
-            key={row.original.code || row.id}
-            className="table-row-wrapper"
-            layout="position"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            style={{ position: 'relative' }}
-          >
-            <div
-              className="table-row table-row-scroll"
-            >
-              {row.getVisibleCells().map((cell) => {
-                const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
-                const isNameColumn = columnId === 'fundName';
-                const rightAlignedColumns = new Set([
-                  'yesterdayChangePercent',
-                  'estimateChangePercent',
-                  'holdingAmount',
-                  'todayProfit',
-                  'holdingProfit',
-                ]);
-                const align = isNameColumn
-                  ? ''
-                  : rightAlignedColumns.has(columnId)
-                    ? 'text-right'
-                    : 'text-center';
-                const cellClassName =
-                  (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
-                const style = getCommonPinningStyles(cell.column, false);
-                return (
-                  <div
-                    key={cell.id}
-                    className={`table-cell ${align} ${cellClassName}`}
-                    style={style}
-                  >
-                    {flexRender(
-                      cell.column.columnDef.cell,
-                      cell.getContext(),
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      >
+        <SortableContext
+          items={data.map((item) => item.code)}
+          strategy={verticalListSortingStrategy}
+        >
+          <AnimatePresence mode="popLayout">
+            {table.getRowModel().rows.map((row) => (
+              <SortableRow key={row.original.code || row.id} row={row} isTableDragging={!!activeId} disabled={sortBy !== 'default'}>
+                <div
+                  className="table-row table-row-scroll"
+                >
+                  {row.getVisibleCells().map((cell) => {
+                    const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
+                    const isNameColumn = columnId === 'fundName';
+                    const rightAlignedColumns = new Set([
+                      'yesterdayChangePercent',
+                      'estimateChangePercent',
+                      'holdingAmount',
+                      'todayProfit',
+                      'holdingProfit',
+                    ]);
+                    const align = isNameColumn
+                      ? ''
+                      : rightAlignedColumns.has(columnId)
+                        ? 'text-right'
+                        : 'text-center';
+                    const cellClassName =
+                      (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
+                    const style = getCommonPinningStyles(cell.column, false);
+                    return (
+                      <div
+                        key={cell.id}
+                        className={`table-cell ${align} ${cellClassName}`}
+                        style={style}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </SortableRow>
+            ))}
+          </AnimatePresence>
+        </SortableContext>
+      </DndContext>
 
       {table.getRowModel().rows.length === 0 && (
         <div className="table-row empty-row">

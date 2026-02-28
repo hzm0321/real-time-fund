@@ -9,6 +9,7 @@ import { glass } from '@dicebear/collection';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString, isPlainObject } from 'lodash';
 import Announcement from "./components/Announcement";
 import { Stat } from "./components/Common";
@@ -36,6 +37,7 @@ import TradeModal from "./components/TradeModal";
 import TransactionHistoryModal from "./components/TransactionHistoryModal";
 import AddHistoryModal from "./components/AddHistoryModal";
 import UpdatePromptModal from "./components/UpdatePromptModal";
+import RefreshButton from "./components/RefreshButton";
 import WeChatModal from "./components/WeChatModal";
 import DcaModal from "./components/DcaModal";
 import githubImg from "./assets/github.svg";
@@ -47,6 +49,7 @@ import PcFundTable from './components/PcFundTable';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isSameOrAfter);
 
 const DEFAULT_TZ = 'Asia/Shanghai';
 const getBrowserTimeZone = () => {
@@ -305,14 +308,12 @@ export default function HomePage() {
   const isExplicitLoginRef = useRef(false);
 
   // 刷新频率状态
-  const [refreshMs, setRefreshMs] = useState(30000);
+  const [refreshMs, setRefreshMs] = useState(60000);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tempSeconds, setTempSeconds] = useState(30);
+  const [tempSeconds, setTempSeconds] = useState(60);
 
   // 全局刷新状态
   const [refreshing, setRefreshing] = useState(false);
-  // 刷新周期进度 0~1，用于环形进度条
-  const [refreshProgress, setRefreshProgress] = useState(0);
 
   // 收起/展开状态
   const [collapsedCodes, setCollapsedCodes] = useState(new Set());
@@ -640,14 +641,27 @@ export default function HomePage() {
 
   // 过滤和排序后的基金列表
   const displayFunds = useMemo(
-    () => funds
-      .filter(f => {
+    () => {
+      let filtered = funds.filter(f => {
         if (currentTab === 'all') return true;
         if (currentTab === 'fav') return favorites.has(f.code);
         const group = groups.find(g => g.id === currentTab);
         return group ? group.codes.includes(f.code) : true;
-      })
-      .sort((a, b) => {
+      });
+
+      if (currentTab !== 'all' && currentTab !== 'fav' && sortBy === 'default') {
+        const group = groups.find(g => g.id === currentTab);
+        if (group && group.codes) {
+          const codeMap = new Map(group.codes.map((code, index) => [code, index]));
+          filtered.sort((a, b) => {
+            const indexA = codeMap.get(a.code) ?? Number.MAX_SAFE_INTEGER;
+            const indexB = codeMap.get(b.code) ?? Number.MAX_SAFE_INTEGER;
+            return indexA - indexB;
+          });
+        }
+      }
+
+      return filtered.sort((a, b) => {
         if (sortBy === 'yield') {
           const valA = isNumber(a.estGszzl) ? a.estGszzl : (a.gszzl ?? a.zzl ?? 0);
           const valB = isNumber(b.estGszzl) ? b.estGszzl : (b.gszzl ?? a.zzl ?? 0);
@@ -664,7 +678,8 @@ export default function HomePage() {
           return sortOrder === 'asc' ? a.name.localeCompare(b.name, 'zh-CN') : b.name.localeCompare(a.name, 'zh-CN');
         }
         return 0;
-      }),
+      });
+    },
     [funds, currentTab, favorites, groups, sortBy, sortOrder, holdings, getHoldingProfit],
   );
 
@@ -1400,8 +1415,12 @@ export default function HomePage() {
     try {
       const list = JSON.parse(value || '[]');
       if (!Array.isArray(list)) return '';
-      const codes = list.map((item) => item?.code).filter(Boolean);
-      return Array.from(new Set(codes)).sort().join('|');
+      const items = list.map((item) => {
+        if (!item?.code) return null;
+        // 加入 jzrq 和 dwjz 以检测净值更新
+        return `${item.code}:${item.jzrq || ''}:${item.dwjz || ''}`;
+      }).filter(Boolean);
+      return Array.from(new Set(items)).join('|');
     } catch (e) {
       return '';
     }
@@ -1729,6 +1748,60 @@ export default function HomePage() {
     });
     setGroups(next);
     storageHelper.setItem('groups', JSON.stringify(next));
+  };
+
+  const handleReorder = (oldIndex, newIndex) => {
+    const movedItem = displayFunds[oldIndex];
+    const targetItem = displayFunds[newIndex];
+    if (!movedItem || !targetItem) return;
+
+    if (currentTab === 'all' || currentTab === 'fav') {
+      const newFunds = [...funds];
+      const fromIndex = newFunds.findIndex(f => f.code === movedItem.code);
+
+      if (fromIndex === -1) return;
+
+      // Remove moved item
+      const [removed] = newFunds.splice(fromIndex, 1);
+
+      // Find target index in the array (after removal)
+      const toIndex = newFunds.findIndex(f => f.code === targetItem.code);
+
+      if (toIndex === -1) {
+        // If target not found (should not happen), put it back
+        newFunds.splice(fromIndex, 0, removed);
+        return;
+      }
+
+      if (oldIndex < newIndex) {
+        // Moving down, insert after target
+        newFunds.splice(toIndex + 1, 0, removed);
+      } else {
+        // Moving up, insert before target
+        newFunds.splice(toIndex, 0, removed);
+      }
+
+      setFunds(newFunds);
+      storageHelper.setItem('funds', JSON.stringify(newFunds));
+    } else {
+      const groupIndex = groups.findIndex(g => g.id === currentTab);
+      if (groupIndex > -1) {
+        const group = groups[groupIndex];
+        const newCodes = [...group.codes];
+        const fromIndex = newCodes.indexOf(movedItem.code);
+        const toIndex = newCodes.indexOf(targetItem.code);
+
+        if (fromIndex !== -1 && toIndex !== -1) {
+          newCodes.splice(fromIndex, 1);
+          newCodes.splice(toIndex, 0, movedItem.code);
+
+          const newGroups = [...groups];
+          newGroups[groupIndex] = { ...group, codes: newCodes };
+          setGroups(newGroups);
+          storageHelper.setItem('groups', JSON.stringify(newGroups));
+        }
+      }
+    }
   };
 
   // 按 code 去重，保留第一次出现的项，避免列表重复
@@ -2061,17 +2134,6 @@ export default function HomePage() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [funds, refreshMs]);
-
-  // 刷新进度条：每 100ms 更新一次进度
-  useEffect(() => {
-    if (funds.length === 0 || refreshMs <= 0) return;
-    const t = setInterval(() => {
-      const elapsed = Date.now() - refreshCycleStartRef.current;
-      const p = Math.min(1, elapsed / refreshMs);
-      setRefreshProgress(p);
-    }, 100);
-    return () => clearInterval(t);
-  }, [funds.length, refreshMs]);
 
   const performSearch = async (val) => {
     if (!val.trim()) {
@@ -2423,7 +2485,7 @@ export default function HomePage() {
 
   const saveSettings = (e) => {
     e?.preventDefault?.();
-    const ms = Math.max(10, Number(tempSeconds)) * 1000;
+    const ms = Math.max(30, Number(tempSeconds)) * 1000;
     setRefreshMs(ms);
     storageHelper.setItem('refreshMs', String(ms));
     setSettingsOpen(false);
@@ -3122,13 +3184,18 @@ export default function HomePage() {
       actionModal.open ||
       tradeModal.open ||
       dcaModal.open ||
+      addHistoryModal.open ||
+      historyModal.open ||
+      loginModalOpen ||
       !!clearConfirm ||
       donateOpen ||
       !!fundDeleteConfirm ||
       updateModalOpen ||
       weChatOpen ||
       scanModalOpen ||
-      scanConfirmModalOpen;
+      scanConfirmModalOpen ||
+      isScanning ||
+      isScanImporting;
 
     if (isAnyModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -3152,13 +3219,19 @@ export default function HomePage() {
     holdingModal.open,
     actionModal.open,
     tradeModal.open,
+    dcaModal.open,
+    addHistoryModal.open,
+    historyModal.open,
+    loginModalOpen,
     clearConfirm,
     donateOpen,
     fundDeleteConfirm,
     updateModalOpen,
     weChatOpen,
     scanModalOpen,
-    scanConfirmModalOpen
+    scanConfirmModalOpen,
+    isScanning,
+    isScanImporting
   ]);
 
   useEffect(() => {
@@ -3375,22 +3448,13 @@ export default function HomePage() {
               </svg>
             </button>
           )}
-          <div
-            className="refresh-btn-wrap"
-            style={{ '--progress': refreshProgress }}
-            title={`刷新周期 ${Math.round(refreshMs / 1000)} 秒`}
-          >
-            <button
-              className="icon-button"
-              aria-label="立即刷新"
-              onClick={manualRefresh}
-              disabled={refreshing || funds.length === 0}
-              aria-busy={refreshing}
-              title="立即刷新"
-            >
-              <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
-            </button>
-          </div>
+          <RefreshButton
+            refreshMs={refreshMs}
+            manualRefresh={manualRefresh}
+            refreshing={refreshing}
+            fundsLength={funds.length}
+            refreshCycleStartRef={refreshCycleStartRef}
+          />
           {/*<button*/}
           {/*  className="icon-button"*/}
           {/*  aria-label="打开设置"*/}
@@ -3743,6 +3807,8 @@ export default function HomePage() {
                                 refreshing={refreshing}
                                 currentTab={currentTab}
                                 favorites={favorites}
+                                sortBy={sortBy}
+                                onReorder={handleReorder}
                                 onRemoveFund={(row) => {
                                   if (refreshing) return;
                                   if (!row || !row.code) return;
@@ -3889,12 +3955,21 @@ export default function HomePage() {
                                   )}
                                   <div className="title-text">
                                     <span
-                                      className={`name-text ${f.jzrq === todayStr ? 'updated' : ''}`}
-                                      title={f.jzrq === todayStr ? "今日净值已更新" : ""}
+                                      className="name-text"
                                     >
                                       {f.name}
                                     </span>
-                                    <span className="muted code-text">#{f.code}</span>
+                                    <span
+                                      className="muted code-text"
+                                      title={f.jzrq === todayStr ? "今日净值已更新" : ""}
+                                    >
+                                      {(() => {
+                                        const holding = holdings[f.code];
+                                        const profit = getHoldingProfit(f, holding);
+                                        return profit ? `¥${profit.amount.toFixed(2)}` : `#${f.code}`;
+                                      })()}
+                                      {f.jzrq === todayStr && <span className="updated-indicator">✓</span>}
+                                    </span>
                                   </div>
                                 </div>
                                 {(() => {
@@ -4073,12 +4148,15 @@ export default function HomePage() {
                                     )}
                                     <div className="title-text">
                                       <span
-                                        className={`name-text ${f.jzrq === todayStr ? 'updated' : ''}`}
+                                        className={`name-text`}
                                         title={f.jzrq === todayStr ? "今日净值已更新" : ""}
                                       >
                                         {f.name}
                                       </span>
-                                      <span className="muted">#{f.code}</span>
+                                      <span className="muted">
+                                        #{f.code}
+                                        {f.jzrq === todayStr && <span className="updated-indicator">✓</span>}
+                                      </span>
                                     </div>
                                   </div>
 
@@ -4219,12 +4297,27 @@ export default function HomePage() {
                                     基于 {Math.round(f.estPricedCoverage * 100)}% 持仓估算
                                   </div>
                                 )}
-                                {Array.isArray(valuationSeries[f.code]) && valuationSeries[f.code].length >= 2 && (
-                                  <FundIntradayChart
-                                    series={valuationSeries[f.code]}
-                                    referenceNav={f.dwjz != null ? Number(f.dwjz) : undefined}
-                                  />
-                                )}
+                                {(() => {
+                                  const showIntraday = Array.isArray(valuationSeries[f.code]) && valuationSeries[f.code].length >= 2;
+                                  if (!showIntraday) return null;
+
+                                  // 如果今日日期大于估值日期，说明是历史估值，不显示分时图
+                                  if (f.gztime && toTz(todayStr).startOf('day').isAfter(toTz(f.gztime).startOf('day'))) {
+                                    return null;
+                                  }
+
+                                  // 如果 jzrq 等于估值日期或在此之前（意味着净值已经更新到了估值日期，或者是历史数据），则隐藏实时估值分时
+                                  if (f.jzrq && f.gztime && toTz(f.jzrq).startOf('day').isSameOrAfter(toTz(f.gztime).startOf('day'))) {
+                                    return null;
+                                  }
+
+                                  return (
+                                    <FundIntradayChart
+                                      series={valuationSeries[f.code]}
+                                      referenceNav={f.dwjz != null ? Number(f.dwjz) : undefined}
+                                    />
+                                  );
+                                })()}
                                 <div
                                   style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
                                   className="title"

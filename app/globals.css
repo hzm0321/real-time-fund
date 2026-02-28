@@ -958,8 +958,7 @@ input[type="number"] {
   line-height: 1.4;
 }
 
-.name-text.updated::after {
-  content: "✓";
+.updated-indicator {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1133,7 +1132,7 @@ input[type="number"] {
 }
 
 .tab {
-  padding: 0 20px;
+  padding: 0 10px;
   border-radius: 8px;
   border: none;
   background: transparent;

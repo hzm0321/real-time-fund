@@ -24,7 +24,7 @@ export default function SettingsModal({
         <div className="form-group" style={{ marginBottom: 16 }}>
           <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>刷新频率</div>
           <div className="chips" style={{ marginBottom: 12 }}>
-            {[10, 30, 60, 120, 300].map((s) => (
+            {[30, 60, 120, 300].map((s) => (
               <button
                 key={s}
                 type="button"
@@ -40,15 +40,15 @@ export default function SettingsModal({
             className="input"
             type="number"
             inputMode="numeric"
-            min="10"
+            min="30"
             step="5"
             value={tempSeconds}
             onChange={(e) => setTempSeconds(Number(e.target.value))}
             placeholder="自定义秒数"
           />
-          {tempSeconds < 10 && (
+          {tempSeconds < 30 && (
             <div className="error-text" style={{ marginTop: 8 }}>
-              最小 10 秒
+              最小 30 秒
             </div>
           )}
         </div>
@@ -77,7 +77,7 @@ export default function SettingsModal({
         </div>
 
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 24 }}>
-          <button className="button" onClick={saveSettings} disabled={tempSeconds < 10}>保存并关闭</button>
+          <button className="button" onClick={saveSettings} disabled={tempSeconds < 30}>保存并关闭</button>
         </div>
       </div>
     </div>
