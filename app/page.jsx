@@ -1502,7 +1502,7 @@ export default function HomePage() {
 
   const storageHelper = useMemo(() => {
     // 仅以下 key 参与云端同步；fundValuationTimeseries 不同步到云端（测试中功能，暂不同步）
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'viewMode', 'dcaPlans']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'viewMode', 'dcaPlans', 'customSettings']);
     const triggerSync = (key, prevValue, nextValue) => {
       if (keys.has(key)) {
         // 标记为脏数据
@@ -1549,7 +1549,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // 仅以下 key 的变更会触发云端同步；fundValuationTimeseries 不在其中
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'viewMode', 'dcaPlans']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'viewMode', 'dcaPlans', 'customSettings']);
     const onStorage = (e) => {
       if (!e.key) return;
       if (e.key === 'localUpdatedAt') {
@@ -1569,6 +1569,18 @@ export default function HomePage() {
       if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     };
   }, [getFundCodesSignature, scheduleSync]);
+
+  const triggerCustomSettingsSync = useCallback(() => {
+    queueMicrotask(() => {
+      dirtyKeysRef.current.add('customSettings');
+      if (!skipSyncRef.current) {
+        const now = nowInTz().toISOString();
+        window.localStorage.setItem('localUpdatedAt', now);
+        setLastSyncTime(now);
+      }
+      scheduleSync();
+    });
+  }, [scheduleSync]);
 
   const applyViewMode = useCallback((mode) => {
     if (mode !== 'card' && mode !== 'list') return;
@@ -2561,6 +2573,7 @@ export default function HomePage() {
       const raw = window.localStorage.getItem('customSettings');
       const parsed = raw ? JSON.parse(raw) : {};
       window.localStorage.setItem('customSettings', JSON.stringify({ ...parsed, pcContainerWidth: w }));
+      triggerCustomSettingsSync();
     } catch { }
     setSettingsOpen(false);
   };
@@ -2571,6 +2584,7 @@ export default function HomePage() {
       const raw = window.localStorage.getItem('customSettings');
       const parsed = raw ? JSON.parse(raw) : {};
       window.localStorage.setItem('customSettings', JSON.stringify({ ...parsed, pcContainerWidth: 1200 }));
+      triggerCustomSettingsSync();
     } catch { }
   };
 
@@ -2715,6 +2729,7 @@ export default function HomePage() {
       });
 
     const viewMode = payload.viewMode === 'list' ? 'list' : 'card';
+    const customSettings = isPlainObject(payload.customSettings) ? payload.customSettings : {};
 
     return JSON.stringify({
       funds: uniqueFundCodes,
@@ -2727,7 +2742,8 @@ export default function HomePage() {
       pendingTrades,
       transactions,
       dcaPlans,
-      viewMode
+      viewMode,
+      customSettings
     });
   }
 
@@ -2767,6 +2783,13 @@ export default function HomePage() {
       }
       if (!keys || keys.has('dcaPlans')) {
         all.dcaPlans = JSON.parse(localStorage.getItem('dcaPlans') || '{}');
+      }
+      if (!keys || keys.has('customSettings')) {
+        try {
+          all.customSettings = JSON.parse(localStorage.getItem('customSettings') || '{}');
+        } catch {
+          all.customSettings = {};
+        }
       }
 
       // 如果是全量收集（keys 为 null），进行完整的数据清洗和验证逻辑
@@ -2837,7 +2860,8 @@ export default function HomePage() {
           pendingTrades: all.pendingTrades,
           transactions: all.transactions,
           dcaPlans: cleanedDcaPlans,
-          viewMode: all.viewMode
+          viewMode: all.viewMode,
+          customSettings: isPlainObject(all.customSettings) ? all.customSettings : {}
         };
       }
 
@@ -2858,6 +2882,7 @@ export default function HomePage() {
         transactions: {},
         dcaPlans: {},
         viewMode: 'card',
+        customSettings: {},
         exportedAt: nowInTz().toISOString()
       };
     }
@@ -2918,6 +2943,13 @@ export default function HomePage() {
       }, {});
       setDcaPlans(nextDcaPlans);
       storageHelper.setItem('dcaPlans', JSON.stringify(nextDcaPlans));
+
+      if (isPlainObject(cloudData.customSettings)) {
+        try {
+          const merged = { ...JSON.parse(localStorage.getItem('customSettings') || '{}'), ...cloudData.customSettings };
+          window.localStorage.setItem('customSettings', JSON.stringify(merged));
+        } catch { }
+      }
 
       if (nextFunds.length) {
         const codes = Array.from(new Set(nextFunds.map((f) => f.code)));
@@ -3947,6 +3979,7 @@ export default function HomePage() {
                                   if (row.holdingProfitValue == null) return;
                                   setPercentModes(prev => ({ ...prev, [row.code]: !prev[row.code] }));
                                 }}
+                                onCustomSettingsChange={triggerCustomSettingsSync}
                               />
                             </div>
                           </div>
@@ -3987,6 +4020,7 @@ export default function HomePage() {
                           if (row.holdingProfitValue == null) return;
                           setPercentModes((prev) => ({ ...prev, [row.code]: !prev[row.code] }));
                         }}
+                        onCustomSettingsChange={triggerCustomSettingsSync}
                       />
                     )}
                     <AnimatePresence mode="popLayout">

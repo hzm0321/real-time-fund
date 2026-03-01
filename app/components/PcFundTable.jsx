@@ -126,6 +126,7 @@ export default function PcFundTable({
   refreshing = false,
   sortBy = 'default',
   onReorder,
+  onCustomSettingsChange,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -183,6 +184,7 @@ export default function PcFundTable({
           ? { ...parsed, pcTableColumns: nextSizing }
           : { pcTableColumns: nextSizing };
       window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
+      onCustomSettingsChange?.();
     } catch { }
   };
 
@@ -212,6 +214,7 @@ export default function PcFundTable({
           ? { ...parsed, pcTableColumnOrder: nextOrder }
           : { pcTableColumnOrder: nextOrder };
       window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
+      onCustomSettingsChange?.();
     } catch { }
   };
 
@@ -246,6 +249,7 @@ export default function PcFundTable({
           ? { ...parsed, pcTableColumnVisibility: nextVisibility }
           : { pcTableColumnVisibility: nextVisibility };
       window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
+      onCustomSettingsChange?.();
     } catch { }
   };
 

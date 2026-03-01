@@ -22,6 +22,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import FitText from './FitText';
 import MobileSettingModal from './MobileSettingModal';
 import { ExitIcon, SettingsIcon, StarIcon } from './Icons';
 
@@ -100,6 +101,7 @@ export default function MobileFundTable({
   refreshing = false,
   sortBy = 'default',
   onReorder,
+  onCustomSettingsChange,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -164,6 +166,7 @@ export default function MobileFundTable({
           ? { ...parsed, mobileTableColumnOrder: nextOrder }
           : { mobileTableColumnOrder: nextOrder };
       window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
+      onCustomSettingsChange?.();
     } catch {}
   };
   const getStoredMobileColumnVisibility = () => {
@@ -194,6 +197,7 @@ export default function MobileFundTable({
           ? { ...parsed, mobileTableColumnVisibility: nextVisibility }
           : { mobileTableColumnVisibility: nextVisibility };
       window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
+      onCustomSettingsChange?.();
     } catch {}
   };
 
@@ -352,7 +356,7 @@ export default function MobileFundTable({
           </div>
         ),
         cell: (info) => <MobileFundNameCell info={info} />,
-        meta: { align: 'left', cellClassName: 'name-cell' },
+        meta: { align: 'left', cellClassName: 'name-cell', width: 140 },
       },
       {
         accessorKey: 'yesterdayChangePercent',
@@ -367,11 +371,11 @@ export default function MobileFundTable({
               <span className={cls} style={{ fontWeight: 700 }}>
                 {info.getValue() ?? '—'}
               </span>
-              <span className="muted" style={{ fontSize: '11px' }}>{date}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>{date}</span>
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'change-cell' },
+        meta: { align: 'right', cellClassName: 'change-cell', width: 72 },
       },
       {
         accessorKey: 'estimateChangePercent',
@@ -387,11 +391,11 @@ export default function MobileFundTable({
               <span className={cls} style={{ fontWeight: 700 }}>
                 {info.getValue() ?? '—'}
               </span>
-              <span className="muted" style={{ fontSize: '11px' }}>{time}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>{time}</span>
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'est-change-cell' },
+        meta: { align: 'right', cellClassName: 'est-change-cell', width: 80 },
       },
       {
         accessorKey: 'todayProfit',
@@ -402,12 +406,14 @@ export default function MobileFundTable({
           const hasProfit = value != null;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
           return (
-            <span className={cls} style={{ fontWeight: 700 }}>
-              {hasProfit ? (info.getValue() ?? '') : ''}
+            <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+              <FitText maxFontSize={14} minFontSize={10}>
+                {hasProfit ? (info.getValue() ?? '') : ''}
+              </FitText>
             </span>
           );
         },
-        meta: { align: 'right', cellClassName: 'profit-cell' },
+        meta: { align: 'right', cellClassName: 'profit-cell', width: 80 },
       },
       {
         accessorKey: 'holdingProfit',
@@ -420,20 +426,22 @@ export default function MobileFundTable({
           return (
             <div
               title="点击切换金额/百分比"
-              style={{ cursor: hasTotal ? 'pointer' : 'default' }}
+              style={{ cursor: hasTotal ? 'pointer' : 'default', width: '100%' }}
               onClick={(e) => {
                 if (!hasTotal) return;
                 e.stopPropagation?.();
                 onHoldingProfitClickRef.current?.(original);
               }}
             >
-              <span className={cls} style={{ fontWeight: 700 }}>
-                {hasTotal ? (info.getValue() ?? '') : ''}
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <FitText maxFontSize={14} minFontSize={10}>
+                  {hasTotal ? (info.getValue() ?? '') : ''}
+                </FitText>
               </span>
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'holding-cell' },
+        meta: { align: 'right', cellClassName: 'holding-cell', width: 80 },
       },
     ],
     [currentTab, favorites, refreshing]
@@ -474,6 +482,18 @@ export default function MobileFundTable({
 
   const headerGroup = table.getHeaderGroups()[0];
 
+  const LAST_COLUMN_EXTRA = 12;
+  const mobileGridLayout = (() => {
+    if (!headerGroup?.headers?.length) return { gridTemplateColumns: '', minWidth: undefined };
+    const gap = 12;
+    const widths = headerGroup.headers.map((h) => h.column.columnDef.meta?.width ?? 80);
+    if (widths.length > 0) widths[widths.length - 1] += LAST_COLUMN_EXTRA;
+    return {
+      gridTemplateColumns: widths.map((w) => `${w}px`).join(' '),
+      minWidth: widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * gap,
+    };
+  })();
+
   const getPinClass = (columnId, isHeader) => {
     if (columnId === 'fundName') return isHeader ? 'table-header-cell-pin-left' : 'table-cell-pin-left';
     return '';
@@ -487,17 +507,25 @@ export default function MobileFundTable({
 
   return (
     <div className="mobile-fund-table">
-      <div className="mobile-fund-table-scroll">
+      <div
+        className="mobile-fund-table-scroll"
+        style={mobileGridLayout.minWidth != null ? { minWidth: mobileGridLayout.minWidth } : undefined}
+      >
         {headerGroup && (
-          <div className="table-header-row mobile-fund-table-header">
-            {headerGroup.headers.map((header) => {
+          <div
+            className="table-header-row mobile-fund-table-header"
+            style={mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : undefined}
+          >
+            {headerGroup.headers.map((header, headerIndex) => {
               const columnId = header.column.id;
               const pinClass = getPinClass(columnId, true);
               const alignClass = getAlignClass(columnId);
+              const isLastColumn = headerIndex === headerGroup.headers.length - 1;
               return (
                 <div
                   key={header.id}
                   className={`table-header-cell ${alignClass} ${pinClass}`}
+                  style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
                 >
                   {header.isPlaceholder
                     ? null
@@ -536,18 +564,21 @@ export default function MobileFundTable({
                         background: 'var(--bg)',
                         position: 'relative',
                         zIndex: 1,
+                        ...(mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : {}),
                       }}
                       {...(sortBy === 'default' ? listeners : {})}
                     >
-                      {row.getVisibleCells().map((cell) => {
+                      {row.getVisibleCells().map((cell, cellIndex) => {
                         const columnId = cell.column.id;
                         const pinClass = getPinClass(columnId, false);
                         const alignClass = getAlignClass(columnId);
                         const cellClassName = cell.column.columnDef.meta?.cellClassName || '';
+                        const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
                         return (
                           <div
                             key={cell.id}
                             className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`}
+                            style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </div>

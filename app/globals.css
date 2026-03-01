@@ -1428,24 +1428,27 @@ input[type="number"] {
   }
 
   .mobile-fund-table-scroll {
-    min-width: 520px;
+    /* min-width 由 MobileFundTable 根据 columns meta.width 动态设置 */
   }
 
   .mobile-fund-table .table-header-row {
     display: grid;
-    grid-template-columns: 140px 1fr 1fr 1.2fr 1.2fr;
+    /* grid-template-columns 由 MobileFundTable 根据当前列顺序动态设置 */
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     padding-left: 0 !important;
   }
 
   .mobile-fund-table .table-header-row .table-header-cell {
-    padding-top: 16px;
-    padding-bottom: 16px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .mobile-fund-table .table-row {
-    grid-template-columns: 140px 1fr 1fr 1.2fr 1.2fr;
     grid-template-areas: unset;
     gap: 12px;
     padding-top: 0 !important;
@@ -1468,6 +1471,9 @@ input[type="number"] {
   .mobile-fund-table .table-row .table-cell {
     padding-top: 12px;
     padding-bottom: 12px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* 基金名称列固定左侧：右侧阴影突出固定列，覆盖行 border-bottom */
