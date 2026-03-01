@@ -115,7 +115,6 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {(row: any) => void} [props.onToggleFavorite] - 添加/取消自选
  * @param {(row: any) => void} [props.onRemoveFromGroup] - 从当前分组移除
  * @param {(row: any, meta: { hasHolding: boolean }) => void} [props.onHoldingAmountClick] - 点击持仓金额
- * @param {(row: any) => void} [props.onHoldingProfitClick] - 点击持有收益
  * @param {boolean} [props.refreshing] - 是否处于刷新状态（控制删除按钮禁用态）
  */
 export default function PcFundTable({
@@ -126,7 +125,7 @@ export default function PcFundTable({
   onToggleFavorite,
   onRemoveFromGroup,
   onHoldingAmountClick,
-  onHoldingProfitClick,
+  onHoldingProfitClick, // 保留以兼容调用方，表格内已不再使用点击切换
   refreshing = false,
   sortBy = 'default',
   onReorder,
@@ -308,20 +307,17 @@ export default function PcFundTable({
   const onToggleFavoriteRef = useRef(onToggleFavorite);
   const onRemoveFromGroupRef = useRef(onRemoveFromGroup);
   const onHoldingAmountClickRef = useRef(onHoldingAmountClick);
-  const onHoldingProfitClickRef = useRef(onHoldingProfitClick);
 
   useEffect(() => {
     onRemoveFundRef.current = onRemoveFund;
     onToggleFavoriteRef.current = onToggleFavorite;
     onRemoveFromGroupRef.current = onRemoveFromGroup;
     onHoldingAmountClickRef.current = onHoldingAmountClick;
-    onHoldingProfitClickRef.current = onHoldingProfitClick;
   }, [
     onRemoveFund,
     onToggleFavorite,
     onRemoveFromGroup,
     onHoldingAmountClick,
-    onHoldingProfitClick,
   ]);
 
   const FundNameCell = ({ info }) => {
@@ -555,10 +551,21 @@ export default function PcFundTable({
           const value = original.todayProfitValue;
           const hasProfit = value != null;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
+          const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
+          const percentStr = original.todayProfitPercent ?? '';
           return (
-            <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10}>
-              {hasProfit ? (info.getValue() ?? '') : ''}
-            </FitText>
+            <div style={{ width: '100%' }}>
+              <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
+                {amountStr}
+              </FitText>
+              {percentStr ? (
+                <span className={`${cls} today-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
+                  <FitText maxFontSize={11} minFontSize={9}>
+                    {percentStr}
+                  </FitText>
+                </span>
+              ) : null}
+            </div>
           );
         },
         meta: {
@@ -576,19 +583,20 @@ export default function PcFundTable({
           const value = original.holdingProfitValue;
           const hasTotal = value != null;
           const cls = hasTotal ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
+          const amountStr = hasTotal ? (info.getValue() ?? '') : '—';
+          const percentStr = original.holdingProfitPercent ?? '';
           return (
-            <div
-              title="点击切换金额/百分比"
-              style={{ cursor: hasTotal ? 'pointer' : 'default', width: '100%' }}
-              onClick={(e) => {
-                if (!hasTotal) return;
-                e.stopPropagation?.();
-                onHoldingProfitClickRef.current?.(original);
-              }}
-            >
-              <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10}>
-                {hasTotal ? (info.getValue() ?? '') : ''}
+            <div style={{ width: '100%' }}>
+              <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
+                {amountStr}
               </FitText>
+              {percentStr ? (
+                <span className={`${cls} holding-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
+                  <FitText maxFontSize={11} minFontSize={9}>
+                    {percentStr}
+                  </FitText>
+                </span>
+              ) : null}
             </div>
           );
         },

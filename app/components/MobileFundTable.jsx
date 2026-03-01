@@ -88,7 +88,6 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {(row: any) => void} [props.onToggleFavorite] - 添加/取消自选
  * @param {(row: any) => void} [props.onRemoveFromGroup] - 从当前分组移除
  * @param {(row: any, meta: { hasHolding: boolean }) => void} [props.onHoldingAmountClick] - 点击持仓金额
- * @param {(row: any) => void} [props.onHoldingProfitClick] - 点击持有收益
  * @param {boolean} [props.refreshing] - 是否刷新中
  * @param {string} [props.sortBy] - 排序方式，'default' 时长按行触发拖拽排序
  * @param {(oldIndex: number, newIndex: number) => void} [props.onReorder] - 拖拽排序回调
@@ -101,7 +100,7 @@ export default function MobileFundTable({
   onToggleFavorite,
   onRemoveFromGroup,
   onHoldingAmountClick,
-  onHoldingProfitClick,
+  onHoldingProfitClick, // 保留以兼容调用方，表格内已不再使用点击切换
   refreshing = false,
   sortBy = 'default',
   onReorder,
@@ -119,18 +118,15 @@ export default function MobileFundTable({
   const onToggleFavoriteRef = useRef(onToggleFavorite);
   const onRemoveFromGroupRef = useRef(onRemoveFromGroup);
   const onHoldingAmountClickRef = useRef(onHoldingAmountClick);
-  const onHoldingProfitClickRef = useRef(onHoldingProfitClick);
 
   useEffect(() => {
     onToggleFavoriteRef.current = onToggleFavorite;
     onRemoveFromGroupRef.current = onRemoveFromGroup;
     onHoldingAmountClickRef.current = onHoldingAmountClick;
-    onHoldingProfitClickRef.current = onHoldingProfitClick;
   }, [
     onToggleFavorite,
     onRemoveFromGroup,
     onHoldingAmountClick,
-    onHoldingProfitClick,
   ]);
 
   const handleDragStart = (e) => setActiveId(e.active.id);
@@ -475,12 +471,23 @@ export default function MobileFundTable({
           const value = original.todayProfitValue;
           const hasProfit = value != null;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
+          const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
+          const percentStr = original.todayProfitPercent ?? '';
           return (
-            <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
-              <FitText maxFontSize={14} minFontSize={10}>
-                {hasProfit ? (info.getValue() ?? '') : ''}
-              </FitText>
-            </span>
+            <div style={{ width: '100%' }}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <FitText maxFontSize={14} minFontSize={10}>
+                  {amountStr}
+                </FitText>
+              </span>
+              {percentStr ? (
+                <span className={`${cls} today-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
+                  <FitText maxFontSize={11} minFontSize={9}>
+                    {percentStr}
+                  </FitText>
+                </span>
+              ) : null}
+            </div>
           );
         },
         meta: { align: 'right', cellClassName: 'profit-cell', width: columnWidthMap.todayProfit },
@@ -493,21 +500,22 @@ export default function MobileFundTable({
           const value = original.holdingProfitValue;
           const hasTotal = value != null;
           const cls = hasTotal ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
+          const amountStr = hasTotal ? (info.getValue() ?? '') : '—';
+          const percentStr = original.holdingProfitPercent ?? '';
           return (
-            <div
-              title="点击切换金额/百分比"
-              style={{ cursor: hasTotal ? 'pointer' : 'default', width: '100%' }}
-              onClick={(e) => {
-                if (!hasTotal) return;
-                e.stopPropagation?.();
-                onHoldingProfitClickRef.current?.(original);
-              }}
-            >
+            <div style={{ width: '100%' }}>
               <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
                 <FitText maxFontSize={14} minFontSize={10}>
-                  {hasTotal ? (info.getValue() ?? '') : ''}
+                  {amountStr}
                 </FitText>
               </span>
+              {percentStr ? (
+                <span className={`${cls} holding-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
+                  <FitText maxFontSize={11} minFontSize={9}>
+                    {percentStr}
+                  </FitText>
+                </span>
+              ) : null}
             </div>
           );
         },

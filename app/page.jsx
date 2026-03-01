@@ -778,13 +778,18 @@ export default function HomePage() {
           holding && isNumber(holding.cost) && isNumber(holding.share)
             ? holding.cost * holding.share
             : 0;
-        const asPercent = !!percentModes[f.code];
+        const todayProfitPercent =
+          profitToday != null && principal > 0
+            ? `${profitToday > 0 ? '+' : profitToday < 0 ? '-' : ''}${Math.abs((profitToday / principal) * 100).toFixed(2)}%`
+            : '';
         const holdingProfit =
           total == null
             ? ''
-            : (asPercent && principal > 0
-              ? `${total > 0 ? '+' : total < 0 ? '-' : ''}${Math.abs((total / principal) * 100).toFixed(2)}%`
-              : `${total > 0 ? '+' : total < 0 ? '-' : ''}¥${Math.abs(total).toFixed(2)}`);
+            : `${total > 0 ? '+' : total < 0 ? '-' : ''}¥${Math.abs(total).toFixed(2)}`;
+        const holdingProfitPercent =
+          total != null && principal > 0
+            ? `${total > 0 ? '+' : total < 0 ? '-' : ''}${Math.abs((total / principal) * 100).toFixed(2)}%`
+            : '';
         const holdingProfitValue = total;
 
         return {
@@ -804,12 +809,14 @@ export default function HomePage() {
           holdingAmount,
           holdingAmountValue,
           todayProfit,
+          todayProfitPercent,
           todayProfitValue,
           holdingProfit,
+          holdingProfitPercent,
           holdingProfitValue,
         };
       }),
-    [displayFunds, holdings, isTradingDay, todayStr, getHoldingProfit, percentModes],
+    [displayFunds, holdings, isTradingDay, todayStr, getHoldingProfit],
   );
 
   // 自动滚动选中 Tab 到可视区域
