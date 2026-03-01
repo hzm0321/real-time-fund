@@ -27,12 +27,12 @@ import MobileSettingModal from './MobileSettingModal';
 import { ExitIcon, SettingsIcon, StarIcon } from './Icons';
 
 const MOBILE_NON_FROZEN_COLUMN_IDS = [
-  'latestNav',
-  'estimateNav',
   'yesterdayChangePercent',
   'estimateChangePercent',
   'todayProfit',
   'holdingProfit',
+  'latestNav',
+  'estimateNav',
 ];
 const MOBILE_COLUMN_HEADERS = {
   latestNav: '最新净值',
@@ -551,6 +551,59 @@ export default function MobileFundTable({
   });
 
   const headerGroup = table.getHeaderGroups()[0];
+
+  const snapPositionsRef = useRef([]);
+  const scrollEndTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!headerGroup?.headers?.length) {
+      snapPositionsRef.current = [];
+      return;
+    }
+    const gap = 12;
+    const widths = headerGroup.headers.map((h) => h.column.columnDef.meta?.width ?? 80);
+    if (widths.length > 0) widths[widths.length - 1] += LAST_COLUMN_EXTRA;
+    const positions = [0];
+    let acc = 0;
+    // 从第二列开始累加，因为第一列是固定的，滚动是为了让后续列贴合到第一列右侧
+    // 累加的是"被滚出去"的非固定列的宽度
+    for (let i = 1; i < widths.length - 1; i++) {
+      acc += widths[i] + gap;
+      positions.push(acc);
+    }
+    snapPositionsRef.current = positions;
+  }, [headerGroup?.headers?.length, columnWidthMap, mobileColumnOrder]);
+
+  useEffect(() => {
+    const el = tableContainerRef.current;
+    if (!el || snapPositionsRef.current.length === 0) return;
+
+    const snapToNearest = () => {
+      const positions = snapPositionsRef.current;
+      if (positions.length === 0) return;
+      const scrollLeft = el.scrollLeft;
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (maxScroll <= 0) return;
+      const nearest = positions.reduce((prev, curr) =>
+        Math.abs(curr - scrollLeft) < Math.abs(prev - scrollLeft) ? curr : prev
+      );
+      const clamped = Math.max(0, Math.min(maxScroll, nearest));
+      if (Math.abs(clamped - scrollLeft) > 2) {
+        el.scrollTo({ left: clamped, behavior: 'smooth' });
+      }
+    };
+
+    const handleScroll = () => {
+      if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+      scrollEndTimerRef.current = setTimeout(snapToNearest, 120);
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+    };
+  }, []);
 
   const mobileGridLayout = (() => {
     if (!headerGroup?.headers?.length) return { gridTemplateColumns: '', minWidth: undefined };

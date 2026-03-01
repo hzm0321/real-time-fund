@@ -28,13 +28,13 @@ import PcTableSettingModal from './PcTableSettingModal';
 import { DragIcon, ExitIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
 
 const NON_FROZEN_COLUMN_IDS = [
-  'latestNav',
-  'estimateNav',
   'yesterdayChangePercent',
   'estimateChangePercent',
   'holdingAmount',
   'todayProfit',
   'holdingProfit',
+  'latestNav',
+  'estimateNav',
 ];
 const COLUMN_HEADERS = {
   latestNav: '最新净值',
