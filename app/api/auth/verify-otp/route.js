@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyOTP, createOrUpdateUser, createSession } from '../../lib/auth';
+import { verifyOTP, createOrUpdateUser, createSession } from '../../../lib/auth';
 
 export async function POST(request) {
   try {

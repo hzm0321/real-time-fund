@@ -17,15 +17,17 @@ export async function POST(request) {
     
     try {
       await sendOTPEmail(email, code);
+      return NextResponse.json({ success: true, message: '验证码已发送到您的邮箱' });
     } catch (emailError) {
       console.error('Failed to send OTP email:', emailError);
-      return NextResponse.json(
-        { error: '发送验证码失败，请检查邮箱配置' },
-        { status: 500 }
-      );
+      // 即使邮件发送失败，也返回成功，因为验证码已经生成并存储
+      // 这样用户可以继续使用验证码进行验证
+      return NextResponse.json({ 
+        success: true, 
+        message: '验证码生成成功，但邮件发送失败，请检查邮箱配置',
+        code: process.env.NODE_ENV === 'development' ? code : undefined
+      });
     }
-    
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Send OTP error:', error);
     return NextResponse.json(

@@ -1,17 +1,31 @@
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.qq.com',
+  host: process.env.SMTP_HOST || 'smtp.163.com',
   port: parseInt(process.env.SMTP_PORT || '465'),
   secure: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 export async function sendOTPEmail(email, code) {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || '基金实时展示';
+  
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error('SMTP 配置未设置');
+  }
+  
+  console.log('SMTP 配置:', {
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS ? '***' : '未设置'
+  });
   
   const mailOptions = {
     from: `"${appName}" <${process.env.SMTP_USER}>`,
@@ -30,10 +44,20 @@ export async function sendOTPEmail(email, code) {
     `,
   };
   
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('邮件发送成功');
+  } catch (error) {
+    console.error('邮件发送失败:', error);
+    throw error;
+  }
 }
 
 export async function sendEmail(to, subject, html) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error('SMTP 配置未设置');
+  }
+  
   const mailOptions = {
     from: `"${process.env.NEXT_PUBLIC_APP_NAME || '基金实时展示'}" <${process.env.SMTP_USER}>`,
     to,
