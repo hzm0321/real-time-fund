@@ -141,78 +141,112 @@ export default function MobileFundTable({
     setActiveId(null);
   };
 
-  const getStoredMobileColumnOrder = () => {
-    if (typeof window === 'undefined') return null;
+  const groupKey = currentTab ?? 'all';
+
+  const getCustomSettingsWithMigration = () => {
+    if (typeof window === 'undefined') return {};
     try {
       const raw = window.localStorage.getItem('customSettings');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const order = parsed?.mobileTableColumnOrder;
-      if (!Array.isArray(order) || order.length === 0) return null;
-      const valid = order.filter((id) => MOBILE_NON_FROZEN_COLUMN_IDS.includes(id));
-      const missing = MOBILE_NON_FROZEN_COLUMN_IDS.filter((id) => !valid.includes(id));
-      return [...valid, ...missing];
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (!parsed || typeof parsed !== 'object') return {};
+      if (parsed.pcTableColumnOrder != null || parsed.pcTableColumnVisibility != null || parsed.pcTableColumns != null || parsed.mobileTableColumnOrder != null || parsed.mobileTableColumnVisibility != null) {
+        const all = {
+          ...(parsed.all && typeof parsed.all === 'object' ? parsed.all : {}),
+          pcTableColumnOrder: parsed.pcTableColumnOrder,
+          pcTableColumnVisibility: parsed.pcTableColumnVisibility,
+          pcTableColumns: parsed.pcTableColumns,
+          mobileTableColumnOrder: parsed.mobileTableColumnOrder,
+          mobileTableColumnVisibility: parsed.mobileTableColumnVisibility,
+        };
+        delete parsed.pcTableColumnOrder;
+        delete parsed.pcTableColumnVisibility;
+        delete parsed.pcTableColumns;
+        delete parsed.mobileTableColumnOrder;
+        delete parsed.mobileTableColumnVisibility;
+        parsed.all = all;
+        window.localStorage.setItem('customSettings', JSON.stringify(parsed));
+      }
+      return parsed;
     } catch {
-      return null;
+      return {};
     }
   };
-  const persistMobileColumnOrder = (nextOrder) => {
+
+  const getInitialMobileConfigByGroup = () => {
+    const parsed = getCustomSettingsWithMigration();
+    const byGroup = {};
+    Object.keys(parsed).forEach((k) => {
+      if (k === 'pcContainerWidth') return;
+      const group = parsed[k];
+      if (!group || typeof group !== 'object') return;
+      const order = Array.isArray(group.mobileTableColumnOrder) && group.mobileTableColumnOrder.length > 0
+        ? group.mobileTableColumnOrder
+        : null;
+      const visibility = group.mobileTableColumnVisibility && typeof group.mobileTableColumnVisibility === 'object'
+        ? group.mobileTableColumnVisibility
+        : null;
+      byGroup[k] = {
+        mobileTableColumnOrder: order ? (() => {
+          const valid = order.filter((id) => MOBILE_NON_FROZEN_COLUMN_IDS.includes(id));
+          const missing = MOBILE_NON_FROZEN_COLUMN_IDS.filter((id) => !valid.includes(id));
+          return [...valid, ...missing];
+        })() : null,
+        mobileTableColumnVisibility: visibility,
+      };
+    });
+    return byGroup;
+  };
+
+  const [configByGroup, setConfigByGroup] = useState(getInitialMobileConfigByGroup);
+
+  const currentGroupMobile = configByGroup[groupKey];
+  const defaultOrder = [...MOBILE_NON_FROZEN_COLUMN_IDS];
+  const defaultVisibility = (() => {
+    const o = {};
+    MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => { o[id] = true; });
+    return o;
+  })();
+
+  const mobileColumnOrder = (() => {
+    const order = currentGroupMobile?.mobileTableColumnOrder ?? defaultOrder;
+    if (!Array.isArray(order) || order.length === 0) return [...MOBILE_NON_FROZEN_COLUMN_IDS];
+    const valid = order.filter((id) => MOBILE_NON_FROZEN_COLUMN_IDS.includes(id));
+    const missing = MOBILE_NON_FROZEN_COLUMN_IDS.filter((id) => !valid.includes(id));
+    return [...valid, ...missing];
+  })();
+  const mobileColumnVisibility = (() => {
+    const vis = currentGroupMobile?.mobileTableColumnVisibility ?? null;
+    if (vis && typeof vis === 'object' && Object.keys(vis).length > 0) return vis;
+    return defaultVisibility;
+  })();
+
+  const persistMobileGroupConfig = (updates) => {
     if (typeof window === 'undefined') return;
     try {
       const raw = window.localStorage.getItem('customSettings');
       const parsed = raw ? JSON.parse(raw) : {};
-      const nextSettings =
-        parsed && typeof parsed === 'object'
-          ? { ...parsed, mobileTableColumnOrder: nextOrder }
-          : { mobileTableColumnOrder: nextOrder };
-      window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
-      onCustomSettingsChange?.();
-    } catch {}
-  };
-  const getStoredMobileColumnVisibility = () => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = window.localStorage.getItem('customSettings');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const visibility = parsed?.mobileTableColumnVisibility;
-      if (!visibility || typeof visibility !== 'object') return null;
-      const normalized = {};
-      MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => {
-        const value = visibility[id];
-        if (typeof value === 'boolean') normalized[id] = value;
-      });
-      return Object.keys(normalized).length ? normalized : null;
-    } catch {
-      return null;
-    }
-  };
-  const persistMobileColumnVisibility = (nextVisibility) => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem('customSettings');
-      const parsed = raw ? JSON.parse(raw) : {};
-      const nextSettings =
-        parsed && typeof parsed === 'object'
-          ? { ...parsed, mobileTableColumnVisibility: nextVisibility }
-          : { mobileTableColumnVisibility: nextVisibility };
-      window.localStorage.setItem('customSettings', JSON.stringify(nextSettings));
+      const group = parsed[groupKey] && typeof parsed[groupKey] === 'object' ? { ...parsed[groupKey] } : {};
+      if (updates.mobileTableColumnOrder !== undefined) group.mobileTableColumnOrder = updates.mobileTableColumnOrder;
+      if (updates.mobileTableColumnVisibility !== undefined) group.mobileTableColumnVisibility = updates.mobileTableColumnVisibility;
+      parsed[groupKey] = group;
+      window.localStorage.setItem('customSettings', JSON.stringify(parsed));
+      setConfigByGroup((prev) => ({ ...prev, [groupKey]: { ...prev[groupKey], ...updates } }));
       onCustomSettingsChange?.();
     } catch {}
   };
 
-  const [mobileColumnOrder, setMobileColumnOrder] = useState(
-    () => getStoredMobileColumnOrder() ?? [...MOBILE_NON_FROZEN_COLUMN_IDS]
-  );
-  const [mobileColumnVisibility, setMobileColumnVisibility] = useState(() => {
-    const stored = getStoredMobileColumnVisibility();
-    if (stored) return stored;
-    const allVisible = {};
-    MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => {
-      allVisible[id] = true;
-    });
-    return allVisible;
-  });
+  const setMobileColumnOrder = (nextOrderOrUpdater) => {
+    const next = typeof nextOrderOrUpdater === 'function'
+      ? nextOrderOrUpdater(mobileColumnOrder)
+      : nextOrderOrUpdater;
+    persistMobileGroupConfig({ mobileTableColumnOrder: next });
+  };
+  const setMobileColumnVisibility = (nextOrUpdater) => {
+    const next = typeof nextOrUpdater === 'function'
+      ? nextOrUpdater(mobileColumnVisibility)
+      : nextOrUpdater;
+    persistMobileGroupConfig({ mobileTableColumnVisibility: next });
+  };
   const [settingModalOpen, setSettingModalOpen] = useState(false);
   const tableContainerRef = useRef(null);
   const [tableContainerWidth, setTableContainerWidth] = useState(0);
@@ -258,9 +292,7 @@ export default function MobileFundTable({
   }, [tableContainerWidth, mobileColumnOrder, mobileColumnVisibility]);
 
   const handleResetMobileColumnOrder = () => {
-    const defaultOrder = [...MOBILE_NON_FROZEN_COLUMN_IDS];
-    setMobileColumnOrder(defaultOrder);
-    persistMobileColumnOrder(defaultOrder);
+    setMobileColumnOrder([...MOBILE_NON_FROZEN_COLUMN_IDS]);
   };
   const handleResetMobileColumnVisibility = () => {
     const allVisible = {};
@@ -268,14 +300,9 @@ export default function MobileFundTable({
       allVisible[id] = true;
     });
     setMobileColumnVisibility(allVisible);
-    persistMobileColumnVisibility(allVisible);
   };
   const handleToggleMobileColumnVisibility = (columnId, visible) => {
-    setMobileColumnVisibility((prev = {}) => {
-      const next = { ...prev, [columnId]: visible };
-      persistMobileColumnVisibility(next);
-      return next;
-    });
+    setMobileColumnVisibility((prev = {}) => ({ ...prev, [columnId]: visible }));
   };
 
   // 移动端名称列：无拖拽把手，长按整行触发排序
@@ -298,6 +325,7 @@ export default function MobileFundTable({
               onRemoveFromGroupRef.current?.(original);
             }}
             title="从当前分组移除"
+            style={{ backgroundColor: 'transparent'}}
           >
             <ExitIcon width="18" height="18" style={{ transform: 'rotate(180deg)' }} />
           </button>
@@ -309,6 +337,7 @@ export default function MobileFundTable({
               onToggleFavoriteRef.current?.(original);
             }}
             title={isFavorites ? '取消自选' : '添加自选'}
+            style={{ backgroundColor: 'transparent'}}
           >
             <StarIcon width="18" height="18" filled={isFavorites} />
           </button>
@@ -538,7 +567,6 @@ export default function MobileFundTable({
       const newNonFrozen = next.filter((id) => id !== 'fundName');
       if (newNonFrozen.length) {
         setMobileColumnOrder(newNonFrozen);
-        persistMobileColumnOrder(newNonFrozen);
       }
     },
     onColumnVisibilityChange: (updater) => {
@@ -546,7 +574,6 @@ export default function MobileFundTable({
       const rest = { ...next };
       delete rest.fundName;
       setMobileColumnVisibility(rest);
-      persistMobileColumnVisibility(rest);
     },
     initialState: {
       columnPinning: {
@@ -738,7 +765,6 @@ export default function MobileFundTable({
         columnVisibility={mobileColumnVisibility}
         onColumnReorder={(newOrder) => {
           setMobileColumnOrder(newOrder);
-          persistMobileColumnOrder(newOrder);
         }}
         onToggleColumnVisibility={handleToggleMobileColumnVisibility}
         onResetColumnOrder={handleResetMobileColumnOrder}

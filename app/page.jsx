@@ -1751,14 +1751,43 @@ export default function HomePage() {
     setGroups(next);
     storageHelper.setItem('groups', JSON.stringify(next));
     if (currentTab === id) setCurrentTab('all');
+    try {
+      const raw = window.localStorage.getItem('customSettings');
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === 'object' && parsed[id] !== undefined) {
+        delete parsed[id];
+        window.localStorage.setItem('customSettings', JSON.stringify(parsed));
+        triggerCustomSettingsSync();
+      }
+    } catch { }
   };
 
   const handleUpdateGroups = (newGroups) => {
+    const removedIds = groups.filter((g) => !newGroups.find((ng) => ng.id === g.id)).map((g) => g.id);
     setGroups(newGroups);
     storageHelper.setItem('groups', JSON.stringify(newGroups));
     // 如果当前选中的分组被删除了，切换回“全部”
     if (currentTab !== 'all' && currentTab !== 'fav' && !newGroups.find(g => g.id === currentTab)) {
       setCurrentTab('all');
+    }
+    if (removedIds.length > 0) {
+      try {
+        const raw = window.localStorage.getItem('customSettings');
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (parsed && typeof parsed === 'object') {
+          let changed = false;
+          removedIds.forEach((groupId) => {
+            if (parsed[groupId] !== undefined) {
+              delete parsed[groupId];
+              changed = true;
+            }
+          });
+          if (changed) {
+            window.localStorage.setItem('customSettings', JSON.stringify(parsed));
+            triggerCustomSettingsSync();
+          }
+        }
+      } catch { }
     }
   };
 
@@ -3906,7 +3935,7 @@ export default function HomePage() {
                   style={{
                     width: '100%',
                     height: '48px',
-                    border: '2px dashed rgba(255,255,255,0.1)',
+                    border: '2px dashed var(--border)',
                     background: 'transparent',
                     borderRadius: '12px',
                     color: 'var(--muted)',
@@ -3926,7 +3955,7 @@ export default function HomePage() {
                     e.currentTarget.style.background = 'rgba(34, 211, 238, 0.05)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                    e.currentTarget.style.borderColor = 'var(--border)';
                     e.currentTarget.style.color = 'var(--muted)';
                     e.currentTarget.style.background = 'transparent';
                   }}

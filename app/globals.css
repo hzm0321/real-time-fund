@@ -1900,7 +1900,7 @@ input[type="number"] {
 
 .mobile-setting-drawer {
   width: 100%;
-  max-height: 75vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   border-radius: 20px 20px 0 0;
