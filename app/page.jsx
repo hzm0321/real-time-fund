@@ -43,6 +43,7 @@ import DcaModal from "./components/DcaModal";
 import githubImg from "./assets/github.svg";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { recordValuation, getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
+import { loadHolidaysForYears, isTradingDay as isDateTradingDay } from './lib/tradingCalendar';
 import { fetchFundData, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds, extractFundNamesWithLLM } from './api/fund';
 import packageJson from '../package.json';
 import PcFundTable from './components/PcFundTable';
@@ -1635,7 +1636,7 @@ export default function HomePage() {
     });
   };
 
-  const scheduleDcaTrades = useCallback(() => {
+  const scheduleDcaTrades = useCallback(async () => {
     if (!isTradingDay) return;
     if (!isPlainObject(dcaPlans)) return;
     const codesSet = new Set(funds.map((f) => f.code));
@@ -1644,6 +1645,14 @@ export default function HomePage() {
     const today = toTz(todayStr).startOf('day');
     const nextPlans = { ...dcaPlans };
     const newPending = [];
+
+    // 预加载回溯区间内所有年份的节假日数据
+    const years = new Set([today.year()]);
+    Object.values(dcaPlans).forEach((plan) => {
+      if (plan?.firstDate) years.add(toTz(plan.firstDate).year());
+      if (plan?.lastDate) years.add(toTz(plan.lastDate).year());
+    });
+    await loadHolidaysForYears([...years]);
 
     Object.entries(dcaPlans).forEach(([code, plan]) => {
       if (!plan || !plan.enabled) return;
@@ -1680,12 +1689,10 @@ export default function HomePage() {
         if (current.isAfter(today, 'day')) break;
         if (current.isBefore(first, 'day')) continue;
 
+        // 回溯补单：严格判断该日是否为 A股交易日（排除周末、法定节假日）
+        if (!isDateTradingDay(current)) continue;
+
         const dateStr = current.format('YYYY-MM-DD');
-        // 每日定投：跳过周末（周六、周日），只生成交易日
-        if (cycle === 'daily') {
-          const dayOfWeek = current.day(); // 0=周日, 6=周六
-          if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-        }
 
         const pending = {
           id: `dca_${code}_${dateStr}_${Date.now()}`,
@@ -1736,7 +1743,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!isTradingDay) return;
-    scheduleDcaTrades();
+    scheduleDcaTrades().catch((e) => {
+      console.error('[scheduleDcaTrades]', e);
+    });
   }, [isTradingDay, scheduleDcaTrades]);
 
   const handleAddGroup = (name) => {

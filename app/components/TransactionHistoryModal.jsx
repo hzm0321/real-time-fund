@@ -78,7 +78,7 @@ export default function TransactionHistoryModal({
             onClick={onAddHistory}
             style={{ fontSize: '12px', padding: '4px 12px', height: 'auto' }}
           >
-            ➕ 添加记录
+            添加记录
           </button>
         </div>
 
