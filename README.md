@@ -72,7 +72,7 @@
 
 3. 修改接收到的邮件为验证码  
 
-    在 Supabase控制台 → Authentication → Email → Confirm sign up，选择 `{{.token}}`。  
+    在 Supabase控制台 → Authentication → Email Templates 中，选择 **Magic Link** 模板进行编辑，在邮件正文中使用变量 `{{ .Token }}` 展示验证码。  
 
 4. 修改验证码位数  
 
