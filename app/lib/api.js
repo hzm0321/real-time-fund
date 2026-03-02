@@ -5,6 +5,7 @@ export const isApiConfigured = true;
 let lastUpdatedAt = null;
 let pollingInterval = null;
 const listeners = new Map();
+const authListeners = new Set();
 
 function startPolling() {
   if (pollingInterval) return;
@@ -57,12 +58,17 @@ export const api = {
       
       checkSession();
       
+      authListeners.add(callback);
+      
       const interval = setInterval(checkSession, 60000);
       
       return {
         data: {
           subscription: {
-            unsubscribe: () => clearInterval(interval)
+            unsubscribe: () => {
+              clearInterval(interval);
+              authListeners.delete(callback);
+            }
           }
         }
       };
@@ -100,7 +106,11 @@ export const api = {
           return { data: null, error: { message: data.error || '验证失败' } };
         }
         
-        return { data: { user: data.user, session: { user: data.user } }, error: null };
+        const session = { user: data.user };
+        
+        authListeners.forEach(callback => callback('SIGNED_IN', session));
+        
+        return { data: { user: data.user, session }, error: null };
       } catch (error) {
         return { data: null, error: { message: '网络错误' } };
       }
@@ -113,6 +123,9 @@ export const api = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scope: scope || 'local' })
         });
+        
+        authListeners.forEach(callback => callback('SIGNED_OUT', null));
+        
         return { error: null };
       } catch (error) {
         return { error };

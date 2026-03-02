@@ -101,8 +101,8 @@ export async function createOrUpdateUser(email) {
   }
   
   const insertResult = await query(
-    'INSERT INTO users (email, email_verified) VALUES (?, TRUE)',
-    [email]
+    'INSERT INTO users (id, email, email_verified) VALUES (?, ?, TRUE)',
+    [crypto.randomUUID(), email]
   );
   
   return insertResult.insertId;
