@@ -1636,6 +1636,7 @@ export default function HomePage() {
   };
 
   const scheduleDcaTrades = useCallback(() => {
+    if (!isTradingDay) return;
     if (!isPlainObject(dcaPlans)) return;
     const codesSet = new Set(funds.map((f) => f.code));
     if (codesSet.size === 0) return;
@@ -1680,6 +1681,11 @@ export default function HomePage() {
         if (current.isBefore(first, 'day')) continue;
 
         const dateStr = current.format('YYYY-MM-DD');
+        // 每日定投：跳过周末（周六、周日），只生成交易日
+        if (cycle === 'daily') {
+          const dayOfWeek = current.day(); // 0=周日, 6=周六
+          if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+        }
 
         const pending = {
           id: `dca_${code}_${dateStr}_${Date.now()}`,
@@ -1726,7 +1732,7 @@ export default function HomePage() {
     });
 
     showToast(`已生成 ${newPending.length} 笔定投买入`, 'success');
-  }, [dcaPlans, funds, todayStr, storageHelper]);
+  }, [isTradingDay, dcaPlans, funds, todayStr, storageHelper]);
 
   useEffect(() => {
     if (!isTradingDay) return;
