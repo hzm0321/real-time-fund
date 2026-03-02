@@ -126,6 +126,55 @@ const parseLatestNetValueFromLsjzContent = (content) => {
   return null;
 };
 
+const extractHoldingsReportDate = (html) => {
+  if (!html) return null;
+
+  // 优先匹配带有“报告期 / 截止日期”等关键字附近的日期
+  const m1 = html.match(/(报告期|截止日期)[^0-9]{0,20}(\d{4}-\d{2}-\d{2})/);
+  if (m1) return m1[2];
+
+  // 兜底：取文中出现的第一个 yyyy-MM-dd 格式日期
+  const m2 = html.match(/(\d{4}-\d{2}-\d{2})/);
+  return m2 ? m2[1] : null;
+};
+
+const isLastQuarterReport = (reportDateStr) => {
+  if (!reportDateStr) return false;
+
+  const report = dayjs(reportDateStr, 'YYYY-MM-DD');
+  if (!report.isValid()) return false;
+
+  const now = nowInTz();
+  const m = now.month(); // 0-11
+  const q = Math.floor(m / 3); // 当前季度 0-3 => Q1-Q4
+
+  let lastQ;
+  let year;
+  if (q === 0) {
+    // 当前为 Q1，则上一季度是上一年的 Q4
+    lastQ = 3;
+    year = now.year() - 1;
+  } else {
+    lastQ = q - 1;
+    year = now.year();
+  }
+
+  const quarterEnds = [
+    { month: 2, day: 31 }, // Q1 -> 03-31
+    { month: 5, day: 30 }, // Q2 -> 06-30
+    { month: 8, day: 30 }, // Q3 -> 09-30
+    { month: 11, day: 31 } // Q4 -> 12-31
+  ];
+
+  const { month: endMonth, day: endDay } = quarterEnds[lastQ];
+  const lastQuarterEnd = dayjs(
+    `${year}-${String(endMonth + 1).padStart(2, '0')}-${endDay}`,
+    'YYYY-MM-DD'
+  );
+
+  return report.isSame(lastQuarterEnd, 'day');
+};
+
 export const fetchSmartFundNetValue = async (code, startDate) => {
   const today = nowInTz().startOf('day');
   let current = toTz(startDate).startOf('day');
@@ -199,7 +248,9 @@ export const fetchFundDataFallback = async (c) => {
           gszzl: null,
           zzl: Number.isFinite(latest.growth) ? latest.growth : null,
           noValuation: true,
-          holdings: []
+          holdings: [],
+          holdingsReportDate: null,
+          holdingsIsLastQuarter: false
         });
       } else {
         reject(new Error('未能获取到基金数据'));
@@ -258,6 +309,15 @@ export const fetchFundData = async (c) => {
         loadScript(holdingsUrl).then(async (apidata) => {
           let holdings = [];
           const html = apidata?.content || '';
+          const holdingsReportDate = extractHoldingsReportDate(html);
+          const holdingsIsLastQuarter = isLastQuarterReport(holdingsReportDate);
+
+          // 如果不是上一季度末的披露数据，则不展示重仓（并避免继续解析/请求行情）
+          if (!holdingsIsLastQuarter) {
+            resolveH({ holdings: [], holdingsReportDate, holdingsIsLastQuarter: false });
+            return;
+          }
+
           const headerRow = (html.match(/<thead[\s\S]*?<tr[\s\S]*?<\/tr>[\s\S]*?<\/thead>/i) || [])[0] || '';
           const headerCells = (headerRow.match(/<th[\s\S]*?>([\s\S]*?)<\/th>/gi) || []).map(th => th.replace(/<[^>]*>/g, '').trim());
           let idxCode = -1, idxName = -1, idxWeight = -1;
@@ -354,10 +414,15 @@ export const fetchFundData = async (c) => {
             } catch (e) {
             }
           }
-          resolveH(holdings);
-        }).catch(() => resolveH([]));
+          resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter });
+        }).catch(() => resolveH({ holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false }));
       });
-      Promise.all([lsjzPromise, holdingsPromise]).then(([tData, holdings]) => {
+      Promise.all([lsjzPromise, holdingsPromise]).then(([tData, holdingsResult]) => {
+        const {
+          holdings,
+          holdingsReportDate,
+          holdingsIsLastQuarter
+        } = holdingsResult || {};
         if (tData) {
           if (tData.jzrq && (!gzData.jzrq || tData.jzrq >= gzData.jzrq)) {
             gzData.dwjz = tData.dwjz;
@@ -365,7 +430,12 @@ export const fetchFundData = async (c) => {
             gzData.zzl = tData.zzl;
           }
         }
-        resolve({ ...gzData, holdings });
+        resolve({
+          ...gzData,
+          holdings,
+          holdingsReportDate,
+          holdingsIsLastQuarter
+        });
       });
     };
     scriptGz.onerror = () => {

@@ -4162,7 +4162,8 @@ export default function HomePage() {
 
                                         if (shouldHideChange) return null;
 
-                                        const changeLabel = hasTodayData ? '涨跌幅' : (isYesterdayChange ? '昨日涨跌幅' : (isPreviousTradingDay ? '上一交易日涨跌幅' : '涨跌幅'));
+                                        // 不再区分“上一交易日涨跌幅”名称，统一使用“昨日涨跌幅”
+                                        const changeLabel = hasTodayData ? '涨跌幅' : '昨日涨跌幅';
                                         return (
                                           <Stat
                                             label={changeLabel}
@@ -4274,58 +4275,58 @@ export default function HomePage() {
                                     />
                                   );
                                 })()}
-                                <div
-                                  style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-                                  className="title"
-                                  onClick={() => toggleCollapse(f.code)}
-                                >
-                                  <div className="row" style={{ width: '100%', flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <span>前10重仓股票</span>
-                                      <ChevronIcon
-                                        width="16"
-                                        height="16"
-                                        className="muted"
-                                        style={{
-                                          transform: collapsedCodes.has(f.code) ? 'rotate(-90deg)' : 'rotate(0deg)',
-                                          transition: 'transform 0.2s ease'
-                                        }}
-                                      />
-                                    </div>
-                                    <span className="muted">涨跌幅 / 占比</span>
-                                  </div>
-                                </div>
-                                <AnimatePresence>
-                                  {!collapsedCodes.has(f.code) && (
-                                    <motion.div
-                                      initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: 'auto', opacity: 1 }}
-                                      exit={{ height: 0, opacity: 0 }}
-                                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                      style={{ overflow: 'hidden' }}
+                                {f.holdingsIsLastQuarter && Array.isArray(f.holdings) && f.holdings.length > 0 && (
+                                  <>
+                                    <div
+                                      style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
+                                      className="title"
+                                      onClick={() => toggleCollapse(f.code)}
                                     >
-                                      {Array.isArray(f.holdings) && f.holdings.length ? (
-                                        <div className="list">
-                                          {f.holdings.map((h, idx) => (
-                                            <div className="item" key={idx}>
-                                              <span className="name">{h.name}</span>
-                                              <div className="values">
-                                                {isNumber(h.change) && (
-                                                  <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
-                                                    {h.change > 0 ? '+' : ''}{h.change.toFixed(2)}%
-                                                  </span>
-                                                )}
-                                                <span className="weight">{h.weight}</span>
-                                              </div>
-                                            </div>
-                                          ))}
+                                      <div className="row" style={{ width: '100%', flex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                          <span>前10重仓股票</span>
+                                          <ChevronIcon
+                                            width="16"
+                                            height="16"
+                                            className="muted"
+                                            style={{
+                                              transform: collapsedCodes.has(f.code) ? 'rotate(-90deg)' : 'rotate(0deg)',
+                                              transition: 'transform 0.2s ease'
+                                            }}
+                                          />
                                         </div>
-                                      ) : (
-                                        <div className="muted" style={{ padding: '8px 0' }}>暂无重仓数据</div>
+                                        <span className="muted">涨跌幅 / 占比</span>
+                                      </div>
+                                    </div>
+                                    <AnimatePresence>
+                                      {!collapsedCodes.has(f.code) && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: 'auto', opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                          style={{ overflow: 'hidden' }}
+                                        >
+                                          <div className="list">
+                                            {f.holdings.map((h, idx) => (
+                                              <div className="item" key={idx}>
+                                                <span className="name">{h.name}</span>
+                                                <div className="values">
+                                                  {isNumber(h.change) && (
+                                                    <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
+                                                      {h.change > 0 ? '+' : ''}{h.change.toFixed(2)}%
+                                                    </span>
+                                                  )}
+                                                  <span className="weight">{h.weight}</span>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </motion.div>
                                       )}
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
+                                    </AnimatePresence>
+                                  </>
+                                )}
                                 <FundTrendChart
                                   key={`${f.code}-${theme}`}
                                   code={f.code}
