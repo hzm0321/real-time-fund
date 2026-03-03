@@ -306,7 +306,12 @@ export const fetchFundData = async (c) => {
       });
       const holdingsPromise = new Promise((resolveH) => {
         const holdingsUrl = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${c}&topline=10&year=&month=&_=${Date.now()}`;
-        loadScript(holdingsUrl).then(async (apidata) => {
+        const holdingsCacheKey = `fund_holdings_archives_${c}`;
+        cachedRequest(
+          () => loadScript(holdingsUrl),
+          holdingsCacheKey,
+          { cacheTime: 60 * 60 * 1000 }
+        ).then(async (apidata) => {
           let holdings = [];
           const html = apidata?.content || '';
           const holdingsReportDate = extractHoldingsReportDate(html);
@@ -529,6 +534,141 @@ export const submitFeedback = async (formData) => {
   return response.json();
 };
 
+const PINGZHONGDATA_GLOBAL_KEYS = [
+  'ishb',
+  'fS_name',
+  'fS_code',
+  'fund_sourceRate',
+  'fund_Rate',
+  'fund_minsg',
+  'stockCodes',
+  'zqCodes',
+  'stockCodesNew',
+  'zqCodesNew',
+  'syl_1n',
+  'syl_6y',
+  'syl_3y',
+  'syl_1y',
+  'Data_fundSharesPositions',
+  'Data_netWorthTrend',
+  'Data_ACWorthTrend',
+  'Data_grandTotal',
+  'Data_rateInSimilarType',
+  'Data_rateInSimilarPersent',
+  'Data_fluctuationScale',
+  'Data_holderStructure',
+  'Data_assetAllocation',
+  'Data_performanceEvaluation',
+  'Data_currentFundManager',
+  'Data_buySedemption',
+  'swithSameType',
+];
+
+let pingzhongdataQueue = Promise.resolve();
+
+const enqueuePingzhongdataLoad = (fn) => {
+  const p = pingzhongdataQueue.then(fn, fn);
+  // 避免队列被 reject 永久阻塞
+  pingzhongdataQueue = p.catch(() => undefined);
+  return p;
+};
+
+const snapshotPingzhongdataGlobals = (fundCode) => {
+  const out = {};
+  for (const k of PINGZHONGDATA_GLOBAL_KEYS) {
+    if (typeof window?.[k] === 'undefined') continue;
+    try {
+      out[k] = JSON.parse(JSON.stringify(window[k]));
+    } catch (e) {
+      out[k] = window[k];
+    }
+  }
+
+  return {
+    fundCode: out.fS_code || fundCode,
+    fundName: out.fS_name || '',
+    ...out,
+  };
+};
+
+const jsonpLoadPingzhongdata = (fundCode, timeoutMs = 10000) => {
+  return new Promise((resolve, reject) => {
+    if (typeof document === 'undefined' || !document.body) {
+      reject(new Error('无浏览器环境'));
+      return;
+    }
+
+    const url = `https://fund.eastmoney.com/pingzhongdata/${fundCode}.js?v=${Date.now()}`;
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+
+    let done = false;
+    let timer = null;
+
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      script.onload = null;
+      script.onerror = null;
+      if (document.body.contains(script)) document.body.removeChild(script);
+    };
+
+    timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('pingzhongdata 请求超时'));
+    }, timeoutMs);
+
+    script.onload = () => {
+      if (done) return;
+      done = true;
+      const data = snapshotPingzhongdataGlobals(fundCode);
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error('pingzhongdata 加载失败'));
+    };
+
+    document.body.appendChild(script);
+  });
+};
+
+const fetchAndParsePingzhongdata = async (fundCode) => {
+  // 使用 JSONP(script 注入) 方式获取并解析 pingzhongdata
+  return enqueuePingzhongdataLoad(() => jsonpLoadPingzhongdata(fundCode));
+};
+
+/**
+ * 获取并解析「基金走势图/资产等」数据（pingzhongdata）
+ * 来源：https://fund.eastmoney.com/pingzhongdata/${fundCode}.js
+ */
+export const fetchFundPingzhongdata = async (fundCode, { cacheTime = 60 * 60 * 1000 } = {}) => {
+  if (!fundCode) throw new Error('fundCode 不能为空');
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new Error('无浏览器环境');
+  }
+
+  const cacheKey = `pingzhongdata_${fundCode}`;
+
+  try {
+    return await cachedRequest(
+      () => fetchAndParsePingzhongdata(fundCode),
+      cacheKey,
+      { cacheTime }
+    );
+  } catch (e) {
+    clearCachedRequest(cacheKey);
+    throw e;
+  }
+};
+
 // 使用智谱 GLM 从 OCR 文本中抽取基金名称
 export const extractFundNamesWithLLM = async (ocrText) => {
   const apiKey = '8df8ccf74a174722847c83b7e222f2af.4A39rJvUeBVDmef1';
@@ -595,8 +735,6 @@ export const extractFundNamesWithLLM = async (ocrText) => {
   }
 };
 
-let historyQueue = Promise.resolve();
-
 export const fetchFundHistory = async (code, range = '1m') => {
   if (typeof window === 'undefined') return [];
 
@@ -609,73 +747,32 @@ export const fetchFundHistory = async (code, range = '1m') => {
     case '6m': start = start.subtract(6, 'month'); break;
     case '1y': start = start.subtract(1, 'year'); break;
     case '3y': start = start.subtract(3, 'year'); break;
+    case 'all': start = dayjs(0).tz(TZ); break;
     default: start = start.subtract(1, 'month');
   }
 
-  const sdate = start.format('YYYY-MM-DD');
-  const edate = end.format('YYYY-MM-DD');
-  const per = 49;
+  // 业绩走势统一走 pingzhongdata.Data_netWorthTrend
+  try {
+    const pz = await fetchFundPingzhongdata(code);
+    const trend = pz?.Data_netWorthTrend;
+    if (Array.isArray(trend) && trend.length) {
+      const startMs = start.startOf('day').valueOf();
+      // end 可能是当日任意时刻，这里用 end-of-day 包含最后一天
+      const endMs = end.endOf('day').valueOf();
+      const out = trend
+        .filter((d) => d && typeof d.x === 'number' && d.x >= startMs && d.x <= endMs)
+        .map((d) => {
+          const value = Number(d.y);
+          if (!Number.isFinite(value)) return null;
+          const date = dayjs(d.x).tz(TZ).format('YYYY-MM-DD');
+          return { date, value };
+        })
+        .filter(Boolean);
 
-  return new Promise((resolve) => {
-    historyQueue = historyQueue.then(async () => {
-      let allData = [];
-      let page = 1;
-      let totalPages = 1;
-
-      try {
-        const parseContent = (content) => {
-            if (!content) return [];
-            const rows = content.split('<tr>');
-            const data = [];
-            for (const row of rows) {
-                const cells = row.match(/<td[^>]*>(.*?)<\/td>/g);
-                if (cells && cells.length >= 2) {
-                    const dateStr = cells[0].replace(/<[^>]+>/g, '').trim();
-                    const valStr = cells[1].replace(/<[^>]+>/g, '').trim();
-                    const val = parseFloat(valStr);
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr) && !isNaN(val)) {
-                        data.push({ date: dateStr, value: val });
-                    }
-                }
-            }
-            return data;
-        };
-
-        // Fetch first page to get metadata
-        const firstUrl = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${code}&page=${page}&per=${per}&sdate=${sdate}&edate=${edate}`;
-        const firstApidata = await loadScript(firstUrl);
-
-        if (!firstApidata || !firstApidata.content || firstApidata.content.includes('暂无数据')) {
-          resolve([]);
-          return;
-        }
-
-        // Parse total pages
-        if (firstApidata.pages) {
-            totalPages = parseInt(firstApidata.pages, 10) || 1;
-        }
-
-        allData = allData.concat(parseContent(firstApidata.content));
-
-        // Fetch remaining pages
-        for (page = 2; page <= totalPages; page++) {
-             const nextUrl = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${code}&page=${page}&per=${per}&sdate=${sdate}&edate=${edate}`;
-             const nextApidata = await loadScript(nextUrl);
-             if (nextApidata && nextApidata.content) {
-                 allData = allData.concat(parseContent(nextApidata.content));
-             }
-        }
-
-        // The data comes in reverse chronological order (newest first), so we need to reverse it for the chart (oldest first)
-        resolve(allData.reverse());
-
-      } catch (e) {
-        console.error('Fetch history error:', e);
-        resolve([]);
-      }
-    }).catch((e) => {
-       console.error('Queue error:', e);
-       resolve([]);
-    });
-  });
+      if (out.length) return out;
+    }
+  } catch (e) {
+    return [];
+  }
+  return [];
 };
