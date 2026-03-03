@@ -21,12 +21,42 @@ export async function GET(request) {
     let results;
     if (since) {
       results = await query(
-        'SELECT data, updated_at FROM user_configs WHERE user_id = ? AND updated_at > ?',
+        `SELECT 
+          funds, 
+          \`groups\`, 
+          dca_plans, 
+          holdings, 
+          view_mode, 
+          favorites, 
+          refresh_ms, 
+          transactions, 
+          pending_trades, 
+          collapsed_codes, 
+          custom_settings, 
+          collapsed_trends, 
+          updated_at 
+        FROM fund_configs 
+        WHERE user_id = ? AND updated_at > ?`,
         [session.userId, since]
       );
     } else {
       results = await query(
-        'SELECT data, updated_at FROM user_configs WHERE user_id = ?',
+        `SELECT 
+          funds, 
+          \`groups\`, 
+          dca_plans, 
+          holdings, 
+          view_mode, 
+          favorites, 
+          refresh_ms, 
+          transactions, 
+          pending_trades, 
+          collapsed_codes, 
+          custom_settings, 
+          collapsed_trends, 
+          updated_at 
+        FROM fund_configs 
+        WHERE user_id = ?`,
         [session.userId]
       );
     }
@@ -34,10 +64,26 @@ export async function GET(request) {
     if (results.length === 0) {
       return NextResponse.json({ data: null, updatedAt: null });
     }
+
+    const row = results[0];
+    const configData = {
+      funds: row.funds || [],
+      groups: row.groups || [],
+      dcaPlans: row.dca_plans || {},
+      holdings: row.holdings || {},
+      viewMode: row.view_mode || 'card',
+      favorites: row.favorites || [],
+      refreshMs: row.refresh_ms || 30000,
+      transactions: row.transactions || {},
+      pendingTrades: row.pending_trades || [],
+      collapsedCodes: row.collapsed_codes || [],
+      customSettings: row.custom_settings || {},
+      collapsedTrends: row.collapsed_trends || []
+    };
     
     return NextResponse.json({ 
-      data: results[0].data,
-      updatedAt: results[0].updated_at
+      data: configData,
+      updatedAt: row.updated_at
     });
   } catch (error) {
     console.error('Sync error:', error);

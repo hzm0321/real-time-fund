@@ -5,7 +5,6 @@ export const isApiConfigured = true;
 let lastUpdatedAt = null;
 let pollingInterval = null;
 const listeners = new Map();
-const authListeners = new Set();
 
 function startPolling() {
   if (pollingInterval) return;
@@ -58,17 +57,12 @@ export const api = {
       
       checkSession();
       
-      authListeners.add(callback);
-      
       const interval = setInterval(checkSession, 60000);
       
       return {
         data: {
           subscription: {
-            unsubscribe: () => {
-              clearInterval(interval);
-              authListeners.delete(callback);
-            }
+            unsubscribe: () => clearInterval(interval)
           }
         }
       };
@@ -106,11 +100,7 @@ export const api = {
           return { data: null, error: { message: data.error || '验证失败' } };
         }
         
-        const session = { user: data.user };
-        
-        authListeners.forEach(callback => callback('SIGNED_IN', session));
-        
-        return { data: { user: data.user, session }, error: null };
+        return { data: { user: data.user, session: { user: data.user } }, error: null };
       } catch (error) {
         return { data: null, error: { message: '网络错误' } };
       }
@@ -123,9 +113,6 @@ export const api = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scope: scope || 'local' })
         });
-        
-        authListeners.forEach(callback => callback('SIGNED_OUT', null));
-        
         return { error: null };
       } catch (error) {
         return { error };
@@ -143,7 +130,7 @@ export const api = {
         eq: () => ({
           maybeSingle: async () => {
             try {
-              const res = await fetch(`${API_BASE}/config`);
+              const res = await fetch(`${API_BASE}/fund/configs`);
               const data = await res.json();
               
               if (!res.ok) {
@@ -163,10 +150,10 @@ export const api = {
       }),
       insert: async (payload) => {
         try {
-          const res = await fetch(`${API_BASE}/config`, {
+          const res = await fetch(`${API_BASE}/fund/configs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: payload.data })
+            body: JSON.stringify(payload.data)
           });
           const data = await res.json();
           
@@ -182,10 +169,10 @@ export const api = {
       upsert: (payload) => ({
         select: async () => {
           try {
-            const res = await fetch(`${API_BASE}/config`, {
+            const res = await fetch(`${API_BASE}/fund/configs`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data: payload.data })
+              body: JSON.stringify(payload.data)
             });
             const data = await res.json();
             
@@ -229,10 +216,10 @@ export const api = {
   rpc: async (name, params) => {
     if (name === 'update_user_config_partial') {
       try {
-        const res = await fetch(`${API_BASE}/config`, {
+        const res = await fetch(`${API_BASE}/fund/update`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: params.payload })
+          body: JSON.stringify(params.payload)
         });
         const data = await res.json();
         
