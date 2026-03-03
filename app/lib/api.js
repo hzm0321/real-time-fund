@@ -131,9 +131,7 @@ export const api = {
           maybeSingle: async () => {
             try {
               const res = await fetch(`${API_BASE}/fund/configs`);
-              console.log("🚀 ~ res:", res)
               const data = await res.json();
-              console.log("🚀 ~ data:", data)
               
               if (!res.ok) {
                 return { data: null, error: { message: data.error || '获取配置失败' } };
@@ -192,13 +190,13 @@ export const api = {
   },
   
   channel: (name) => {
-    return {
+    const channelObj = {
       on: (event, callback) => {
         if (!listeners.has(event)) {
           listeners.set(event, []);
         }
         listeners.get(event).push(callback);
-        return { on: () => {} };
+        return channelObj;
       },
       subscribe: (callback) => {
         if (callback) {
@@ -208,6 +206,7 @@ export const api = {
         return { subscribe: () => {} };
       }
     };
+    return channelObj;
   },
   
   removeChannel: () => {
