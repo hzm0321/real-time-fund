@@ -480,13 +480,14 @@ export default function MobileFundTable({
           const value = original.estimateChangeValue;
           const isMuted = original.estimateChangeMuted;
           const time = original.estimateTime ?? '-';
+          const displayTime = typeof time === 'string' && time.length > 5 ? time.slice(5) : time;
           const cls = isMuted ? 'muted' : value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <span className={cls} style={{ fontWeight: 700 }}>
                 {info.getValue() ?? '—'}
               </span>
-              <span className="muted" style={{ fontSize: '10px' }}>{time}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>{displayTime}</span>
             </div>
           );
         },

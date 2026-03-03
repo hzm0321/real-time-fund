@@ -43,6 +43,7 @@ import DcaModal from "./components/DcaModal";
 import githubImg from "./assets/github.svg";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { recordValuation, getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
+import { loadHolidaysForYears, isTradingDay as isDateTradingDay } from './lib/tradingCalendar';
 import { fetchFundData, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds, extractFundNamesWithLLM } from './api/fund';
 import packageJson from '../package.json';
 import PcFundTable from './components/PcFundTable';
@@ -342,6 +343,7 @@ export default function HomePage() {
   const [favorites, setFavorites] = useState(new Set());
   const [groups, setGroups] = useState([]); // [{ id, name, codes: [] }]
   const [currentTab, setCurrentTab] = useState('all');
+  const hasLocalTabInitRef = useRef(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [groupManageOpen, setGroupManageOpen] = useState(false);
   const [addFundToGroupOpen, setAddFundToGroupOpen] = useState(false);
@@ -1635,7 +1637,8 @@ export default function HomePage() {
     });
   };
 
-  const scheduleDcaTrades = useCallback(() => {
+  const scheduleDcaTrades = useCallback(async () => {
+    if (!isTradingDay) return;
     if (!isPlainObject(dcaPlans)) return;
     const codesSet = new Set(funds.map((f) => f.code));
     if (codesSet.size === 0) return;
@@ -1643,6 +1646,14 @@ export default function HomePage() {
     const today = toTz(todayStr).startOf('day');
     const nextPlans = { ...dcaPlans };
     const newPending = [];
+
+    // 预加载回溯区间内所有年份的节假日数据
+    const years = new Set([today.year()]);
+    Object.values(dcaPlans).forEach((plan) => {
+      if (plan?.firstDate) years.add(toTz(plan.firstDate).year());
+      if (plan?.lastDate) years.add(toTz(plan.lastDate).year());
+    });
+    await loadHolidaysForYears([...years]);
 
     Object.entries(dcaPlans).forEach(([code, plan]) => {
       if (!plan || !plan.enabled) return;
@@ -1678,6 +1689,9 @@ export default function HomePage() {
         current = stepOnce();
         if (current.isAfter(today, 'day')) break;
         if (current.isBefore(first, 'day')) continue;
+
+        // 回溯补单：严格判断该日是否为 A股交易日（排除周末、法定节假日）
+        if (!isDateTradingDay(current)) continue;
 
         const dateStr = current.format('YYYY-MM-DD');
 
@@ -1726,11 +1740,13 @@ export default function HomePage() {
     });
 
     showToast(`已生成 ${newPending.length} 笔定投买入`, 'success');
-  }, [dcaPlans, funds, todayStr, storageHelper]);
+  }, [isTradingDay, dcaPlans, funds, todayStr, storageHelper]);
 
   useEffect(() => {
     if (!isTradingDay) return;
-    scheduleDcaTrades();
+    scheduleDcaTrades().catch((e) => {
+      console.error('[scheduleDcaTrades]', e);
+    });
   }, [isTradingDay, scheduleDcaTrades]);
 
   const handleAddGroup = (name) => {
@@ -1956,6 +1972,17 @@ export default function HomePage() {
       if (Array.isArray(savedGroups)) {
         setGroups(savedGroups);
       }
+      // 读取用户上次选择的分组（仅本地存储，不同步云端）
+      const savedTab = localStorage.getItem('currentTab');
+      if (
+        savedTab === 'all' ||
+        savedTab === 'fav' ||
+        (savedTab && Array.isArray(savedGroups) && savedGroups.some((g) => g?.id === savedTab))
+      ) {
+        setCurrentTab(savedTab);
+      } else if (savedTab) {
+        setCurrentTab('all');
+      }
       // 加载持仓数据
       const savedHoldings = JSON.parse(localStorage.getItem('holdings') || '{}');
       if (isPlainObject(savedHoldings)) {
@@ -1978,10 +2005,21 @@ export default function HomePage() {
         setTheme(savedTheme);
       }
       } catch { }
+      if (!cancelled) {
+        hasLocalTabInitRef.current = true;
+      }
     };
     init();
     return () => { cancelled = true; };
   }, [isSupabaseConfigured]);
+
+  // 记录用户当前选择的分组（仅本地存储，不同步云端）
+  useEffect(() => {
+    if (!hasLocalTabInitRef.current) return;
+    try {
+      localStorage.setItem('currentTab', currentTab);
+    } catch { }
+  }, [currentTab]);
 
   // 主题同步到 document 并持久化
   useEffect(() => {
@@ -4162,7 +4200,8 @@ export default function HomePage() {
 
                                         if (shouldHideChange) return null;
 
-                                        const changeLabel = hasTodayData ? '涨跌幅' : (isYesterdayChange ? '昨日涨跌幅' : (isPreviousTradingDay ? '上一交易日涨跌幅' : '涨跌幅'));
+                                        // 不再区分“上一交易日涨跌幅”名称，统一使用“昨日涨跌幅”
+                                        const changeLabel = hasTodayData ? '涨跌幅' : '昨日涨跌幅';
                                         return (
                                           <Stat
                                             label={changeLabel}
@@ -4274,58 +4313,58 @@ export default function HomePage() {
                                     />
                                   );
                                 })()}
-                                <div
-                                  style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-                                  className="title"
-                                  onClick={() => toggleCollapse(f.code)}
-                                >
-                                  <div className="row" style={{ width: '100%', flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <span>前10重仓股票</span>
-                                      <ChevronIcon
-                                        width="16"
-                                        height="16"
-                                        className="muted"
-                                        style={{
-                                          transform: collapsedCodes.has(f.code) ? 'rotate(-90deg)' : 'rotate(0deg)',
-                                          transition: 'transform 0.2s ease'
-                                        }}
-                                      />
-                                    </div>
-                                    <span className="muted">涨跌幅 / 占比</span>
-                                  </div>
-                                </div>
-                                <AnimatePresence>
-                                  {!collapsedCodes.has(f.code) && (
-                                    <motion.div
-                                      initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: 'auto', opacity: 1 }}
-                                      exit={{ height: 0, opacity: 0 }}
-                                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                      style={{ overflow: 'hidden' }}
+                                {f.holdingsIsLastQuarter && Array.isArray(f.holdings) && f.holdings.length > 0 && (
+                                  <>
+                                    <div
+                                      style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
+                                      className="title"
+                                      onClick={() => toggleCollapse(f.code)}
                                     >
-                                      {Array.isArray(f.holdings) && f.holdings.length ? (
-                                        <div className="list">
-                                          {f.holdings.map((h, idx) => (
-                                            <div className="item" key={idx}>
-                                              <span className="name">{h.name}</span>
-                                              <div className="values">
-                                                {isNumber(h.change) && (
-                                                  <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
-                                                    {h.change > 0 ? '+' : ''}{h.change.toFixed(2)}%
-                                                  </span>
-                                                )}
-                                                <span className="weight">{h.weight}</span>
-                                              </div>
-                                            </div>
-                                          ))}
+                                      <div className="row" style={{ width: '100%', flex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                          <span>前10重仓股票</span>
+                                          <ChevronIcon
+                                            width="16"
+                                            height="16"
+                                            className="muted"
+                                            style={{
+                                              transform: collapsedCodes.has(f.code) ? 'rotate(-90deg)' : 'rotate(0deg)',
+                                              transition: 'transform 0.2s ease'
+                                            }}
+                                          />
                                         </div>
-                                      ) : (
-                                        <div className="muted" style={{ padding: '8px 0' }}>暂无重仓数据</div>
+                                        <span className="muted">涨跌幅 / 占比</span>
+                                      </div>
+                                    </div>
+                                    <AnimatePresence>
+                                      {!collapsedCodes.has(f.code) && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: 'auto', opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                          style={{ overflow: 'hidden' }}
+                                        >
+                                          <div className="list">
+                                            {f.holdings.map((h, idx) => (
+                                              <div className="item" key={idx}>
+                                                <span className="name">{h.name}</span>
+                                                <div className="values">
+                                                  {isNumber(h.change) && (
+                                                    <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
+                                                      {h.change > 0 ? '+' : ''}{h.change.toFixed(2)}%
+                                                    </span>
+                                                  )}
+                                                  <span className="weight">{h.weight}</span>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </motion.div>
                                       )}
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
+                                    </AnimatePresence>
+                                  </>
+                                )}
                                 <FundTrendChart
                                   key={`${f.code}-${theme}`}
                                   code={f.code}

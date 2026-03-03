@@ -97,7 +97,7 @@ export default function FundIntradayChart({ series = [], referenceNav, theme = '
   }, [series, referenceNav, chartColors.danger, chartColors.success]);
 
   const options = useMemo(() => {
-    const colors = getChartThemeColors();
+    const colors = getChartThemeColors(theme);
     return {
     responsive: true,
     maintainAspectRatio: false,
@@ -260,11 +260,20 @@ export default function FundIntradayChart({ series = [], referenceNav, theme = '
           <span
             style={{
               fontSize: 9,
-              padding: '1px 5px',
+              padding: '2px 6px',
               borderRadius: 4,
-              background: 'var(--primary)',
-              color: '#0f172a',
-              fontWeight: 600
+              ...(theme === 'light'
+                ? {
+                    border: '1px solid',
+                    borderColor: chartColors.primary,
+                    color: chartColors.primary,
+                    background: 'transparent',
+                  }
+                : {
+                    background: 'var(--primary)',
+                    color: '#0f172a',
+                  }),
+              fontWeight: 600,
             }}
             title="正在测试中的功能"
           >

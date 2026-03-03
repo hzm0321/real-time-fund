@@ -83,5 +83,5 @@ fabric.properties
 
 .env.local
 .DS_Store
-.idea
+.idea/*
 .husky/_/

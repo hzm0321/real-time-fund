@@ -35,8 +35,21 @@ export default function ConfirmModal({ title, message, onConfirm, onCancel, conf
           {message}
         </p>
         <div className="row" style={{ gap: 12 }}>
-          <button className="button secondary" onClick={onCancel} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}>取消</button>
-          <button className="button danger" onClick={onConfirm} style={{ flex: 1 }}>{confirmText}</button>
+          <button
+            className="button secondary"
+            onClick={onCancel}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}
+          >
+            取消
+          </button>
+          <button
+            className="button danger"
+            onClick={onConfirm}
+            style={{ flex: 1 }}
+            autoFocus
+          >
+            {confirmText}
+          </button>
         </div>
       </motion.div>
     </motion.div>
