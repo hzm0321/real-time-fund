@@ -11,6 +11,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString, isPlainObject } from 'lodash';
+import { v4 as uuidv4 } from 'uuid';
 import Announcement from "./components/Announcement";
 import { Stat } from "./components/Common";
 import FundTrendChart from "./components/FundTrendChart";
@@ -987,7 +988,7 @@ export default function HomePage() {
     setTransactions(prev => {
       const current = prev[fundCode] || [];
       const record = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         type: data.type,
         share: data.share,
         amount: data.amount,
@@ -1012,7 +1013,7 @@ export default function HomePage() {
     // 如果没有价格（API失败），加入待处理队列
     if (!data.price || data.price === 0) {
         const pending = {
-            id: crypto.randomUUID(),
+            id: uuidv4(),
             fundCode: fund.code,
             fundName: fund.name,
             type: tradeModal.type,
@@ -1063,7 +1064,7 @@ export default function HomePage() {
     setTransactions(prev => {
       const current = prev[fund.code] || [];
       const record = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         type: tradeModal.type,
         share: data.share,
         amount: isBuy ? data.totalCost : (data.share * data.price),

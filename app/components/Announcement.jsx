@@ -52,6 +52,8 @@ export default function Announcement() {
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
+              maxHeight: 'calc(100dvh - 40px)',
+              overflow: 'hidden',
             }}
           >
             <div className="title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 700, fontSize: '18px', color: 'var(--accent)' }}>
@@ -62,7 +64,7 @@ export default function Announcement() {
               </svg>
               <span>公告</span>
             </div>
-            <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px' }}>
+            <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
               为了增加更多用户方便访问, 新增国内加速地址：<a className="link-button"
                                                           target="_blank"
                                                           rel="noopener noreferrer"
