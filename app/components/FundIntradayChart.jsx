@@ -282,7 +282,7 @@ export default function FundIntradayChart({ series = [], referenceNav, theme = '
         </span>
         {displayDate && <span style={{ fontSize: 11 }}>估值日期 {displayDate}</span>}
       </div>
-      <div style={{ position: 'relative', height: 100, width: '100%' }}>
+      <div style={{ position: 'relative', height: 100, width: '100%', touchAction: 'pan-y' }}>
         <Line ref={chartRef} data={chartData} options={options} plugins={plugins} />
       </div>
     </div>

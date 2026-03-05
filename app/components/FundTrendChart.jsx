@@ -530,7 +530,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             style={{ overflow: 'hidden' }}
           >
-            <div style={{ position: 'relative', height: 180, width: '100%' }}>
+            <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
               {loading && (
                 <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
                   <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>

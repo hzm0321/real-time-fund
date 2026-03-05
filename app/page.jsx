@@ -49,6 +49,7 @@ import { fetchFundData, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFu
 import packageJson from '../package.json';
 import PcFundTable from './components/PcFundTable';
 import MobileFundTable from './components/MobileFundTable';
+import { useFundFuzzyMatcher } from './hooks/useFundFuzzyMatcher';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -352,6 +353,24 @@ export default function HomePage() {
   // 排序状态
   const [sortBy, setSortBy] = useState('default'); // default, name, yield, holding
   const [sortOrder, setSortOrder] = useState('desc'); // asc | desc
+  const [isSortLoaded, setIsSortLoaded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSortBy = window.localStorage.getItem('localSortBy');
+      const savedSortOrder = window.localStorage.getItem('localSortOrder');
+      if (savedSortBy) setSortBy(savedSortBy);
+      if (savedSortOrder) setSortOrder(savedSortOrder);
+      setIsSortLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isSortLoaded) {
+      window.localStorage.setItem('localSortBy', sortBy);
+      window.localStorage.setItem('localSortOrder', sortOrder);
+    }
+  }, [sortBy, sortOrder, isSortLoaded]);
 
   // 视图模式
   const [viewMode, setViewMode] = useState('card'); // card, list
@@ -1155,6 +1174,7 @@ export default function HomePage() {
   const abortScanRef = useRef(false); // 终止扫描标记
   const fileInputRef = useRef(null);
   const ocrWorkerRef = useRef(null);
+  const { resolveFundCodeByFuzzy } = useFundFuzzyMatcher();
 
   const handleScanClick = () => {
     setScanModalOpen(true);
@@ -1309,6 +1329,15 @@ export default function HomePage() {
               if (found && found.CODE) {
                 allCodes.add(found.CODE);
               }
+            } else {
+              // 使用 fuse.js 读取 Public 中的 allFunds 数据进行模糊匹配，补充搜索接口的不足
+              try {
+                const fuzzyCode = await resolveFundCodeByFuzzy(name);
+                if (fuzzyCode) {
+                  allCodes.add(fuzzyCode);
+                }
+              } catch (e) {
+              }
             }
           } catch (e) {
           }
@@ -1378,7 +1407,7 @@ export default function HomePage() {
     });
   };
 
-  const confirmScanImport = async () => {
+  const confirmScanImport = async (targetGroupId = 'all') => {
     const codes = Array.from(selectedScannedCodes);
     if (codes.length === 0) {
       showToast('请至少选择一个基金代码', 'error');
@@ -1422,6 +1451,34 @@ export default function HomePage() {
           }
         });
         if (Object.keys(nextSeries).length > 0) setValuationSeries(prev => ({ ...prev, ...nextSeries }));
+
+        if (targetGroupId === 'fav') {
+          setFavorites(prev => {
+            const next = new Set(prev);
+            codes.forEach(code => next.add(code));
+            storageHelper.setItem('favorites', JSON.stringify(Array.from(next)));
+            return next;
+          });
+          setCurrentTab('fav');
+        } else if (targetGroupId && targetGroupId !== 'all') {
+          setGroups(prev => {
+            const updated = prev.map(g => {
+              if (g.id === targetGroupId) {
+                return {
+                  ...g,
+                  codes: Array.from(new Set([...g.codes, ...codes]))
+                };
+              }
+              return g;
+            });
+            storageHelper.setItem('groups', JSON.stringify(updated));
+            return updated;
+          });
+          setCurrentTab(targetGroupId);
+        } else {
+          setCurrentTab('all');
+        }
+
         setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
       } else {
         if (codes.length > 0 && successCount === 0 && failedCount === 0) {
@@ -2505,49 +2562,26 @@ export default function HomePage() {
       setError('请输入或选择基金代码');
       return;
     }
-    setLoading(true);
-    try {
-      const newFunds = [];
-      const failures = [];
-      const nameMap = {};
-      selectedFunds.forEach(f => { nameMap[f.CODE] = f.NAME; });
-      for (const c of selectedCodes) {
-        if (funds.some((f) => f.code === c)) continue;
-        try {
-          const data = await fetchFundData(c);
-          newFunds.push(data);
-        } catch (err) {
-          failures.push({ code: c, name: nameMap[c] });
-        }
-      }
-      if (newFunds.length === 0) {
-        setError('未添加任何新基金');
-      } else {
-        const next = dedupeByCode([...newFunds, ...funds]);
-        setFunds(next);
-        storageHelper.setItem('funds', JSON.stringify(next));
-        const nextSeries = {};
-        newFunds.forEach(u => {
-          if (u?.code != null && !u.noValuation && Number.isFinite(Number(u.gsz))) {
-            nextSeries[u.code] = recordValuation(u.code, { gsz: u.gsz, gztime: u.gztime });
-          }
-        });
-        if (Object.keys(nextSeries).length > 0) setValuationSeries(prev => ({ ...prev, ...nextSeries }));
-      }
-      setSearchTerm('');
-      setSelectedFunds([]);
-      setShowDropdown(false);
-      inputRef.current?.blur();
-      setIsSearchFocused(false);
-      if (failures.length > 0) {
-        setAddFailures(failures);
-        setAddResultOpen(true);
-      }
-    } catch (e) {
-      setError(e.message || '添加失败');
-    } finally {
-      setLoading(false);
+    const nameMap = {};
+    selectedFunds.forEach(f => { nameMap[f.CODE] = f.NAME; });
+    const fundsToConfirm = selectedCodes.map(code => ({
+      code,
+      name: nameMap[code] || '',
+      status: funds.some(f => f.code === code) ? 'added' : 'pending'
+    }));
+    const pendingCodes = fundsToConfirm.filter(f => f.status === 'pending').map(f => f.code);
+    if (pendingCodes.length === 0) {
+      setError('所选基金已全部添加');
+      return;
     }
+    setScannedFunds(fundsToConfirm);
+    setSelectedScannedCodes(new Set(pendingCodes));
+    setScanConfirmModalOpen(true);
+    setSearchTerm('');
+    setSelectedFunds([]);
+    setShowDropdown(false);
+    inputRef.current?.blur();
+    setIsSearchFocused(false);
   };
 
   const removeFund = (removeCode) => {
@@ -4702,6 +4736,7 @@ export default function HomePage() {
             onToggle={toggleScannedCode}
             onConfirm={confirmScanImport}
             refreshing={refreshing}
+            groups={groups}
           />
         )}
       </AnimatePresence>

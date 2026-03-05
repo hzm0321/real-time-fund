@@ -3074,3 +3074,77 @@ input[type="number"] {
     margin: 16px;
   }
 }
+
+/* ========== 下拉选择框样式 ========== */
+.select {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(11, 18, 32, 0.9);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.select:hover {
+  border-color: var(--accent);
+}
+
+.select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+.select option {
+  background: var(--card);
+  color: var(--text);
+  padding: 8px;
+}
+
+.select option:hover,
+.select option:checked {
+  background: rgba(34, 211, 238, 0.15);
+  color: var(--primary);
+}
+
+/* 亮色主题：下拉选择框 */
+[data-theme="light"] .select {
+  background-color: rgba(255, 255, 255, 0.95);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  border-color: var(--border);
+}
+
+[data-theme="light"] .select:hover {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+
+[data-theme="light"] .select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+[data-theme="light"] .select option {
+  background: #fff;
+  color: var(--text);
+}
+
+[data-theme="light"] .select option {
+  background: #fff;
+  color: var(--text);
+}
+
+[data-theme="light"] .select option:hover,
+[data-theme="light"] .select option:checked {
+  background: rgba(8, 145, 178, 0.12);
+  color: var(--primary);
+}
