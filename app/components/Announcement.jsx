@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v11';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v12';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
