@@ -1,12 +1,8 @@
 # ===== 构建阶段 =====
 FROM node:22-bullseye AS builder
 
-# 安装时区数据 (Alpine 需要 tzdata，Ubuntu/Debian 通常自带)
-RUN apk add --no-cache tzdata 
-
 # 设置时区
 ENV TZ=Asia/Shanghai
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 COPY package*.json ./
