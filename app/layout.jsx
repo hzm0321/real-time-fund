@@ -3,7 +3,7 @@ import AnalyticsGate from './components/AnalyticsGate';
 import packageJson from '../package.json';
 
 export const metadata = {
-  title: `基估宝 V${packageJson.version}`,
+  title: `优基库 V${packageJson.version}`,
   description: '输入基金编号添加基金，实时显示估值与前10重仓'
 };
 
@@ -13,7 +13,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
     <head>
-      <meta name="apple-mobile-web-app-title" content="基估宝" />
+      <meta name="apple-mobile-web-app-title" content="优基库" />
       <meta name="apple-mobile-web-app-capable" content="yes"/>
       <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
       <link rel="apple-touch-icon" href="/Icon-60@3x.png?v=1"/>

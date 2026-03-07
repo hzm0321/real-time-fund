@@ -2348,11 +2348,13 @@ export default function HomePage() {
       });
       if (error) throw error;
       if (data?.user) {
+        setUser(data.user);
         setLoginModalOpen(false);
         setLoginEmail('');
         setLoginOtp('');
         setLoginSuccess('');
         setLoginError('');
+        fetchCloudConfig(data.user.id, true);
       }
     } catch (err) {
       setLoginError(err.message || '验证失败，请检查验证码或稍后再试');
@@ -3667,7 +3669,7 @@ export default function HomePage() {
               <path d="M5 14c2-4 7-6 14-5" stroke="var(--primary)" strokeWidth="2" />
             </svg>
           </div>
-          <span>基估宝</span>
+          <span>优基库</span>
         </div>
         <div className={`glass add-fund-section navbar-add-fund ${(isSearchFocused || selectedFunds.length > 0) ? 'search-focused' : ''}`} role="region" aria-label="添加基金">
           <div className="search-container" ref={dropdownRef}>
@@ -3791,9 +3793,6 @@ export default function HomePage() {
               <UpdateIcon width="14" height="14" />
             </div>
           )}
-          <span className="github-icon-wrap">
-            <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} />
-          </span>
           {isMobile && (
             <button
               className="icon-button mobile-search-btn"
@@ -4573,16 +4572,18 @@ export default function HomePage() {
         <p style={{ marginBottom: 12 }}>注：估算数据与真实结算数据会有1%左右误差，非股票型基金误差较大</p>
         <div style={{ marginTop: 12, opacity: 0.8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <p style={{ margin: 0 }}>
-            遇到任何问题或需求建议可
+            该项目基于开源项目开发，项目地址：
             <button
               className="link-button"
               onClick={() => {
-                setFeedbackNonce((n) => n + 1);
-                setFeedbackOpen(true);
+                window.open(
+                  `https://github.com/hzm0321/real-time-fund`,
+                  '_blank',
+                );
               }}
               style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '0 4px', textDecoration: 'underline', fontSize: 'inherit', fontWeight: 600 }}
             >
-              点此提交反馈
+              点此跳转
             </button>
           </p>
           <button
