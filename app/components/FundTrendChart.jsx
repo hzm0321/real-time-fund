@@ -54,7 +54,7 @@ function getChartThemeColors(theme) {
   return CHART_COLORS[theme] || CHART_COLORS.dark;
 }
 
-export default function FundTrendChart({ code, isExpanded, onToggleExpand, transactions = [], theme = 'dark' }) {
+export default function FundTrendChart({ code, isExpanded, onToggleExpand, transactions = [], theme = 'dark', hideHeader = false }) {
   const [range, setRange] = useState('1m');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -490,79 +490,102 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
   }];
   }, [theme]); // theme 变化时重算以应用亮色/暗色坐标轴与 crosshair
 
-  return (
-    <div style={{ marginTop: 16 }} onClick={(e) => e.stopPropagation()}>
-      <div
-        style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-        className="title"
-        onClick={onToggleExpand}
-      >
-        <div className="row" style={{ width: '100%', flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>业绩走势</span>
-            <ChevronIcon
-              width="16"
-              height="16"
-              className="muted"
-              style={{
-                transform: !isExpanded ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease'
-              }}
-            />
+  const chartBlock = (
+    <>
+      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+        {loading && (
+          <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
+            <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>
           </div>
-          {data.length > 0 && (
-             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-               <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
-               <span style={{ color: lineColor, fontWeight: 600 }}>
-                 {change > 0 ? '+' : ''}{change.toFixed(2)}%
-               </span>
-             </div>
-          )}
-        </div>
+        )}
+
+        {!loading && data.length === 0 && (
+          <div className="chart-overlay">
+            <span className="muted" style={{ fontSize: '12px' }}>暂无数据</span>
+          </div>
+        )}
+
+        {data.length > 0 && (
+          <Line ref={chartRef} data={chartData} options={options} plugins={plugins} />
+        )}
       </div>
 
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            style={{ overflow: 'hidden' }}
+      <div className="trend-range-bar">
+        {ranges.map(r => (
+          <button
+            key={r.value}
+            type="button"
+            className={`trend-range-btn ${range === r.value ? 'active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); setRange(r.value); }}
           >
-            <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
-              {loading && (
-                <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
-                  <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>
-                </div>
-              )}
+            {r.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
 
-              {!loading && data.length === 0 && (
-                 <div className="chart-overlay">
-                  <span className="muted" style={{ fontSize: '12px' }}>暂无数据</span>
-                </div>
-              )}
-
-              {data.length > 0 && (
-                <Line ref={chartRef} data={chartData} options={options} plugins={plugins} />
-              )}
+  return (
+    <div style={{ marginTop: hideHeader ? 0 : 16 }} onClick={(e) => e.stopPropagation()}>
+      {!hideHeader && (
+        <div
+          style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
+          className="title"
+          onClick={onToggleExpand}
+        >
+          <div className="row" style={{ width: '100%', flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>业绩走势</span>
+              <ChevronIcon
+                width="16"
+                height="16"
+                className="muted"
+                style={{
+                  transform: !isExpanded ? 'rotate(-90deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}
+              />
             </div>
+            {data.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
+                <span style={{ color: lineColor, fontWeight: 600 }}>
+                  {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-            <div className="trend-range-bar">
-              {ranges.map(r => (
-                <button
-                  key={r.value}
-                  type="button"
-                  className={`trend-range-btn ${range === r.value ? 'active' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); setRange(r.value); }}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {hideHeader && data.length > 0 && (
+        <div className="row" style={{ marginBottom: 8, justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
+            <span style={{ color: lineColor, fontWeight: 600 }}>
+              {change > 0 ? '+' : ''}{change.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {hideHeader ? (
+        chartBlock
+      ) : (
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              {chartBlock}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
     </div>
   );
 }

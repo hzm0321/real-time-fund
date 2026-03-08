@@ -25,7 +25,14 @@ import { CSS } from '@dnd-kit/utilities';
 import ConfirmModal from './ConfirmModal';
 import FitText from './FitText';
 import PcTableSettingModal from './PcTableSettingModal';
-import { DragIcon, ExitIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+import FundCard from './FundCard';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { CloseIcon, DragIcon, ExitIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
 
 const NON_FROZEN_COLUMN_IDS = [
   'yesterdayChangePercent',
@@ -118,6 +125,9 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {(row: any) => void} [props.onRemoveFromGroup] - 从当前分组移除
  * @param {(row: any, meta: { hasHolding: boolean }) => void} [props.onHoldingAmountClick] - 点击持仓金额
  * @param {boolean} [props.refreshing] - 是否处于刷新状态（控制删除按钮禁用态）
+ * @param {(row: any) => Object} [props.getFundCardProps] - 给定行返回 FundCard 的 props；传入后点击基金名称将用弹框展示卡片详情
+ * @param {React.MutableRefObject<(() => void) | null>} [props.closeDialogRef] - 注入关闭弹框的方法，用于确认删除时关闭
+ * @param {boolean} [props.blockDialogClose] - 为 true 时阻止点击遮罩关闭弹框（如删除确认弹框打开时）
  */
 export default function PcFundTable({
   data = [],
@@ -132,6 +142,9 @@ export default function PcFundTable({
   sortBy = 'default',
   onReorder,
   onCustomSettingsChange,
+  getFundCardProps,
+  closeDialogRef,
+  blockDialogClose = false,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -143,6 +156,7 @@ export default function PcFundTable({
   );
 
   const [activeId, setActiveId] = useState(null);
+  const [cardDialogRow, setCardDialogRow] = useState(null);
 
   const handleDragStart = (event) => {
     setActiveId(event.active.id);
@@ -342,6 +356,13 @@ export default function PcFundTable({
   const onHoldingAmountClickRef = useRef(onHoldingAmountClick);
 
   useEffect(() => {
+    if (closeDialogRef) {
+      closeDialogRef.current = () => setCardDialogRow(null);
+      return () => { closeDialogRef.current = null; };
+    }
+  }, [closeDialogRef]);
+
+  useEffect(() => {
     onRemoveFundRef.current = onRemoveFund;
     onToggleFavoriteRef.current = onToggleFavorite;
     onRemoveFromGroupRef.current = onRemoveFromGroup;
@@ -353,7 +374,7 @@ export default function PcFundTable({
     onHoldingAmountClick,
   ]);
 
-  const FundNameCell = ({ info, showFullFundName }) => {
+  const FundNameCell = ({ info, showFullFundName, onOpenCardDialog }) => {
     const original = info.row.original || {};
     const code = original.code;
     const isUpdated = original.isUpdated;
@@ -400,7 +421,15 @@ export default function PcFundTable({
             <StarIcon width="18" height="18" filled={isFavorites} />
           </button>
         )}
-        <div className="title-text">
+        <div
+          className="title-text"
+          role={onOpenCardDialog ? 'button' : undefined}
+          tabIndex={onOpenCardDialog ? 0 : undefined}
+          onClick={onOpenCardDialog ? (e) => { e.stopPropagation?.(); onOpenCardDialog(original); } : undefined}
+          onKeyDown={onOpenCardDialog ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCardDialog(original); } } : undefined}
+          style={onOpenCardDialog ? { cursor: 'pointer' } : undefined}
+          title={onOpenCardDialog ? '查看基金详情' : (original.isUpdated ? '今日净值已更新' : undefined)}
+        >
           <span
             className={`name-text ${showFullFundName ? 'show-full' : ''}`}
             title={isUpdated ? '今日净值已更新' : ''}
@@ -425,7 +454,13 @@ export default function PcFundTable({
         size: 265,
         minSize: 140,
         enablePinning: true,
-        cell: (info) => <FundNameCell info={info} showFullFundName={showFullFundName} />,
+        cell: (info) => (
+          <FundNameCell
+            info={info}
+            showFullFundName={showFullFundName}
+            onOpenCardDialog={getFundCardProps ? (row) => setCardDialogRow(row) : undefined}
+          />
+        ),
         meta: {
           align: 'left',
           cellClassName: 'name-cell',
@@ -712,7 +747,7 @@ export default function PcFundTable({
           };
 
           return (
-            <div className="row" style={{ justifyContent: 'center', gap: 4 }}>
+            <div className="row" style={{ justifyContent: 'center', gap: 4, padding: '8px 0' }}>
               <button
                 className="icon-button danger"
                 onClick={handleClick}
@@ -732,7 +767,7 @@ export default function PcFundTable({
         },
       },
     ],
-    [currentTab, favorites, refreshing, sortBy, showFullFundName],
+    [currentTab, favorites, refreshing, sortBy, showFullFundName, getFundCardProps],
   );
 
   const table = useReactTable({
@@ -997,6 +1032,40 @@ export default function PcFundTable({
         showFullFundName={showFullFundName}
         onToggleShowFullFundName={handleToggleShowFullFundName}
       />
+      <Dialog
+        open={!!(cardDialogRow && getFundCardProps)}
+        onOpenChange={(open) => {
+          if (!open && !blockDialogClose) setCardDialogRow(null);
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-2xl max-h-[88vh] flex flex-col p-0 overflow-hidden"
+          showCloseButton={false}
+          onPointerDownOutside={blockDialogClose ? (e) => e.preventDefault() : undefined}
+        >
+          <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-6 pb-4 pt-6 text-left border-b border-[var(--border)]">
+            <DialogTitle className="text-base font-semibold text-[var(--text)]">
+              基金详情
+            </DialogTitle>
+            <button
+              type="button"
+              className="icon-button rounded-lg"
+              aria-label="关闭"
+              onClick={() => setCardDialogRow(null)}
+              style={{ padding: 4, borderColor: 'transparent' }}
+            >
+              <CloseIcon width="20" height="20" />
+            </button>
+          </DialogHeader>
+          <div
+            className="flex-1 min-h-0 overflow-y-auto px-6 py-4"
+          >
+            {cardDialogRow && getFundCardProps ? (
+              <FundCard {...getFundCardProps(cardDialogRow)} layoutMode="drawer" />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

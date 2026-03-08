@@ -1,13 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion, Reorder } from 'framer-motion';
-import { createPortal } from 'react-dom';
+import { AnimatePresence, Reorder } from 'framer-motion';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerClose,
+} from '@/components/ui/drawer';
+import { Switch } from '@/components/ui/switch';
 import ConfirmModal from './ConfirmModal';
 import { CloseIcon, DragIcon, ResetIcon, SettingsIcon } from './Icons';
 
 /**
- * 移动端表格个性化设置弹框（底部抽屉）
+ * 移动端表格个性化设置弹框（底部抽屉，基于 Drawer 组件）
  * @param {Object} props
  * @param {boolean} props.open - 是否打开
  * @param {() => void} props.onClose - 关闭回调
@@ -38,226 +45,169 @@ export default function MobileSettingModal({
     if (!open) setResetConfirmOpen(false);
   }, [open]);
 
-  useEffect(() => {
-    if (open) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }
-  }, [open]);
-
   const handleReorder = (newItems) => {
     const newOrder = newItems.map((item) => item.id);
     onColumnReorder?.(newOrder);
   };
 
-  const content = (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="mobile-setting-overlay"
-          className="mobile-setting-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="个性化设置"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          onClick={onClose}
-          style={{ zIndex: 10001 }}
+  return (
+    <>
+      <Drawer
+        open={open}
+        onOpenChange={(v) => {
+          if (!v) onClose();
+        }}
+        direction="bottom"
+      >
+        <DrawerContent
+          className="glass"
+          defaultHeight="77vh"
+          minHeight="40vh"
+          maxHeight="90vh"
         >
-          <motion.div
-            className="mobile-setting-drawer glass"
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mobile-setting-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <SettingsIcon width="20" height="20" />
-                <span>个性化设置</span>
-              </div>
-              <button
-                className="icon-button"
-                onClick={onClose}
-                title="关闭"
-                style={{ border: 'none', background: 'transparent' }}
-              >
-                <CloseIcon width="20" height="20" />
-              </button>
-            </div>
+          <DrawerHeader className="mobile-setting-header flex-row items-center justify-between gap-2 py-5 pt-5 text-base font-semibold">
+            <DrawerTitle className="flex items-center gap-2.5 text-left">
+              <SettingsIcon width="20" height="20" />
+              <span>个性化设置</span>
+            </DrawerTitle>
+            <DrawerClose
+              className="icon-button border-none bg-transparent p-1"
+              title="关闭"
+              style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
+            >
+              <CloseIcon width="20" height="20" />
+            </DrawerClose>
+          </DrawerHeader>
 
-            <div className="mobile-setting-body">
-              {onToggleShowFullFundName && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 0',
-                    borderBottom: '1px solid var(--border)',
-                    marginBottom: 16,
-                  }}
-                >
-                  <span style={{ fontSize: '14px' }}>展示完整基金名称</span>
-                  <button
-                    type="button"
-                    className="icon-button pc-table-column-switch"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleShowFullFundName(!showFullFundName);
-                    }}
-                    title={showFullFundName ? '关闭' : '开启'}
-                    style={{
-                      border: 'none',
-                      padding: '0 4px',
-                      backgroundColor: 'transparent',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span className={`dca-toggle-track ${showFullFundName ? 'enabled' : ''}`}>
-                      <span
-                        className="dca-toggle-thumb"
-                        style={{ left: showFullFundName ? 16 : 2 }}
-                      />
-                    </span>
-                  </button>
-                </div>
-              )}
-              <h3 className="mobile-setting-subtitle">表头设置</h3>
+          <div className="mobile-setting-body flex flex-1 flex-col overflow-y-auto">
+            {onToggleShowFullFundName && (
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: 12,
-                  gap: 8,
+                  padding: '12px 0',
+                  borderBottom: '1px solid var(--border)',
+                  marginBottom: 16,
                 }}
               >
-                <p className="muted" style={{ fontSize: '13px', margin: 0 }}>
-                  拖拽调整列顺序
-                </p>
-                {(onResetColumnOrder || onResetColumnVisibility) && (
-                  <button
-                    className="icon-button"
-                    onClick={() => setResetConfirmOpen(true)}
-                    title="重置表头设置"
-                    style={{
-                      border: 'none',
-                      width: '28px',
-                      height: '28px',
-                      backgroundColor: 'transparent',
-                      color: 'var(--muted)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ResetIcon width="16" height="16" />
-                  </button>
-                )}
+                <span style={{ fontSize: '14px' }}>展示完整基金名称</span>
+                <Switch
+                  checked={!!showFullFundName}
+                  onCheckedChange={(checked) => {
+                    onToggleShowFullFundName?.(!!checked);
+                  }}
+                  title={showFullFundName ? '关闭' : '开启'}
+                />
               </div>
-              {columns.length === 0 ? (
-                <div className="muted" style={{ textAlign: 'center', padding: '24px 0', fontSize: '14px' }}>
-                  暂无可配置列
-                </div>
-              ) : (
-                <Reorder.Group
-                  axis="y"
-                  values={columns}
-                  onReorder={handleReorder}
-                  className="mobile-setting-list"
+            )}
+            <h3 className="mobile-setting-subtitle">表头设置</h3>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 12,
+                gap: 8,
+              }}
+            >
+              <p className="muted" style={{ fontSize: '13px', margin: 0 }}>
+                拖拽调整列顺序
+              </p>
+              {(onResetColumnOrder || onResetColumnVisibility) && (
+                <button
+                  className="icon-button"
+                  onClick={() => setResetConfirmOpen(true)}
+                  title="重置表头设置"
+                  style={{
+                    border: 'none',
+                    width: '28px',
+                    height: '28px',
+                    backgroundColor: 'transparent',
+                    color: 'var(--muted)',
+                    flexShrink: 0,
+                  }}
                 >
-                  <AnimatePresence mode="popLayout">
-                    {columns.map((item, index) => (
-                      <Reorder.Item
-                        key={item.id || `col-${index}`}
-                        value={item}
-                        className="mobile-setting-item glass"
-                        layout
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 35,
-                          mass: 1,
-                          layout: { duration: 0.2 },
-                        }}
-                      >
-                        <div
-                          className="drag-handle"
-                          style={{
-                            cursor: 'grab',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0 8px',
-                            color: 'var(--muted)',
-                          }}
-                        >
-                          <DragIcon width="18" height="18" />
-                        </div>
-                        <span style={{ flex: 1, fontSize: '14px' }}>{item.header}</span>
-                        {onToggleColumnVisibility && (
-                          <button
-                            type="button"
-                            className="icon-button pc-table-column-switch"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleColumnVisibility(item.id, columnVisibility?.[item.id] === false);
-                            }}
-                            title={columnVisibility?.[item.id] === false ? '显示' : '隐藏'}
-                            style={{
-                              border: 'none',
-                              padding: '0 4px',
-                              backgroundColor: 'transparent',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <span className={`dca-toggle-track ${columnVisibility?.[item.id] !== false ? 'enabled' : ''}`}>
-                              <span
-                                className="dca-toggle-thumb"
-                                style={{ left: columnVisibility?.[item.id] !== false ? 16 : 2 }}
-                              />
-                            </span>
-                          </button>
-                        )}
-                      </Reorder.Item>
-                    ))}
-                  </AnimatePresence>
-                </Reorder.Group>
+                  <ResetIcon width="16" height="16" />
+                </button>
               )}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-      {resetConfirmOpen && (
-        <ConfirmModal
-          key="mobile-reset-confirm"
-          title="重置表头设置"
-          message="是否重置表头顺序和显示/隐藏为默认值？"
-          onConfirm={() => {
-            onResetColumnOrder?.();
-            onResetColumnVisibility?.();
-            setResetConfirmOpen(false);
-          }}
-          onCancel={() => setResetConfirmOpen(false)}
-          confirmText="重置"
-        />
-      )}
-    </AnimatePresence>
-  );
+            {columns.length === 0 ? (
+              <div className="muted" style={{ textAlign: 'center', padding: '24px 0', fontSize: '14px' }}>
+                暂无可配置列
+              </div>
+            ) : (
+              <Reorder.Group
+                axis="y"
+                values={columns}
+                onReorder={handleReorder}
+                className="mobile-setting-list"
+              >
+                <AnimatePresence mode="popLayout">
+                  {columns.map((item, index) => (
+                    <Reorder.Item
+                      key={item.id || `col-${index}`}
+                      value={item}
+                      className="mobile-setting-item glass"
+                      layout
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 500,
+                        damping: 35,
+                        mass: 1,
+                        layout: { duration: 0.2 },
+                      }}
+                    >
+                      <div
+                        className="drag-handle"
+                        style={{
+                          cursor: 'grab',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '0 8px',
+                          color: 'var(--muted)',
+                        }}
+                      >
+                        <DragIcon width="18" height="18" />
+                      </div>
+                      <span style={{ flex: 1, fontSize: '14px' }}>{item.header}</span>
+                      {onToggleColumnVisibility && (
+                        <Switch
+                          checked={columnVisibility?.[item.id] !== false}
+                          onCheckedChange={(checked) => {
+                            onToggleColumnVisibility(item.id, !!checked);
+                          }}
+                          title={columnVisibility?.[item.id] === false ? '显示' : '隐藏'}
+                        />
+                      )}
+                    </Reorder.Item>
+                  ))}
+                </AnimatePresence>
+              </Reorder.Group>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
 
-  if (typeof document === 'undefined') return null;
-  return createPortal(content, document.body);
+      <AnimatePresence>
+        {resetConfirmOpen && (
+          <ConfirmModal
+            key="mobile-reset-confirm"
+            title="重置表头设置"
+            message="是否重置表头顺序和显示/隐藏为默认值？"
+            onConfirm={() => {
+              onResetColumnOrder?.();
+              onResetColumnVisibility?.();
+              setResetConfirmOpen(false);
+            }}
+            onCancel={() => setResetConfirmOpen(false)}
+            confirmText="重置"
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
 }

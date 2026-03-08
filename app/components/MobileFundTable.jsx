@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   flexRender,
@@ -22,9 +23,18 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { throttle } from 'lodash';
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import FitText from './FitText';
+import FundCard from './FundCard';
 import MobileSettingModal from './MobileSettingModal';
-import { ExitIcon, SettingsIcon, StarIcon } from './Icons';
+import { CloseIcon, ExitIcon, SettingsIcon, StarIcon } from './Icons';
 
 const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'yesterdayChangePercent',
@@ -93,6 +103,7 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {boolean} [props.refreshing] - 是否刷新中
  * @param {string} [props.sortBy] - 排序方式，'default' 时长按行触发拖拽排序
  * @param {(oldIndex: number, newIndex: number) => void} [props.onReorder] - 拖拽排序回调
+ * @param {(row: any) => Object} [props.getFundCardProps] - 给定行返回 FundCard 的 props；传入后点击基金名称将用底部弹框展示卡片视图
  */
 export default function MobileFundTable({
   data = [],
@@ -107,6 +118,10 @@ export default function MobileFundTable({
   sortBy = 'default',
   onReorder,
   onCustomSettingsChange,
+  stickyTop = 0,
+  getFundCardProps,
+  blockDrawerClose = false,
+  closeDrawerRef,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -116,10 +131,18 @@ export default function MobileFundTable({
   );
 
   const [activeId, setActiveId] = useState(null);
+  const ignoreNextDrawerCloseRef = useRef(false);
 
   const onToggleFavoriteRef = useRef(onToggleFavorite);
   const onRemoveFromGroupRef = useRef(onRemoveFromGroup);
   const onHoldingAmountClickRef = useRef(onHoldingAmountClick);
+
+  useEffect(() => {
+    if (closeDrawerRef) {
+      closeDrawerRef.current = () => setCardSheetRow(null);
+      return () => { closeDrawerRef.current = null; };
+    }
+  }, [closeDrawerRef]);
 
   useEffect(() => {
     onToggleFavoriteRef.current = onToggleFavorite;
@@ -261,9 +284,9 @@ export default function MobileFundTable({
       group.mobileShowFullFundName = show;
       parsed[groupKey] = group;
       window.localStorage.setItem('customSettings', JSON.stringify(parsed));
-      setConfigByGroup((prev) => ({ 
-        ...prev, 
-        [groupKey]: { ...prev[groupKey], mobileShowFullFundName: show } 
+      setConfigByGroup((prev) => ({
+        ...prev,
+        [groupKey]: { ...prev[groupKey], mobileShowFullFundName: show }
       }));
       onCustomSettingsChange?.();
     } catch {}
@@ -274,8 +297,13 @@ export default function MobileFundTable({
   };
 
   const [settingModalOpen, setSettingModalOpen] = useState(false);
+  const [cardSheetRow, setCardSheetRow] = useState(null);
   const tableContainerRef = useRef(null);
+  const portalHeaderRef = useRef(null);
   const [tableContainerWidth, setTableContainerWidth] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [showPortalHeader, setShowPortalHeader] = useState(false);
+  const [effectiveStickyTop, setEffectiveStickyTop] = useState(stickyTop);
 
   useEffect(() => {
     const el = tableContainerRef.current;
@@ -286,6 +314,87 @@ export default function MobileFundTable({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const getEffectiveStickyTop = () => {
+      const stickySummaryCard = document.querySelector('.group-summary-sticky .group-summary-card');
+      if (!stickySummaryCard) return stickyTop;
+
+      const stickySummaryWrapper = stickySummaryCard.closest('.group-summary-sticky');
+      if (!stickySummaryWrapper) return stickyTop;
+
+      const wrapperRect = stickySummaryWrapper.getBoundingClientRect();
+      const isSummaryStuck = wrapperRect.top <= stickyTop + 1;
+
+      return isSummaryStuck ? stickyTop + stickySummaryWrapper.offsetHeight : stickyTop;
+    };
+
+    const updateVerticalState = () => {
+      const nextStickyTop = getEffectiveStickyTop();
+      setEffectiveStickyTop((prev) => (prev === nextStickyTop ? prev : nextStickyTop));
+
+      const tableRect = tableContainerRef.current?.getBoundingClientRect();
+      if (!tableRect) {
+        setShowPortalHeader(window.scrollY >= nextStickyTop);
+        return;
+      }
+
+      setShowPortalHeader(tableRect.top <= nextStickyTop);
+    };
+
+    const throttledVerticalUpdate = throttle(updateVerticalState, 1000/60, { leading: true, trailing: true });
+
+    updateVerticalState();
+    window.addEventListener('scroll', throttledVerticalUpdate, { passive: true });
+    window.addEventListener('resize', throttledVerticalUpdate, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', throttledVerticalUpdate);
+      window.removeEventListener('resize', throttledVerticalUpdate);
+      throttledVerticalUpdate.cancel();
+    };
+  }, [stickyTop]);
+
+  useEffect(() => {
+    const tableEl = tableContainerRef.current;
+    if (!tableEl) return;
+
+    const handleScroll = () => {
+      setIsScrolled(tableEl.scrollLeft > 0);
+    };
+
+    handleScroll();
+    tableEl.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      tableEl.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const tableEl = tableContainerRef.current;
+    const portalEl = portalHeaderRef.current;
+    if (!tableEl || !portalEl) return;
+
+    const syncScrollToPortal = () => {
+      portalEl.scrollLeft = tableEl.scrollLeft;
+    };
+
+    const syncScrollToTable = () => {
+      tableEl.scrollLeft = portalEl.scrollLeft;
+    };
+
+    syncScrollToPortal();
+
+    const handleTableScroll = () => syncScrollToPortal();
+    const handlePortalScroll = () => syncScrollToTable();
+
+    tableEl.addEventListener('scroll', handleTableScroll, { passive: true });
+
+    return () => {
+      tableEl.removeEventListener('scroll', handleTableScroll);
+    };
+  }, [showPortalHeader]);
 
   const NAME_CELL_WIDTH = 140;
   const GAP = 12;
@@ -332,8 +441,8 @@ export default function MobileFundTable({
     setMobileColumnVisibility((prev = {}) => ({ ...prev, [columnId]: visible }));
   };
 
-  // 移动端名称列：无拖拽把手，长按整行触发排序
-  const MobileFundNameCell = ({ info, showFullFundName }) => {
+  // 移动端名称列：无拖拽把手，长按整行触发排序；点击名称可打开底部卡片弹框（需传入 getFundCardProps）
+  const MobileFundNameCell = ({ info, showFullFundName, onOpenCardSheet }) => {
     const original = info.row.original || {};
     const code = original.code;
     const isUpdated = original.isUpdated;
@@ -371,9 +480,24 @@ export default function MobileFundTable({
           </button>
         )}
         <div className="title-text">
-          <span 
-            className={`name-text ${showFullFundName ? 'show-full' : ''}`} 
-            title={isUpdated ? '今日净值已更新' : ''}
+          <span
+            className={`name-text ${showFullFundName ? 'show-full' : ''}`}
+            title={isUpdated ? '今日净值已更新' : onOpenCardSheet ? '点击查看卡片' : ''}
+            role={onOpenCardSheet ? 'button' : undefined}
+            tabIndex={onOpenCardSheet ? 0 : undefined}
+            style={onOpenCardSheet ? { cursor: 'pointer' } : undefined}
+            onClick={(e) => {
+              if (onOpenCardSheet) {
+                e.stopPropagation?.();
+                onOpenCardSheet(original);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (onOpenCardSheet && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                onOpenCardSheet(original);
+              }
+            }}
           >
             {info.getValue() ?? '—'}
           </span>
@@ -459,7 +583,13 @@ export default function MobileFundTable({
             </button>
           </div>
         ),
-        cell: (info) => <MobileFundNameCell info={info} showFullFundName={showFullFundName} />,
+        cell: (info) => (
+          <MobileFundNameCell
+            info={info}
+            showFullFundName={showFullFundName}
+            onOpenCardSheet={getFundCardProps ? (row) => setCardSheetRow(row) : undefined}
+          />
+        ),
         meta: { align: 'left', cellClassName: 'name-cell', width: columnWidthMap.fundName },
       },
       {
@@ -615,7 +745,7 @@ export default function MobileFundTable({
         meta: { align: 'right', cellClassName: 'holding-cell', width: columnWidthMap.holdingProfit },
       },
     ],
-    [currentTab, favorites, refreshing, columnWidthMap, showFullFundName]
+    [currentTab, favorites, refreshing, columnWidthMap, showFullFundName, getFundCardProps]
   );
 
   const table = useReactTable({
@@ -716,7 +846,11 @@ export default function MobileFundTable({
   })();
 
   const getPinClass = (columnId, isHeader) => {
-    if (columnId === 'fundName') return isHeader ? 'table-header-cell-pin-left' : 'table-cell-pin-left';
+    if (columnId === 'fundName') {
+      const baseClass = isHeader ? 'table-header-cell-pin-left' : 'table-cell-pin-left';
+      const scrolledClass = isScrolled ? 'is-scrolled' : '';
+      return `${baseClass} ${scrolledClass}`.trim();
+    }
     return '';
   };
 
@@ -726,116 +860,198 @@ export default function MobileFundTable({
     return 'text-right';
   };
 
-  return (
-    <div className="mobile-fund-table" ref={tableContainerRef}>
+  const renderTableHeader = ()=>{
+    if(!headerGroup) return null;
+    return (
       <div
-        className="mobile-fund-table-scroll"
-        style={mobileGridLayout.minWidth != null ? { minWidth: mobileGridLayout.minWidth } : undefined}
+        className="table-header-row mobile-fund-table-header"
+        style={mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : undefined}
       >
-        {headerGroup && (
+        {headerGroup.headers.map((header, headerIndex) => {
+          const columnId = header.column.id;
+          const pinClass = getPinClass(columnId, true);
+          const alignClass = getAlignClass(columnId);
+          const isLastColumn = headerIndex === headerGroup.headers.length - 1;
+          return (
+            <div
+              key={header.id}
+              className={`table-header-cell ${alignClass} ${pinClass}`}
+              style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
+            >
+              {header.isPlaceholder
+                ? null
+                : flexRender(header.column.columnDef.header, header.getContext())}
+            </div>
+          );
+        })}
+      </div>
+    )
+  }
+
+  const renderContent = (onlyShowHeader) => {
+    if (onlyShowHeader) {
+      return (
+        <div style={{position: 'fixed', top: effectiveStickyTop}} className="mobile-fund-table mobile-fund-table-portal-header" ref={portalHeaderRef}>
           <div
-            className="table-header-row mobile-fund-table-header"
-            style={mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : undefined}
+            className="mobile-fund-table-scroll"
+            style={mobileGridLayout.minWidth != null ? { minWidth: mobileGridLayout.minWidth } : undefined}
           >
-            {headerGroup.headers.map((header, headerIndex) => {
-              const columnId = header.column.id;
-              const pinClass = getPinClass(columnId, true);
-              const alignClass = getAlignClass(columnId);
-              const isLastColumn = headerIndex === headerGroup.headers.length - 1;
-              return (
-                <div
-                  key={header.id}
-                  className={`table-header-cell ${alignClass} ${pinClass}`}
-                  style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </div>
-              );
-            })}
+            {renderTableHeader()}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mobile-fund-table" ref={tableContainerRef}>
+        <div
+          className="mobile-fund-table-scroll"
+          style={mobileGridLayout.minWidth != null ? { minWidth: mobileGridLayout.minWidth } : undefined}
+        >
+          {renderTableHeader()}
+
+          {!onlyShowHeader && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            >
+              <SortableContext
+                items={data.map((item) => item.code)}
+                strategy={verticalListSortingStrategy}
+              >
+                <AnimatePresence mode="popLayout">
+                  {table.getRowModel().rows.map((row) => (
+                    <SortableRow
+                      key={row.original.code || row.id}
+                      row={row}
+                      isTableDragging={!!activeId}
+                      disabled={sortBy !== 'default'}
+                    >
+                      {(setActivatorNodeRef, listeners) => (
+                        <div
+                          ref={sortBy === 'default' ? setActivatorNodeRef : undefined}
+                          className="table-row"
+                          style={{
+                            background: 'var(--bg)',
+                            position: 'relative',
+                            zIndex: 1,
+                            ...(mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : {}),
+                          }}
+                          {...(sortBy === 'default' ? listeners : {})}
+                        >
+                          {row.getVisibleCells().map((cell, cellIndex) => {
+                            const columnId = cell.column.id;
+                            const pinClass = getPinClass(columnId, false);
+                            const alignClass = getAlignClass(columnId);
+                            const cellClassName = cell.column.columnDef.meta?.cellClassName || '';
+                            const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
+                            return (
+                              <div
+                                key={cell.id}
+                                className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`}
+                                style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
+                              >
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </SortableRow>
+                  ))}
+                </AnimatePresence>
+              </SortableContext>
+            </DndContext>
+
+          )}
+        </div>
+
+        {table.getRowModel().rows.length === 0 && !onlyShowHeader && (
+          <div className="table-row empty-row">
+            <div className="table-cell" style={{ textAlign: 'center' }}>
+              <span className="muted">暂无数据</span>
+            </div>
           </div>
         )}
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        {!onlyShowHeader && (
+          <MobileSettingModal
+            open={settingModalOpen}
+            onClose={() => setSettingModalOpen(false)}
+            columns={mobileColumnOrder.map((id) => ({ id, header: MOBILE_COLUMN_HEADERS[id] ?? id }))}
+            columnVisibility={mobileColumnVisibility}
+            onColumnReorder={(newOrder) => {
+              setMobileColumnOrder(newOrder);
+            }}
+            onToggleColumnVisibility={handleToggleMobileColumnVisibility}
+            onResetColumnOrder={handleResetMobileColumnOrder}
+            onResetColumnVisibility={handleResetMobileColumnVisibility}
+            showFullFundName={showFullFundName}
+            onToggleShowFullFundName={handleToggleShowFullFundName}
+          />
+        )}
+
+        <Drawer
+          open={!!(cardSheetRow && getFundCardProps)}
+          onOpenChange={(open) => {
+            if (!open) {
+              if (ignoreNextDrawerCloseRef.current) {
+                ignoreNextDrawerCloseRef.current = false;
+                return;
+              }
+              if (!blockDrawerClose) setCardSheetRow(null);
+            }
+          }}
         >
-          <SortableContext
-            items={data.map((item) => item.code)}
-            strategy={verticalListSortingStrategy}
+          <DrawerContent
+            className="h-[77vh] max-h-[88vh] mt-0 flex flex-col"
+            onPointerDownOutside={(e) => {
+              if (blockDrawerClose) return;
+              if (e?.target?.closest?.('[data-slot="dialog-content"], [role="dialog"]')) {
+                ignoreNextDrawerCloseRef.current = true;
+                return;
+              }
+              setCardSheetRow(null);
+            }}
           >
-            <AnimatePresence mode="popLayout">
-              {table.getRowModel().rows.map((row) => (
-                <SortableRow
-                  key={row.original.code || row.id}
-                  row={row}
-                  isTableDragging={!!activeId}
-                  disabled={sortBy !== 'default'}
+            <DrawerHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-5 pb-4 pt-2 text-left">
+              <DrawerTitle className="text-base font-semibold text-[var(--text)]">
+                基金详情
+              </DrawerTitle>
+              <DrawerClose asChild>
+                <button
+                  type="button"
+                  className="icon-button rounded-lg"
+                  aria-label="关闭"
+                  style={{ padding: 4, borderColor: 'transparent' }}
                 >
-                  {(setActivatorNodeRef, listeners) => (
-                    <div
-                      ref={sortBy === 'default' ? setActivatorNodeRef : undefined}
-                      className="table-row"
-                      style={{
-                        background: 'var(--bg)',
-                        position: 'relative',
-                        zIndex: 1,
-                        ...(mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : {}),
-                      }}
-                      {...(sortBy === 'default' ? listeners : {})}
-                    >
-                      {row.getVisibleCells().map((cell, cellIndex) => {
-                        const columnId = cell.column.id;
-                        const pinClass = getPinClass(columnId, false);
-                        const alignClass = getAlignClass(columnId);
-                        const cellClassName = cell.column.columnDef.meta?.cellClassName || '';
-                        const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
-                        return (
-                          <div
-                            key={cell.id}
-                            className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`}
-                            style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </SortableRow>
-              ))}
-            </AnimatePresence>
-          </SortableContext>
-        </DndContext>
+                  <CloseIcon width="24" height="24" />
+                </button>
+              </DrawerClose>
+            </DrawerHeader>
+            <div
+              className="flex-1 min-h-0 overflow-y-auto px-5 pb-8 pt-0"
+              style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
+            >
+              {cardSheetRow && getFundCardProps ? (
+                <FundCard {...getFundCardProps(cardSheetRow)} />
+              ) : null}
+            </div>
+          </DrawerContent>
+        </Drawer>
+
+        {!onlyShowHeader && showPortalHeader && ReactDOM.createPortal(renderContent(true), document.body)}
       </div>
+    );
+  };
 
-      {table.getRowModel().rows.length === 0 && (
-        <div className="table-row empty-row">
-          <div className="table-cell" style={{ textAlign: 'center' }}>
-            <span className="muted">暂无数据</span>
-          </div>
-        </div>
-      )}
-
-      <MobileSettingModal
-        open={settingModalOpen}
-        onClose={() => setSettingModalOpen(false)}
-        columns={mobileColumnOrder.map((id) => ({ id, header: MOBILE_COLUMN_HEADERS[id] ?? id }))}
-        columnVisibility={mobileColumnVisibility}
-        onColumnReorder={(newOrder) => {
-          setMobileColumnOrder(newOrder);
-        }}
-        onToggleColumnVisibility={handleToggleMobileColumnVisibility}
-        onResetColumnOrder={handleResetMobileColumnOrder}
-        onResetColumnVisibility={handleResetMobileColumnVisibility}
-        showFullFundName={showFullFundName}
-        onToggleShowFullFundName={handleToggleShowFullFundName}
-      />
-    </div>
+  return (
+    <>
+      {renderContent()}
+    </>
   );
 }

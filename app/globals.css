@@ -43,6 +43,13 @@
   --sidebar-accent-foreground: #e5e7eb;
   --sidebar-border: #1f2937;
   --sidebar-ring: #22d3ee;
+  --drawer-overlay: rgba(2, 6, 23, 0.5);
+  --dialog-overlay: rgba(2, 6, 23, 0.6);
+  --tabs-list-bg: rgba(255, 255, 255, 0.04);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(34, 211, 238, 0.12);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
 }
 
 /* 亮色主题：ui-ux-pro-max 规范 - 正文 #0F172A、弱化 #475569、玻璃 bg-white/80+、边框可见 */
@@ -84,6 +91,13 @@
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #e2e8f0;
   --sidebar-ring: #0891b2;
+  --drawer-overlay: rgba(15, 23, 42, 0.25);
+  --dialog-overlay: rgba(15, 23, 42, 0.35);
+  --tabs-list-bg: rgba(0, 0, 0, 0.04);
+  --tabs-list-border: var(--border);
+  --tabs-trigger-active-bg: rgba(8, 145, 178, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--background);
 }
 
 * {
@@ -93,7 +107,7 @@
 html,
 body {
   height: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -784,7 +798,7 @@ body::before {
 @media (max-width: 640px) {
   .content {
     padding-top: 140px;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   .navbar {
@@ -950,7 +964,7 @@ input[type="number"] {
     padding: 12px;
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   .grid {
@@ -1535,6 +1549,22 @@ input[type="number"] {
     /* min-width 由 MobileFundTable 根据 columns meta.width 动态设置 */
   }
 
+  .mobile-fund-table-portal-header {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    left: 13px;
+    right: 13px;
+    box-sizing: border-box;
+  }
+  .mobile-fund-table-portal-header::-webkit-scrollbar {
+    display: none;
+  }
+  .mobile-fund-table-portal-header .mobile-fund-table-scroll {
+    padding: 0;
+  }
+
   .mobile-fund-table .table-header-row {
     display: grid;
     /* grid-template-columns 由 MobileFundTable 根据当前列顺序动态设置 */
@@ -1586,13 +1616,17 @@ input[type="number"] {
     position: sticky;
     left: 0;
     z-index: 2;
-    box-shadow: 4px 0 10px -2px rgba(0, 0, 0, 0.12);
-    border-right: 1px solid rgba(0, 0, 0, 0.08);
     border-bottom: none;
   }
 
-  [data-theme="light"] .mobile-fund-table .table-header-cell-pin-left,
-  [data-theme="light"] .mobile-fund-table .table-cell-pin-left {
+  .mobile-fund-table .is-scrolled,
+  .mobile-fund-table .is-scrolled {
+    box-shadow: 4px 0 10px -2px rgba(0, 0, 0, 0.12);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  [data-theme="light"] .mobile-fund-table .is-scrolled,
+  [data-theme="light"] .mobile-fund-table .is-scrolled {
     box-shadow: 4px 0 10px -2px rgba(0, 0, 0, 0.08);
     border-right-color: rgba(0, 0, 0, 0.06);
   }
@@ -2011,6 +2045,65 @@ input[type="number"] {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+}
+
+/* shadcn Drawer：符合项目规范，适配亮/暗主题 */
+.drawer-shadow-bottom {
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
+}
+.drawer-shadow-top {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+[data-theme="light"] .drawer-shadow-bottom {
+  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.12);
+}
+[data-theme="light"] .drawer-shadow-top {
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.12);
+}
+
+/* shadcn Dialog：符合项目规范(ui-ux-pro-max)，适配亮/暗主题，略微玻璃拟态 */
+[data-slot="dialog-content"] {
+  background: rgba(17, 24, 39, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+[data-theme="light"] [data-slot="dialog-content"] {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dialog-content-shadow {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .dialog-content-shadow {
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+}
+
+[data-slot="dialog-content"] [data-slot="dialog-close"] {
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+[data-slot="dialog-content"] [data-slot="dialog-close"]:hover {
+  color: var(--foreground);
+  opacity: 1;
+}
+
+[data-slot="dialog-content"] [data-slot="dialog-close"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+[data-slot="dialog-title"] {
+  color: var(--foreground);
+}
+
+[data-slot="dialog-description"] {
+  color: var(--muted-foreground);
 }
 
 .mobile-setting-drawer {
@@ -3170,6 +3263,26 @@ input[type="number"] {
   border-color: var(--muted);
   background: rgba(255, 255, 255, 0.05);
   box-shadow: none;
+}
+
+.button.danger {
+  background: linear-gradient(180deg, #ef4444, #f87171);
+  color: #2b0b0b;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.button.danger:hover {
+  box-shadow: 0 10px 20px rgba(248, 113, 113, 0.25);
+}
+
+[data-theme="light"] .button.danger {
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  color: #fff;
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+[data-theme="light"] .button.danger:hover {
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.25);
 }
 
 /* ========== 移动端响应式 ========== */

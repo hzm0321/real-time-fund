@@ -81,38 +81,6 @@
 
 5. 目前项目用到的 sql 语句，查看项目 supabase.sql 文件。
 
-### Supabase Edge Functions 配置说明
-
-本项目使用 Supabase Edge Functions 来检查用户配置状态。需要部署以下边缘函数：
-
-#### 1. 边缘函数文件位置
-边缘函数代码位于 `doc/edgeFunctions/*`
-
-#### 2. 部署步骤
-
-1. **新建边缘函数代码**：
-位置在 Supabase控制台 → Edge Functions
-
-2. **复制边缘函数代码**：
-   将 `doc/edgeFunctions/*` 复制到 `supabase/functions/*`。复制成功后即可点击部署
-
-#### 3. 边缘函数说明
-
-**check-data** - 检查用户配置状态
-- **功能**：检查用户在 `user_configs` 表中的配置状态
-- **认证**：需要用户 JWT token
-- **返回状态**：
-  - `not_found`：用户配置记录不存在
-  - `empty`：用户配置记录存在但数据为空
-  - `found`：用户配置记录存在且有有效数据
-
-#### 4. 环境变量要求
-
-边缘函数需要以下 Supabase 环境变量（自动注入，无需手动配置）：
-- `SUPABASE_URL`：Supabase 项目 URL
-- `SUPABASE_ANON_KEY`：Supabase 匿名公钥
-- `SUPABASE_SERVICE_ROLE_KEY`：Supabase Service Role Key（用于绕过 RLS 查询）
-
 更多 Supabase 相关内容查阅官方文档。
 
 ### 构建与部署

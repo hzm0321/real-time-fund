@@ -13,10 +13,28 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString, isPlainObject } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import Announcement from "./components/Announcement";
-import { Stat } from "./components/Common";
-import FundTrendChart from "./components/FundTrendChart";
-import FundIntradayChart from "./components/FundIntradayChart";
-import { ChevronIcon, CloseIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, ListIcon, LoginIcon, LogoutIcon, MoonIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, SunIcon, TrashIcon, UpdateIcon, UserIcon, CameraIcon } from "./components/Icons";
+import EmptyStateCard from "./components/EmptyStateCard";
+import FundCard from "./components/FundCard";
+import GroupSummary from "./components/GroupSummary";
+import {
+  CloseIcon,
+  EyeIcon,
+  EyeOffIcon,
+  GridIcon,
+  ListIcon,
+  LoginIcon,
+  LogoutIcon,
+  MoonIcon,
+  PinIcon,
+  PinOffIcon,
+  PlusIcon,
+  SettingsIcon,
+  SortIcon,
+  SunIcon,
+  UpdateIcon,
+  UserIcon,
+  CameraIcon,
+} from "./components/Icons";
 import AddFundToGroupModal from "./components/AddFundToGroupModal";
 import AddResultModal from "./components/AddResultModal";
 import CloudConfigModal from "./components/CloudConfigModal";
@@ -90,214 +108,6 @@ function ScanButton({ onClick, disabled }) {
         <CameraIcon width="18" height="18" />
       )}
     </button>
-  );
-}
-
-// 数字滚动组件（初始化时无动画，后续变更再动画）
-function CountUp({ value, prefix = '', suffix = '', decimals = 2, className = '', style = {} }) {
-  const [displayValue, setDisplayValue] = useState(value);
-  const previousValue = useRef(value);
-  const isFirstChange = useRef(true);
-
-  useEffect(() => {
-    if (previousValue.current === value) return;
-
-    // 首次数值变化（包括从 0/默认值变为实际数据）不做动画，直接跳到目标值
-    if (isFirstChange.current) {
-      isFirstChange.current = false;
-      previousValue.current = value;
-      setDisplayValue(value);
-      return;
-    }
-
-    const start = previousValue.current;
-    const end = value;
-    const duration = 400; // 0.4秒动画
-    const startTime = performance.now();
-
-    const animate = (currentTime) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // easeOutQuart
-      const ease = 1 - Math.pow(1 - progress, 4);
-
-      const current = start + (end - start) * ease;
-      setDisplayValue(current);
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        previousValue.current = value;
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }, [value]);
-
-  return (
-    <span className={className} style={style}>
-      {prefix}{Math.abs(displayValue).toFixed(decimals)}{suffix}
-    </span>
-  );
-}
-
-function GroupSummary({ funds, holdings, groupName, getProfit, stickyTop }) {
-  const [showPercent, setShowPercent] = useState(true);
-  const [isMasked, setIsMasked] = useState(false);
-  const [isSticky, setIsSticky] = useState(false);
-  const rowRef = useRef(null);
-  const [assetSize, setAssetSize] = useState(24);
-  const [metricSize, setMetricSize] = useState(18);
-  const [winW, setWinW] = useState(0);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setWinW(window.innerWidth);
-      const onR = () => setWinW(window.innerWidth);
-      window.addEventListener('resize', onR);
-      return () => window.removeEventListener('resize', onR);
-    }
-  }, []);
-
-  const summary = useMemo(() => {
-    let totalAsset = 0;
-    let totalProfitToday = 0;
-    let totalHoldingReturn = 0;
-    let totalCost = 0;
-    let hasHolding = false;
-    let hasAnyTodayData = false;
-
-    funds.forEach(fund => {
-      const holding = holdings[fund.code];
-      const profit = getProfit(fund, holding);
-
-      if (profit) {
-        hasHolding = true;
-        totalAsset += profit.amount;
-        if (profit.profitToday != null) {
-          // 与卡片展示口径一致：先按“分”四舍五入再汇总，避免浮点误差/逐项舍入差导致不一致
-          totalProfitToday += Math.round(profit.profitToday * 100) / 100;
-          hasAnyTodayData = true;
-        }
-        if (profit.profitTotal !== null) {
-          totalHoldingReturn += profit.profitTotal;
-          if (holding && isNumber(holding.cost) && isNumber(holding.share)) {
-            totalCost += holding.cost * holding.share;
-          }
-        }
-      }
-    });
-
-    const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
-
-    return { totalAsset, totalProfitToday, totalHoldingReturn, hasHolding, returnRate, hasAnyTodayData };
-  }, [funds, holdings, getProfit]);
-
-  useLayoutEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const height = el.clientHeight;
-    // 使用 80px 作为更严格的阈值，因为 margin/padding 可能导致实际占用更高
-    const tooTall = height > 80;
-    if (tooTall) {
-      setAssetSize(s => Math.max(16, s - 1));
-      setMetricSize(s => Math.max(12, s - 1));
-    } else {
-      // 如果高度正常，尝试适当恢复字体大小，但不要超过初始值
-      // 这里的逻辑可以优化：如果当前远小于阈值，可以尝试增大，但为了稳定性，主要处理缩小的场景
-      // 或者：如果高度非常小（例如远小于80），可以尝试+1，但要小心死循环
-    }
-  }, [winW, summary.totalAsset, summary.totalProfitToday, summary.totalHoldingReturn, summary.returnRate, showPercent, assetSize, metricSize]); // 添加 assetSize, metricSize 到依赖，确保逐步缩小生效
-
-  if (!summary.hasHolding) return null;
-
-  return (
-    <div className={isSticky ? "group-summary-sticky" : ""} style={isSticky && stickyTop ? { top: stickyTop } : {}}>
-    <div className="glass card group-summary-card" style={{ marginBottom: 8, padding: '16px 20px', background: 'rgba(255, 255, 255, 0.03)', position: 'relative' }}>
-      <span
-        className="sticky-toggle-btn"
-        onClick={() => setIsSticky(!isSticky)}
-        style={{
-          position: 'absolute',
-          top: 4,
-          right: 4,
-          width: 24,
-          height: 24,
-          padding: 4,
-          opacity: 0.6,
-          zIndex: 10,
-          color: 'var(--muted)'
-        }}
-      >
-        {isSticky ? <PinIcon width="14" height="14" /> : <PinOffIcon width="14" height="14" />}
-      </span>
-      <div ref={rowRef} className="row" style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <div className="muted" style={{ fontSize: '12px' }}>{groupName}</div>
-            <button
-              className="fav-button"
-              onClick={() => setIsMasked(value => !value)}
-              aria-label={isMasked ? '显示资产' : '隐藏资产'}
-              style={{ margin: 0, padding: 2, display: 'inline-flex', alignItems: 'center' }}
-            >
-              {isMasked ? <EyeOffIcon width="16" height="16" /> : <EyeIcon width="16" height="16" />}
-            </button>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-            <span style={{ fontSize: '16px', marginRight: 2 }}>¥</span>
-            {isMasked ? (
-              <span style={{ fontSize: assetSize, position: 'relative', top: 4 }}>******</span>
-            ) : (
-              <CountUp value={summary.totalAsset} style={{ fontSize: assetSize }} />
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 24 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div className="muted" style={{ fontSize: '12px', marginBottom: 4 }}>当日收益</div>
-            <div
-              className={summary.hasAnyTodayData ? (summary.totalProfitToday > 0 ? 'up' : summary.totalProfitToday < 0 ? 'down' : '') : 'muted'}
-              style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}
-            >
-              {isMasked ? (
-                <span style={{ fontSize: metricSize }}>******</span>
-              ) : summary.hasAnyTodayData ? (
-                <>
-                  <span style={{ marginRight: 1 }}>{summary.totalProfitToday > 0 ? '+' : summary.totalProfitToday < 0 ? '-' : ''}</span>
-                  <CountUp value={Math.abs(summary.totalProfitToday)} style={{ fontSize: metricSize }} />
-                </>
-              ) : (
-                <span style={{ fontSize: metricSize }}>--</span>
-              )}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="muted" style={{ fontSize: '12px', marginBottom: 4 }}>持有收益{showPercent ? '(%)' : ''}</div>
-            <div
-              className={summary.totalHoldingReturn > 0 ? 'up' : summary.totalHoldingReturn < 0 ? 'down' : ''}
-              style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-              onClick={() => setShowPercent(!showPercent)}
-              title="点击切换金额/百分比"
-            >
-              {isMasked ? (
-                <span style={{ fontSize: metricSize }}>******</span>
-              ) : (
-                <>
-                  <span style={{ marginRight: 1 }}>{summary.totalHoldingReturn > 0 ? '+' : summary.totalHoldingReturn < 0 ? '-' : ''}</span>
-                  {showPercent ? (
-                    <CountUp value={Math.abs(summary.returnRate)} suffix="%" style={{ fontSize: metricSize }} />
-                  ) : (
-                    <CountUp value={Math.abs(summary.totalHoldingReturn)} style={{ fontSize: metricSize }} />
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    </div>
   );
 }
 
@@ -427,6 +237,7 @@ export default function HomePage() {
   // 动态计算 Navbar 和 FilterBar 高度
   const navbarRef = useRef(null);
   const filterBarRef = useRef(null);
+  const containerRef = useRef(null);
   const [navbarHeight, setNavbarHeight] = useState(0);
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   // 主题初始固定为 dark，避免 SSR 与客户端首屏不一致导致 hydration 报错；真实偏好由 useLayoutEffect 在首帧前恢复
@@ -507,6 +318,8 @@ export default function HomePage() {
   const [isTradingDay, setIsTradingDay] = useState(true); // 默认为交易日，通过接口校正
   const tabsRef = useRef(null);
   const [fundDeleteConfirm, setFundDeleteConfirm] = useState(null); // { code, name }
+  const fundDetailDrawerCloseRef = useRef(null); // 由 MobileFundTable 注入，用于确认删除时关闭基金详情 Drawer
+  const fundDetailDialogCloseRef = useRef(null); // 由 PcFundTable 注入，用于确认删除时关闭基金详情 Dialog
 
   const todayStr = formatDate();
 
@@ -1746,9 +1559,12 @@ export default function HomePage() {
 
   const applyViewMode = useCallback((mode) => {
     if (mode !== 'card' && mode !== 'list') return;
+    if (mode !== viewMode) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     setViewMode(mode);
     storageHelper.setItem('viewMode', mode);
-  }, [storageHelper]);
+  }, [storageHelper, viewMode]);
 
   const toggleFavorite = (code) => {
     setFavorites(prev => {
@@ -2635,6 +2451,8 @@ export default function HomePage() {
     if (hasHolding) {
       setFundDeleteConfirm({ code: fund.code, name: fund.name });
     } else {
+      fundDetailDrawerCloseRef.current?.();
+      fundDetailDialogCloseRef.current?.();
       removeFund(fund.code);
     }
   };
@@ -3181,13 +2999,15 @@ export default function HomePage() {
   const fetchCloudConfig = async (userId, checkConflict = false) => {
     if (!userId) return;
     try {
-      const { data: checkResult, error: checkError } = await supabase.functions.invoke(`check-data?userId=${userId}`, {
-        method: 'GET',
-      });
+      const { data: meta, error: metaError } = await supabase
+        .from('user_configs')
+        .select(`id, updated_at${checkConflict ? ', data' : ''}`)
+        .eq('user_id', userId)
+        .maybeSingle();
 
-      if (checkError) throw checkError;
+      if (metaError) throw metaError;
 
-      if (checkResult.status === 'not_found') {
+      if (!meta?.id) {
         const { error: insertError } = await supabase
           .from('user_configs')
           .insert({ user_id: userId });
@@ -3195,9 +3015,13 @@ export default function HomePage() {
         setCloudConfigModal({ open: true, userId, type: 'empty' });
         return;
       }
+      if (checkConflict) {
+        setCloudConfigModal({ open: true, userId, type: 'conflict', cloudData: meta.data });
+        return;
+      }
 
-      if (checkResult.status === 'empty') {
-        setCloudConfigModal({ open: true, userId, type: 'empty' });
+      const localUpdatedAt = window.localStorage.getItem('localUpdatedAt');
+      if (localUpdatedAt && meta.updated_at && new Date(meta.updated_at) < new Date(localUpdatedAt)) {
         return;
       }
 
@@ -3205,7 +3029,7 @@ export default function HomePage() {
         .from('user_configs')
         .select('id, data, updated_at')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -3215,10 +3039,13 @@ export default function HomePage() {
         const cloudComparable = getComparablePayload(data.data);
 
         if (localComparable !== cloudComparable) {
+          // 如果数据不一致
           if (checkConflict) {
+            // 只有明确要求检查冲突时才提示（例如刚登录时）
             setCloudConfigModal({ open: true, userId, type: 'conflict', cloudData: data.data });
             return;
           }
+          // 否则直接覆盖本地（例如已登录状态下的刷新）
           await applyCloudConfig(data.data, data.updated_at);
           return;
         }
@@ -3591,7 +3418,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="container content" style={{ width: containerWidth }}>
+    <div ref={containerRef} className="container content" style={{ width: containerWidth }}>
       <AnimatePresence>
         {showThemeTransition && (
           <motion.div
@@ -3947,7 +3774,7 @@ export default function HomePage() {
 
       <div className="grid">
         <div className="col-12">
-          <div ref={filterBarRef} className="filter-bar" style={{ top: isMobile ? undefined : navbarHeight , marginTop: navbarHeight, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div ref={filterBarRef} className="filter-bar" style={{ ...(isMobile ? {} : { top: navbarHeight }), marginTop: navbarHeight, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div className="tabs-container">
               <div
                 className="tabs-scroll-area"
@@ -4095,15 +3922,11 @@ export default function HomePage() {
           </div>
 
           {displayFunds.length === 0 ? (
-            <div className="glass card empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px' }}>
-              <div style={{ fontSize: '48px', marginBottom: 16, opacity: 0.5 }}>📂</div>
-              <div className="muted" style={{ marginBottom: 20 }}>{funds.length === 0 ? '尚未添加基金' : '该分组下暂无数据'}</div>
-              {currentTab !== 'all' && currentTab !== 'fav' && funds.length > 0 && (
-                <button className="button" onClick={() => setAddFundToGroupOpen(true)}>
-                  添加基金到此分组
-                </button>
-              )}
-            </div>
+            <EmptyStateCard
+              fundsLength={funds.length}
+              currentTab={currentTab}
+              onAddToGroup={() => setAddFundToGroupOpen(true)}
+            />
           ) : (
             <>
               <GroupSummary
@@ -4203,6 +4026,39 @@ export default function HomePage() {
                                   setPercentModes(prev => ({ ...prev, [row.code]: !prev[row.code] }));
                                 }}
                                 onCustomSettingsChange={triggerCustomSettingsSync}
+                                closeDialogRef={fundDetailDialogCloseRef}
+                                blockDialogClose={!!fundDeleteConfirm}
+                                getFundCardProps={(row) => {
+                                  const fund = row?.rawFund || (row ? { code: row.code, name: row.fundName } : null);
+                                  if (!fund) return {};
+                                  return {
+                                    fund,
+                                    todayStr,
+                                    currentTab,
+                                    favorites,
+                                    dcaPlans,
+                                    holdings,
+                                    percentModes,
+                                    valuationSeries,
+                                    collapsedCodes,
+                                    collapsedTrends,
+                                    transactions,
+                                    theme,
+                                    isTradingDay,
+                                    refreshing,
+                                    getHoldingProfit,
+                                    onRemoveFromGroup: removeFundFromCurrentGroup,
+                                    onToggleFavorite: toggleFavorite,
+                                    onRemoveFund: requestRemoveFund,
+                                    onHoldingClick: (f) => setHoldingModal({ open: true, fund: f }),
+                                    onActionClick: (f) => setActionModal({ open: true, fund: f }),
+                                    onPercentModeToggle: (code) =>
+                                      setPercentModes((prev) => ({ ...prev, [code]: !prev[code] })),
+                                    onToggleCollapse: toggleCollapse,
+                                    onToggleTrendCollapse: toggleTrendCollapse,
+                                    layoutMode: 'drawer',
+                                  };
+                                }}
                               />
                             </div>
                           </div>
@@ -4215,6 +4071,9 @@ export default function HomePage() {
                         currentTab={currentTab}
                         favorites={favorites}
                         sortBy={sortBy}
+                        stickyTop={navbarHeight + filterBarHeight - 14}
+                        blockDrawerClose={!!fundDeleteConfirm}
+                        closeDrawerRef={fundDetailDrawerCloseRef}
                         onReorder={handleReorder}
                         onRemoveFund={(row) => {
                           if (refreshing) return;
@@ -4244,6 +4103,37 @@ export default function HomePage() {
                           setPercentModes((prev) => ({ ...prev, [row.code]: !prev[row.code] }));
                         }}
                         onCustomSettingsChange={triggerCustomSettingsSync}
+                        getFundCardProps={(row) => {
+                          const fund = row?.rawFund || (row ? { code: row.code, name: row.fundName } : null);
+                          if (!fund) return {};
+                          return {
+                            fund,
+                            todayStr,
+                            currentTab,
+                            favorites,
+                            dcaPlans,
+                            holdings,
+                            percentModes,
+                            valuationSeries,
+                            collapsedCodes,
+                            collapsedTrends,
+                            transactions,
+                            theme,
+                            isTradingDay,
+                            refreshing,
+                            getHoldingProfit,
+                            onRemoveFromGroup: removeFundFromCurrentGroup,
+                            onToggleFavorite: toggleFavorite,
+                            onRemoveFund: requestRemoveFund,
+                            onHoldingClick: (f) => setHoldingModal({ open: true, fund: f }),
+                            onActionClick: (f) => setActionModal({ open: true, fund: f }),
+                            onPercentModeToggle: (code) =>
+                              setPercentModes((prev) => ({ ...prev, [code]: !prev[code] })),
+                            onToggleCollapse: toggleCollapse,
+                            onToggleTrendCollapse: toggleTrendCollapse,
+                            layoutMode: 'drawer',
+                          };
+                        }}
                       />
                     )}
                     <AnimatePresence mode="popLayout">
@@ -4258,274 +4148,33 @@ export default function HomePage() {
                           transition={{ duration: 0.2 }}
                           style={{ position: 'relative', overflow: 'hidden' }}
                         >
-                          <motion.div
-                            className="glass card"
-                            style={{ position: 'relative', zIndex: 1 }}
-                          >
-                            <>
-                                <div className="row" style={{ marginBottom: 10 }}>
-                                  <div className="title">
-                                    {currentTab !== 'all' && currentTab !== 'fav' ? (
-                                      <button
-                                        className="icon-button fav-button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          removeFundFromCurrentGroup(f.code);
-                                        }}
-                                        title="从当前分组移除"
-                                      >
-                                        <ExitIcon width="18" height="18" style={{ transform: 'rotate(180deg)' }} />
-                                      </button>
-                                    ) : (
-                                      <button
-                                        className={`icon-button fav-button ${favorites.has(f.code) ? 'active' : ''}`}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleFavorite(f.code);
-                                        }}
-                                        title={favorites.has(f.code) ? "取消自选" : "添加自选"}
-                                      >
-                                        <StarIcon width="18" height="18" filled={favorites.has(f.code)} />
-                                      </button>
-                                    )}
-                                    <div className="title-text">
-                                      <span
-                                        className={`name-text`}
-                                        title={f.jzrq === todayStr ? "今日净值已更新" : ""}
-                                      >
-                                        {f.name}
-                                      </span>
-                                      <span className="muted">
-                                        #{f.code}
-                                        {dcaPlans[f.code]?.enabled === true && <span className="dca-indicator">定</span>}
-                                        {f.jzrq === todayStr && <span className="updated-indicator">✓</span>}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div className="actions">
-                                    <div className="badge-v">
-                                      <span>{f.noValuation ? '净值日期' : '估值时间'}</span>
-                                      <strong>{f.noValuation ? (f.jzrq || '-') : (f.gztime || f.time || '-')}</strong>
-                                    </div>
-                                    <div className="row" style={{ gap: 4 }}>
-                                      <button
-                                        className="icon-button danger"
-                                        onClick={() => !refreshing && requestRemoveFund(f)}
-                                        title="删除"
-                                        disabled={refreshing}
-                                        style={{ width: '28px', height: '28px', opacity: refreshing ? 0.6 : 1, cursor: refreshing ? 'not-allowed' : 'pointer' }}
-                                      >
-                                        <TrashIcon width="14" height="14" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="row" style={{ marginBottom: 12 }}>
-                                  <Stat label="单位净值" value={f.dwjz ?? '—'} />
-                                  {f.noValuation ? (
-                                    // 无估值数据的基金，直接显示净值涨跌幅，不显示估值相关字段
-                                    <Stat
-                                      label="涨跌幅"
-                                      value={f.zzl !== undefined && f.zzl !== null ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : '—'}
-                                      delta={f.zzl}
-                                    />
-                                  ) : (
-                                    <>
-                                      {(() => {
-                                        const hasTodayData = f.jzrq === todayStr;
-                                        let isYesterdayChange = false;
-                                        let isPreviousTradingDay = false;
-                                        if (!hasTodayData && isString(f.jzrq)) {
-                                          const today = toTz(todayStr).startOf('day');
-                                          const jzDate = toTz(f.jzrq).startOf('day');
-                                          const yesterday = today.clone().subtract(1, 'day');
-                                          if (jzDate.isSame(yesterday, 'day')) {
-                                            isYesterdayChange = true;
-                                          } else if (jzDate.isBefore(yesterday, 'day')) {
-                                            isPreviousTradingDay = true;
-                                          }
-                                        }
-                                        const shouldHideChange = isTradingDay && !hasTodayData && !isYesterdayChange && !isPreviousTradingDay;
-
-                                        if (shouldHideChange) return null;
-
-                                        // 不再区分“上一交易日涨跌幅”名称，统一使用“昨日涨幅”
-                                        const changeLabel = hasTodayData ? '涨跌幅' : '昨日涨幅';
-                                        return (
-                                          <Stat
-                                            label={changeLabel}
-                                            value={f.zzl !== undefined ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : ''}
-                                            delta={f.zzl}
-                                          />
-                                        );
-                                      })()}
-                                      <Stat label="估值净值" value={f.estPricedCoverage > 0.05 ? f.estGsz.toFixed(4) : (f.gsz ?? '—')} />
-                                      <Stat
-                                        label="估值涨幅"
-                                        value={f.estPricedCoverage > 0.05 ? `${f.estGszzl > 0 ? '+' : ''}${f.estGszzl.toFixed(2)}%` : (isNumber(f.gszzl) ? `${f.gszzl > 0 ? '+' : ''}${f.gszzl.toFixed(2)}%` : f.gszzl ?? '—')}
-                                        delta={f.estPricedCoverage > 0.05 ? f.estGszzl : (Number(f.gszzl) || 0)}
-                                      />
-                                    </>
-                                  )}
-                                </div>
-
-                                <div className="row" style={{ marginBottom: 12 }}>
-                                  {(() => {
-                                    const holding = holdings[f.code];
-                                    const profit = getHoldingProfit(f, holding);
-
-                                    if (!profit) {
-                                      return (
-                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
-                                          <span className="label">持仓金额</span>
-                                          <div
-                                            className="value muted"
-                                            style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                                            onClick={() => setHoldingModal({ open: true, fund: f })}
-                                          >
-                                            未设置 <SettingsIcon width="12" height="12" />
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-
-                                    return (
-                                      <>
-                                        <div
-                                          className="stat"
-                                          style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
-                                          onClick={() => setActionModal({ open: true, fund: f })}
-                                        >
-                                          <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            持仓金额 <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />
-                                          </span>
-                                          <span className="value">¥{profit.amount.toFixed(2)}</span>
-                                        </div>
-                                        <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
-                                          <span className="label">当日收益</span>
-                                          <span className={`value ${profit.profitToday != null ? (profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : '') : 'muted'}`}>
-                                            {profit.profitToday != null
-                                              ? `${profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}¥${Math.abs(profit.profitToday).toFixed(2)}`
-                                              : '--'}
-                                          </span>
-                                        </div>
-                                        {profit.profitTotal !== null && (
-                                          <div
-                                            className="stat"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setPercentModes(prev => ({ ...prev, [f.code]: !prev[f.code] }));
-                                            }}
-                                            style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
-                                            title="点击切换金额/百分比"
-                                          >
-                                            <span className="label">持有收益{percentModes[f.code] ? '(%)' : ''}</span>
-                                            <span className={`value ${profit.profitTotal > 0 ? 'up' : profit.profitTotal < 0 ? 'down' : ''}`}>
-                                              {profit.profitTotal > 0 ? '+' : profit.profitTotal < 0 ? '-' : ''}
-                                              {percentModes[f.code]
-                                                ? `${Math.abs((holding.cost * holding.share) ? (profit.profitTotal / (holding.cost * holding.share)) * 100 : 0).toFixed(2)}%`
-                                                : `¥${Math.abs(profit.profitTotal).toFixed(2)}`
-                                              }
-                                            </span>
-                                          </div>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-
-                                {f.estPricedCoverage > 0.05 && (
-                                  <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: -8, marginBottom: 10, textAlign: 'right' }}>
-                                    基于 {Math.round(f.estPricedCoverage * 100)}% 持仓估算
-                                  </div>
-                                )}
-                                {(() => {
-                                  const showIntraday = Array.isArray(valuationSeries[f.code]) && valuationSeries[f.code].length >= 2;
-                                  if (!showIntraday) return null;
-
-                                  // 如果今日日期大于估值日期，说明是历史估值，不显示分时图
-                                  if (f.gztime && toTz(todayStr).startOf('day').isAfter(toTz(f.gztime).startOf('day'))) {
-                                    return null;
-                                  }
-
-                                  // 如果 jzrq 等于估值日期或在此之前（意味着净值已经更新到了估值日期，或者是历史数据），则隐藏实时估值分时
-                                  if (f.jzrq && f.gztime && toTz(f.jzrq).startOf('day').isSameOrAfter(toTz(f.gztime).startOf('day'))) {
-                                    return null;
-                                  }
-
-                                  return (
-                                    <FundIntradayChart
-                                      key={`${f.code}-intraday-${theme}`}
-                                      series={valuationSeries[f.code]}
-                                      referenceNav={f.dwjz != null ? Number(f.dwjz) : undefined}
-                                      theme={theme}
-                                    />
-                                  );
-                                })()}
-                                {f.holdingsIsLastQuarter && Array.isArray(f.holdings) && f.holdings.length > 0 && (
-                                  <>
-                                    <div
-                                      style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-                                      className="title"
-                                      onClick={() => toggleCollapse(f.code)}
-                                    >
-                                      <div className="row" style={{ width: '100%', flex: 1 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          <span>前10重仓股票</span>
-                                          <ChevronIcon
-                                            width="16"
-                                            height="16"
-                                            className="muted"
-                                            style={{
-                                              transform: collapsedCodes.has(f.code) ? 'rotate(-90deg)' : 'rotate(0deg)',
-                                              transition: 'transform 0.2s ease'
-                                            }}
-                                          />
-                                        </div>
-                                        <span className="muted">涨跌幅 / 占比</span>
-                                      </div>
-                                    </div>
-                                    <AnimatePresence>
-                                      {!collapsedCodes.has(f.code) && (
-                                        <motion.div
-                                          initial={{ height: 0, opacity: 0 }}
-                                          animate={{ height: 'auto', opacity: 1 }}
-                                          exit={{ height: 0, opacity: 0 }}
-                                          transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                          style={{ overflow: 'hidden' }}
-                                        >
-                                          <div className="list">
-                                            {f.holdings.map((h, idx) => (
-                                              <div className="item" key={idx}>
-                                                <span className="name">{h.name}</span>
-                                                <div className="values">
-                                                  {isNumber(h.change) && (
-                                                    <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
-                                                      {h.change > 0 ? '+' : ''}{h.change.toFixed(2)}%
-                                                    </span>
-                                                  )}
-                                                  <span className="weight">{h.weight}</span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </motion.div>
-                                      )}
-                                    </AnimatePresence>
-                                  </>
-                                )}
-                                <FundTrendChart
-                                  key={`${f.code}-${theme}`}
-                                  code={f.code}
-                                  isExpanded={!collapsedTrends.has(f.code)}
-                                  onToggleExpand={() => toggleTrendCollapse(f.code)}
-                                  transactions={transactions[f.code] || []}
-                                  theme={theme}
-                                />
-                              </>
-                          </motion.div>
+                            <FundCard
+                              fund={f}
+                              todayStr={todayStr}
+                              currentTab={currentTab}
+                              favorites={favorites}
+                              dcaPlans={dcaPlans}
+                              holdings={holdings}
+                              percentModes={percentModes}
+                              valuationSeries={valuationSeries}
+                              collapsedCodes={collapsedCodes}
+                              collapsedTrends={collapsedTrends}
+                              transactions={transactions}
+                              theme={theme}
+                              isTradingDay={isTradingDay}
+                              refreshing={refreshing}
+                              getHoldingProfit={getHoldingProfit}
+                              onRemoveFromGroup={removeFundFromCurrentGroup}
+                              onToggleFavorite={toggleFavorite}
+                              onRemoveFund={requestRemoveFund}
+                              onHoldingClick={(fund) => setHoldingModal({ open: true, fund })}
+                              onActionClick={(fund) => setActionModal({ open: true, fund })}
+                              onPercentModeToggle={(code) =>
+                                setPercentModes((prev) => ({ ...prev, [code]: !prev[code] }))
+                              }
+                              onToggleCollapse={toggleCollapse}
+                              onToggleTrendCollapse={toggleTrendCollapse}
+                            />
                         </motion.div>
                       ))}
                     </AnimatePresence>
@@ -4544,6 +4193,8 @@ export default function HomePage() {
             message={`基金 "${fundDeleteConfirm.name}" 存在持仓记录。删除后将移除该基金及其持仓数据，是否继续？`}
             confirmText="确定删除"
             onConfirm={() => {
+              fundDetailDrawerCloseRef.current?.();
+              fundDetailDialogCloseRef.current?.();
               removeFund(fundDeleteConfirm.code);
               setFundDeleteConfirm(null);
             }}
