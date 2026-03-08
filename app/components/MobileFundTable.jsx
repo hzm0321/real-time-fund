@@ -263,9 +263,9 @@ export default function MobileFundTable({
       group.mobileShowFullFundName = show;
       parsed[groupKey] = group;
       window.localStorage.setItem('customSettings', JSON.stringify(parsed));
-      setConfigByGroup((prev) => ({ 
-        ...prev, 
-        [groupKey]: { ...prev[groupKey], mobileShowFullFundName: show } 
+      setConfigByGroup((prev) => ({
+        ...prev,
+        [groupKey]: { ...prev[groupKey], mobileShowFullFundName: show }
       }));
       onCustomSettingsChange?.();
     } catch {}
@@ -338,11 +338,9 @@ export default function MobileFundTable({
     const handlePortalScroll = () => syncScrollToTable();
 
     tableEl.addEventListener('scroll', handleTableScroll, { passive: true });
-    portalEl.addEventListener('scroll', handlePortalScroll, { passive: true });
 
     return () => {
       tableEl.removeEventListener('scroll', handleTableScroll);
-      portalEl.removeEventListener('scroll', handlePortalScroll);
     };
   }, [showPortalHeader]);
 
@@ -430,8 +428,8 @@ export default function MobileFundTable({
           </button>
         )}
         <div className="title-text">
-          <span 
-            className={`name-text ${showFullFundName ? 'show-full' : ''}`} 
+          <span
+            className={`name-text ${showFullFundName ? 'show-full' : ''}`}
             title={isUpdated ? '今日净值已更新' : ''}
           >
             {info.getValue() ?? '—'}
