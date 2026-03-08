@@ -281,6 +281,7 @@ export default function MobileFundTable({
   const [tableContainerWidth, setTableContainerWidth] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showPortalHeader, setShowPortalHeader] = useState(false);
+  const [effectiveStickyTop, setEffectiveStickyTop] = useState(stickyTop);
 
   useEffect(() => {
     const el = tableContainerRef.current;
@@ -294,13 +295,39 @@ export default function MobileFundTable({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const getEffectiveStickyTop = () => {
+      const stickySummaryCard = document.querySelector('.group-summary-sticky .group-summary-card');
+      if (!stickySummaryCard) return stickyTop;
+
+      const stickySummaryWrapper = stickySummaryCard.closest('.group-summary-sticky');
+      if (!stickySummaryWrapper) return stickyTop;
+
+      const wrapperRect = stickySummaryWrapper.getBoundingClientRect();
+      const isSummaryStuck = wrapperRect.top <= stickyTop + 1;
+
+      return isSummaryStuck ? stickyTop + stickySummaryWrapper.offsetHeight : stickyTop;
+    };
+
     const handleVerticalScroll = () => {
-      setShowPortalHeader(window.scrollY >= stickyTop);
+      const nextStickyTop = getEffectiveStickyTop();
+      setEffectiveStickyTop((prev) => (prev === nextStickyTop ? prev : nextStickyTop));
+
+      const tableRect = tableContainerRef.current?.getBoundingClientRect();
+      if (!tableRect) {
+        setShowPortalHeader(window.scrollY >= nextStickyTop);
+        return;
+      }
+
+      setShowPortalHeader(tableRect.top <= nextStickyTop);
     };
 
     handleVerticalScroll();
     window.addEventListener('scroll', handleVerticalScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleVerticalScroll);
+    window.addEventListener('resize', handleVerticalScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleVerticalScroll);
+      window.removeEventListener('resize', handleVerticalScroll);
+    };
   }, [stickyTop]);
 
   useEffect(() => {
@@ -818,7 +845,7 @@ export default function MobileFundTable({
   const renderContent = (onlyShowHeader) => {
     if (onlyShowHeader) {
       return (
-        <div style={{position: 'fixed', top: stickyTop}} className="mobile-fund-table mobile-fund-table-portal-header" ref={portalHeaderRef}>
+        <div style={{position: 'fixed', top: effectiveStickyTop}} className="mobile-fund-table mobile-fund-table-portal-header" ref={portalHeaderRef}>
           <div
             className="mobile-fund-table-scroll"
             style={mobileGridLayout.minWidth != null ? { minWidth: mobileGridLayout.minWidth } : undefined}
