@@ -114,7 +114,7 @@ docker run -d -p 3000:3000 --name fund real-time-fund
 #### docker-compose（会读取同目录 `.env` 作为 build-arg 与运行环境）
 ```bash
 # 建议先：cp env.example .env 并编辑 .env
-docker compose up -d
+docker compose up -d --build
 ```
 
 ## 📖 使用说明
