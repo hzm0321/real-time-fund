@@ -64,7 +64,13 @@ export default function FundCard({
   const profit = getHoldingProfit?.(f, holding) ?? null;
   const hasHoldings = f.holdingsIsLastQuarter && Array.isArray(f.holdings) && f.holdings.length > 0;
 
-  const style = layoutMode === 'drawer' ? { border: 'none', boxShadow: 'none' } : {};
+  const style = layoutMode === 'drawer' ? {
+    border: 'none',
+    boxShadow: 'none',
+    paddingLeft: 0,
+    paddingRight: 0,
+    background: 'transparent',
+  } : {};
 
   return (
     <motion.div

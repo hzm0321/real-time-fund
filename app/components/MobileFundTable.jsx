@@ -696,6 +696,7 @@ export default function MobileFundTable({
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
           const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
           const percentStr = original.todayProfitPercent ?? '';
+          const isUpdated = original.isUpdated;
           return (
             <div style={{ width: '100%' }}>
               <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
@@ -703,7 +704,7 @@ export default function MobileFundTable({
                   {amountStr}
                 </FitText>
               </span>
-              {percentStr ? (
+              {percentStr && !isUpdated ? (
                 <span className={`${cls} today-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
                   <FitText maxFontSize={11} minFontSize={9}>
                     {percentStr}
@@ -1022,15 +1023,12 @@ export default function MobileFundTable({
               <DrawerTitle className="text-base font-semibold text-[var(--text)]">
                 基金详情
               </DrawerTitle>
-              <DrawerClose asChild>
-                <button
-                  type="button"
-                  className="icon-button rounded-lg"
-                  aria-label="关闭"
-                  style={{ padding: 4, borderColor: 'transparent' }}
-                >
-                  <CloseIcon width="24" height="24" />
-                </button>
+              <DrawerClose
+                className="icon-button border-none bg-transparent p-1"
+                title="关闭"
+                style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
+              >
+                <CloseIcon width="20" height="20" />
               </DrawerClose>
             </DrawerHeader>
             <div

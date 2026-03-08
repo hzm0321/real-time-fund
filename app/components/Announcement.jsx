@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v12';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v13';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -16,6 +16,16 @@ export default function Announcement() {
   }, []);
 
   const handleClose = () => {
+    // 清理历史 ANNOUNCEMENT_KEY
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('hasClosedAnnouncement_v') && key !== ANNOUNCEMENT_KEY) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
     localStorage.setItem(ANNOUNCEMENT_KEY, 'true');
     setIsVisible(false);
   };
@@ -65,14 +75,12 @@ export default function Announcement() {
               <span>公告</span>
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
-              <p>v0.2.1 版本更新内容如下：</p>
-              <p>1. 改进拍照识别基金准确度。</p>
-              <p>2. 拍照导入支持选择分组，识别持仓金额、持仓收益。</p>
-              <p>3. 个性化设置新增展示完整基金名称。</p>
-              <p>4. 表格列新增估算收益(估值涨幅+持有收益涨幅)。</p>
-              以下功能将会在下一个版本上线：
-              <p>1. 大盘走势数据。</p>
-              <p>2. 关联板块。</p>
+              <p>v0.2.2 版本更新内容如下：</p>
+              <p>1. 新增 ios pwa 应用支持。</p>
+              <p>2. 引入 shadcn ui 组件库，逐步调整项目样式。</p>
+              <p>3. 列表模式表头固定。</p>
+              <p>4. 列表模式点击名称，展示基金详情弹框。</p>
+              <p>注：强烈建议苹果用户通过 Safari 浏览器→分享→添加应用到主屏幕，实现保存网页成APP效果。（安卓同理）</p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>

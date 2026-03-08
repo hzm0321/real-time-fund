@@ -1272,6 +1272,16 @@ input[type="number"] {
   background: var(--primary);
 }
 
+/* PC 表头固定时的 portal 容器：与 table-scroll-area 横向滚动同步，但隐藏自身滚动条 */
+.pc-fund-table-portal-header {
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* IE / Edge legacy */
+}
+
+.pc-fund-table-portal-header::-webkit-scrollbar {
+  display: none;                 /* Chrome / Safari */
+}
+
 /* 纵向滚动条通用样式（与项目整体规范一致，供弹窗、列表等使用） */
 .scrollbar-y-styled {
   scrollbar-width: thin;

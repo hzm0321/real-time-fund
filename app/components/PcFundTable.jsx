@@ -1,6 +1,8 @@
 'use client';
 
+import ReactDOM from 'react-dom';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { throttle } from 'lodash';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   flexRender,
@@ -128,6 +130,7 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {(row: any) => Object} [props.getFundCardProps] - 给定行返回 FundCard 的 props；传入后点击基金名称将用弹框展示卡片详情
  * @param {React.MutableRefObject<(() => void) | null>} [props.closeDialogRef] - 注入关闭弹框的方法，用于确认删除时关闭
  * @param {boolean} [props.blockDialogClose] - 为 true 时阻止点击遮罩关闭弹框（如删除确认弹框打开时）
+ * @param {number} [props.stickyTop] - 表头固定时的 top 偏移（与 MobileFundTable 一致，用于适配导航栏、筛选栏等）
  */
 export default function PcFundTable({
   data = [],
@@ -145,6 +148,7 @@ export default function PcFundTable({
   getFundCardProps,
   closeDialogRef,
   blockDialogClose = false,
+  stickyTop = 0,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -157,6 +161,11 @@ export default function PcFundTable({
 
   const [activeId, setActiveId] = useState(null);
   const [cardDialogRow, setCardDialogRow] = useState(null);
+  const tableContainerRef = useRef(null);
+  const portalHeaderRef = useRef(null);
+  const [showPortalHeader, setShowPortalHeader] = useState(false);
+  const [effectiveStickyTop, setEffectiveStickyTop] = useState(stickyTop);
+  const [portalHorizontal, setPortalHorizontal] = useState({ left: 0, right: 0 });
 
   const handleDragStart = (event) => {
     setActiveId(event.active.id);
@@ -373,6 +382,87 @@ export default function PcFundTable({
     onRemoveFromGroup,
     onHoldingAmountClick,
   ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const getEffectiveStickyTop = () => {
+      const stickySummaryCard = document.querySelector('.group-summary-sticky .group-summary-card');
+      if (!stickySummaryCard) return stickyTop;
+
+      const stickySummaryWrapper = stickySummaryCard.closest('.group-summary-sticky');
+      if (!stickySummaryWrapper) return stickyTop;
+
+      const wrapperRect = stickySummaryWrapper.getBoundingClientRect();
+      const isSummaryStuck = wrapperRect.top <= stickyTop + 1;
+
+      return isSummaryStuck ? stickyTop + stickySummaryWrapper.offsetHeight : stickyTop;
+    };
+
+    const updateVerticalState = () => {
+      const nextStickyTop = getEffectiveStickyTop();
+      setEffectiveStickyTop((prev) => (prev === nextStickyTop ? prev : nextStickyTop));
+
+      const tableEl = tableContainerRef.current;
+      const scrollEl = tableEl?.closest('.table-scroll-area');
+      const targetEl = scrollEl || tableEl;
+      const rect = targetEl?.getBoundingClientRect();
+
+      if (!rect) {
+        setShowPortalHeader(window.scrollY >= nextStickyTop);
+        return;
+      }
+
+      setShowPortalHeader(rect.top <= nextStickyTop);
+
+      setPortalHorizontal((prev) => {
+        const next = {
+          left: rect.left,
+          right: typeof window !== 'undefined' ? Math.max(0, window.innerWidth - rect.right) : 0,
+        };
+        if (prev.left === next.left && prev.right === next.right) return prev;
+        return next;
+      });
+    };
+
+    const throttledVerticalUpdate = throttle(updateVerticalState, 1000 / 60, { leading: true, trailing: true });
+
+    updateVerticalState();
+    window.addEventListener('scroll', throttledVerticalUpdate, { passive: true });
+    window.addEventListener('resize', throttledVerticalUpdate, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', throttledVerticalUpdate);
+      window.removeEventListener('resize', throttledVerticalUpdate);
+      throttledVerticalUpdate.cancel();
+    };
+  }, [stickyTop]);
+
+  useEffect(() => {
+    const tableEl = tableContainerRef.current;
+    const portalEl = portalHeaderRef.current;
+    const scrollEl = tableEl?.closest('.table-scroll-area');
+    if (!scrollEl || !portalEl) return;
+
+    const syncScrollToPortal = () => {
+      portalEl.scrollLeft = scrollEl.scrollLeft;
+    };
+
+    const syncScrollToTable = () => {
+      scrollEl.scrollLeft = portalEl.scrollLeft;
+    };
+
+    syncScrollToPortal();
+
+    const handleTableScroll = () => syncScrollToPortal();
+    const handlePortalScroll = () => syncScrollToTable();
+
+    scrollEl.addEventListener('scroll', handleTableScroll, { passive: true });
+    portalEl.addEventListener('scroll', handlePortalScroll, { passive: true });
+
+    return () => {
+      scrollEl.removeEventListener('scroll', handleTableScroll);
+      portalEl.removeEventListener('scroll', handlePortalScroll);
+    };
+  }, [showPortalHeader]);
 
   const FundNameCell = ({ info, showFullFundName, onOpenCardDialog }) => {
     const original = info.row.original || {};
@@ -657,12 +747,13 @@ export default function PcFundTable({
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
           const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
           const percentStr = original.todayProfitPercent ?? '';
+          const isUpdated = original.isUpdated;
           return (
             <div style={{ width: '100%' }}>
               <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
                 {amountStr}
               </FitText>
-              {percentStr ? (
+              {percentStr && !isUpdated ? (
                 <span className={`${cls} today-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
                   <FitText maxFontSize={11} minFontSize={9}>
                     {percentStr}
@@ -833,8 +924,47 @@ export default function PcFundTable({
     };
   };
 
+  const renderTableHeader = (forPortal = false) => {
+    if (!headerGroup) return null;
+    return (
+      <div className="table-header-row table-header-row-scroll">
+        {headerGroup.headers.map((header) => {
+          const style = getCommonPinningStyles(header.column, true);
+          const isNameColumn =
+            header.column.id === 'fundName' ||
+            header.column.columnDef?.accessorKey === 'fundName';
+          const align = isNameColumn ? '' : 'text-center';
+          return (
+            <div
+              key={header.id}
+              className={`table-header-cell ${align}`}
+              style={style}
+            >
+              {header.isPlaceholder
+                ? null
+                : flexRender(
+                  header.column.columnDef.header,
+                  header.getContext(),
+                )}
+              {!forPortal && (
+                <div
+                  onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
+                  onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
+                  className={`resizer ${header.column.getIsResizing() ? 'isResizing' : ''
+                    } ${header.column.getCanResize() ? '' : 'disabled'}`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const totalHeaderWidth = headerGroup?.headers?.reduce((acc, h) => acc + h.column.getSize(), 0) ?? 0;
+
   return (
-    <div className="pc-fund-table">
+    <div className="pc-fund-table" ref={tableContainerRef}>
       <style>{`
         .table-row-scroll {
           --row-bg: var(--bg);
@@ -909,37 +1039,7 @@ export default function PcFundTable({
         }
       `}</style>
       {/* 表头 */}
-      {headerGroup && (
-        <div className="table-header-row table-header-row-scroll">
-          {headerGroup.headers.map((header) => {
-            const style = getCommonPinningStyles(header.column, true);
-            const isNameColumn =
-              header.column.id === 'fundName' ||
-              header.column.columnDef?.accessorKey === 'fundName';
-            const align = isNameColumn ? '' : 'text-center';
-            return (
-              <div
-                key={header.id}
-                className={`table-header-cell ${align}`}
-                style={style}
-              >
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                    header.column.columnDef.header,
-                    header.getContext(),
-                  )}
-                <div
-                  onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  className={`resizer ${header.column.getIsResizing() ? 'isResizing' : ''
-                    } ${header.column.getCanResize() ? '' : 'disabled'}`}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {renderTableHeader(false)}
 
       {/* 表体 */}
       <DndContext
@@ -1066,6 +1166,50 @@ export default function PcFundTable({
           </div>
         </DialogContent>
       </Dialog>
+
+      {showPortalHeader && ReactDOM.createPortal(
+        <div
+          className="pc-fund-table pc-fund-table-portal-header"
+          ref={portalHeaderRef}
+          style={{
+            position: 'fixed',
+            top: effectiveStickyTop,
+            left: portalHorizontal.left,
+            right: portalHorizontal.right,
+            zIndex: 10,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+          }}
+        >
+          <div
+            className="table-header-row table-header-row-scroll"
+            style={{ minWidth: totalHeaderWidth, width: 'fit-content' }}
+          >
+            {headerGroup?.headers.map((header) => {
+              const style = getCommonPinningStyles(header.column, true);
+              const isNameColumn =
+                header.column.id === 'fundName' ||
+                header.column.columnDef?.accessorKey === 'fundName';
+              const align = isNameColumn ? '' : 'text-center';
+              return (
+                <div
+                  key={header.id}
+                  className={`table-header-cell ${align}`}
+                  style={style}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+                </div>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

@@ -3993,6 +3993,7 @@ export default function HomePage() {
                           <div className="table-scroll-area">
                             <div className="table-scroll-area-inner">
                               <PcFundTable
+                                stickyTop={navbarHeight + filterBarHeight}
                                 data={pcFundTableData}
                                 refreshing={refreshing}
                                 currentTab={currentTab}
