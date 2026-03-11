@@ -1481,7 +1481,7 @@ export default function HomePage() {
 
   const storageHelper = useMemo(() => {
     // 仅以下 key 参与云端同步；fundValuationTimeseries 不同步到云端（测试中功能，暂不同步）
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings', 'viewMode']);
     const triggerSync = (key, prevValue, nextValue) => {
       if (keys.has(key)) {
         // 标记为脏数据
@@ -1528,7 +1528,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // 仅以下 key 的变更会触发云端同步；fundValuationTimeseries 不在其中
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'dcaPlans', 'customSettings']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'dcaPlans', 'customSettings', 'viewMode']);
     const onStorage = (e) => {
       if (!e.key) return;
       if (e.key === 'localUpdatedAt') {
@@ -2762,6 +2762,8 @@ export default function HomePage() {
 
     const customSettings = isPlainObject(payload.customSettings) ? payload.customSettings : {};
 
+    const viewMode = (payload.viewMode === 'list' || payload.viewMode === 'card') ? payload.viewMode : 'list';
+
     return JSON.stringify({
       funds: uniqueFundCodes,
       favorites,
@@ -2773,7 +2775,8 @@ export default function HomePage() {
       pendingTrades,
       transactions,
       dcaPlans,
-      customSettings
+      customSettings,
+      viewMode
     });
   }
 
@@ -2817,6 +2820,10 @@ export default function HomePage() {
         } catch {
           all.customSettings = {};
         }
+      }
+      if (!keys || keys.has('viewMode')) {
+        const storedViewMode = localStorage.getItem('viewMode');
+        all.viewMode = (storedViewMode === 'list' || storedViewMode === 'card') ? storedViewMode : 'list';
       }
 
       // 如果是全量收集（keys 为 null），进行完整的数据清洗和验证逻辑
@@ -2887,7 +2894,8 @@ export default function HomePage() {
           pendingTrades: all.pendingTrades,
           transactions: all.transactions,
           dcaPlans: cleanedDcaPlans,
-          customSettings: isPlainObject(all.customSettings) ? all.customSettings : {}
+          customSettings: isPlainObject(all.customSettings) ? all.customSettings : {},
+          viewMode: all.viewMode || 'list'
         };
       }
 
@@ -2908,6 +2916,7 @@ export default function HomePage() {
         transactions: {},
         dcaPlans: {},
         customSettings: {},
+        viewMode: 'card',
         exportedAt: nowInTz().toISOString()
       };
     }

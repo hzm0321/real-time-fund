@@ -93,7 +93,12 @@ export async function PATCH(request) {
 
     Object.keys(partialData).forEach(key => {
       if (FIELD_MAPPING[key]) {
-        mergedData[key] = partialData[key];
+        if (key === 'viewMode') {
+          const validViewMode = partialData[key] === 'list' || partialData[key] === 'card' ? partialData[key] : 'card';
+          mergedData[key] = validViewMode;
+        } else {
+          mergedData[key] = partialData[key];
+        }
       }
     });
 
@@ -104,7 +109,11 @@ export async function PATCH(request) {
       const dbKey = FIELD_MAPPING[frontendKey];
       if (mergedData[frontendKey] !== undefined) {
         setClauses.push(`${dbKey === 'groups' ? '`groups`' : dbKey} = ?`);
-        values.push(JSON.stringify(mergedData[frontendKey]));
+        if (frontendKey === 'viewMode') {
+          values.push(mergedData[frontendKey]);
+        } else {
+          values.push(JSON.stringify(mergedData[frontendKey]));
+        }
       }
     });
 
@@ -122,7 +131,7 @@ export async function PATCH(request) {
       );
     } else {
       const insertFields = ['user_id', ...Object.values(FIELD_MAPPING).map(f => f === 'groups' ? '`groups`' : f)];
-      const insertValues = [session.userId, ...values.slice(0, -1)];
+      const insertValues = [session.userId, ...values];
       const placeholders = insertValues.map(() => '?').join(', ');
       
       await query(
