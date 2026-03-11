@@ -49,14 +49,20 @@ export default function ConfirmModal({
           <button
             type="button"
             className="button secondary min-w-0 flex-1 cursor-pointer h-auto min-h-[48px] py-3 sm:h-11 sm:min-h-0 sm:py-0"
-            onClick={onCancel}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel();
+            }}
           >
             取消
           </button>
           <button
             type="button"
             className={`${confirmButtonToneClass} min-w-0 flex-1 cursor-pointer h-auto min-h-[48px] py-3 sm:h-11 sm:min-h-0 sm:py-0`}
-            onClick={onConfirm}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirm();
+            }}
           >
             {confirmText}
           </button>
