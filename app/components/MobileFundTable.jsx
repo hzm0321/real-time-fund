@@ -554,7 +554,7 @@ export default function MobileFundTable({
                 }
               }}
             >
-              {masked ? '******' : holdingAmountDisplay}
+              {masked ? <span className="mask-text">******</span> : holdingAmountDisplay}
               {hasDca && <span className="dca-indicator">定</span>}
               {isUpdated && <span className="updated-indicator">✓</span>}
             </span>
@@ -759,7 +759,7 @@ export default function MobileFundTable({
             <div style={{ width: '100%' }}>
               <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
                 <FitText maxFontSize={14} minFontSize={10}>
-                  {masked && hasProfit ? '******' : amountStr}
+                  {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
                 </FitText>
               </span>
               {hasProfit && percentStr && !masked ? (
@@ -789,7 +789,7 @@ export default function MobileFundTable({
             <div style={{ width: '100%' }}>
               <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
                 <FitText maxFontSize={14} minFontSize={10}>
-                  {masked && hasProfit ? '******' : amountStr}
+                  {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
                 </FitText>
               </span>
               {percentStr && !isUpdated && !masked ? (
@@ -818,7 +818,7 @@ export default function MobileFundTable({
             <div style={{ width: '100%' }}>
               <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
                 <FitText maxFontSize={14} minFontSize={10}>
-                  {masked && hasTotal ? '******' : amountStr}
+                  {masked && hasTotal ? <span className="mask-text">******</span> : amountStr}
                 </FitText>
               </span>
               {percentStr && !masked ? (

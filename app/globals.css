@@ -1025,6 +1025,12 @@ input[type="number"] {
   color: var(--success);
 }
 
+.mask-text,
+.up .mask-text,
+.down .mask-text {
+  color: var(--text) !important;
+}
+
 .list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

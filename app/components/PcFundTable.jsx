@@ -692,7 +692,7 @@ export default function PcFundTable({
           return (
             <div style={{ width: '100%' }}>
               <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
-                {masked && hasProfit ? '******' : amountStr}
+                {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
               </FitText>
               {hasProfit && percentStr && !masked ? (
                 <span className={`${cls} estimate-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
@@ -750,7 +750,7 @@ export default function PcFundTable({
             >
               <div style={{ flex: '1 1 0', minWidth: 0 }}>
                 <FitText style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10}>
-                  {masked ? '******' : (info.getValue() ?? '—')}
+                  {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '—')}
                 </FitText>
               </div>
               <button
@@ -788,7 +788,7 @@ export default function PcFundTable({
           return (
             <div style={{ width: '100%' }}>
               <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
-                {masked && hasProfit ? '******' : amountStr}
+                {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
               </FitText>
               {percentStr && !isUpdated && !masked ? (
                 <span className={`${cls} today-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
@@ -820,7 +820,7 @@ export default function PcFundTable({
           return (
             <div style={{ width: '100%' }}>
               <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
-                {masked && hasTotal ? '******' : amountStr}
+                {masked && hasTotal ? <span className="mask-text">******</span> : amountStr}
               </FitText>
               {percentStr && !masked ? (
                 <span className={`${cls} holding-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>

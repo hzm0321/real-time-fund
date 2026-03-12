@@ -244,6 +244,7 @@ export default function GroupSummary({
               <span style={{ fontSize: '16px', marginRight: 2 }}>¥</span>
               {isMasked ? (
                 <span
+                  className="mask-text"
                   style={{ fontSize: assetSize, position: 'relative', top: 4 }}
                 >
                   ******
@@ -278,7 +279,9 @@ export default function GroupSummary({
                 }}
               >
                 {isMasked ? (
-                  <span style={{ fontSize: metricSize }}>******</span>
+                  <span className="mask-text" style={{ fontSize: metricSize }}>
+                    ******
+                  </span>
                 ) : summary.hasAnyTodayData ? (
                   <>
                     <span style={{ marginRight: 1 }}>
@@ -331,7 +334,9 @@ export default function GroupSummary({
                 title="点击切换金额/百分比"
               >
                 {isMasked ? (
-                  <span style={{ fontSize: metricSize }}>******</span>
+                  <span className="mask-text" style={{ fontSize: metricSize }}>
+                    ******
+                  </span>
                 ) : (
                   <>
                     <span style={{ marginRight: 1 }}>
