@@ -5,6 +5,50 @@ import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
 
+const DrawerScrollLockContext = React.createContext(null)
+
+/**
+ * 移动端滚动锁定：仅将 body 设为 position:fixed，用负值 top 把页面“拉”回当前视口位置，
+ * 既锁定滚动又保留视觉位置；overlay 上 ontouchmove preventDefault 防止背景触摸滚动。
+ */
+function useScrollLock(open) {
+  const savedScrollYRef = React.useRef(0)
+  const onOverlayTouchMove = React.useCallback((e) => {
+    e.preventDefault()
+  }, [])
+
+  React.useEffect(() => {
+    if (!open || typeof document === "undefined") return
+    const scrollY = window.scrollY ?? window.pageYOffset
+    savedScrollYRef.current = scrollY
+    const prev = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      left: document.body.style.left,
+      right: document.body.style.right,
+      width: document.body.style.width,
+    }
+    document.body.style.position = "fixed"
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = "0"
+    document.body.style.right = "0"
+    document.body.style.width = "100%"
+    return () => {
+      document.body.style.position = prev.position
+      document.body.style.top = prev.top
+      document.body.style.left = prev.left
+      document.body.style.right = prev.right
+      document.body.style.width = prev.width
+      window.scrollTo(0, savedScrollYRef.current)
+    }
+  }, [open])
+
+  return React.useMemo(
+    () => (open ? { onTouchMove: onOverlayTouchMove } : null),
+    [open, onOverlayTouchMove]
+  )
+}
+
 function parseVhToPx(vhStr) {
   if (typeof vhStr === "number") return vhStr
   const match = String(vhStr).match(/^([\d.]+)\s*vh$/)
@@ -12,10 +56,17 @@ function parseVhToPx(vhStr) {
   return (window.innerHeight * Number(match[1])) / 100
 }
 
-function Drawer({
-  ...props
-}) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />;
+function Drawer({ open, ...props }) {
+  const scrollLock = useScrollLock(open)
+  const contextValue = React.useMemo(
+    () => ({ ...scrollLock, open: !!open }),
+    [scrollLock, open]
+  )
+  return (
+    <DrawerScrollLockContext.Provider value={contextValue}>
+      <DrawerPrimitive.Root modal={false} data-slot="drawer" open={open} {...props} />
+    </DrawerScrollLockContext.Provider>
+  )
 }
 
 function DrawerTrigger({
@@ -40,14 +91,26 @@ function DrawerOverlay({
   className,
   ...props
 }) {
+  const ctx = React.useContext(DrawerScrollLockContext)
+  const { open = false, ...scrollLockProps } = ctx || {}
+  // modal={false} 时 vaul 不渲染/隐藏 Overlay，用自定义遮罩 div 保证始终有遮罩；点击遮罩关闭
   return (
-    <DrawerPrimitive.Overlay
-      data-slot="drawer-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-[var(--drawer-overlay)] backdrop-blur-[4px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
-        className
-      )}
-      {...props} />
+    <DrawerPrimitive.Close asChild>
+      <div
+        data-slot="drawer-overlay"
+        data-state={open ? "open" : "closed"}
+        role="button"
+        tabIndex={-1}
+        aria-label="关闭"
+        className={cn(
+          "fixed inset-0 z-50 cursor-default bg-[var(--drawer-overlay,rgba(0,0,0,0.45))] backdrop-blur-[6px]",
+          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+          className
+        )}
+        {...scrollLockProps}
+        {...props}
+      />
+    </DrawerPrimitive.Close>
   );
 }
 

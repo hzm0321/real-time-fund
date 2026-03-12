@@ -106,8 +106,10 @@
 
 html,
 body {
+  overscroll-behavior-y: none;
   height: 100%;
   overflow-x: clip;
+  will-change: auto; /* 或者移除任何 will-change: transform */
 }
 
 body {

@@ -34,6 +34,17 @@ const getBrowserTimeZone = () => {
 const TZ = getBrowserTimeZone();
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : dayjs().tz(TZ));
 
+const formatDisplayDate = (value) => {
+  if (!value) return '-';
+
+  const d = toTz(value);
+  if (!d.isValid()) return value;
+
+  const hasTime = /[T\s]\d{2}:\d{2}/.test(String(value));
+
+  return hasTime ? d.format('MM-DD HH:mm') : d.format('MM-DD');
+};
+
 export default function FundCard({
   fund: f,
   todayStr,
@@ -126,7 +137,11 @@ export default function FundCard({
         <div className="actions">
           <div className="badge-v">
             <span>{f.noValuation ? '净值日期' : '估值时间'}</span>
-            <strong>{f.noValuation ? (f.jzrq || '-') : (f.gztime || f.time || '-')}</strong>
+            <strong>
+              {f.noValuation
+                ? formatDisplayDate(f.jzrq)
+                : formatDisplayDate(f.gztime || f.time)}
+            </strong>
           </div>
           <div className="row" style={{ gap: 4 }}>
             <button

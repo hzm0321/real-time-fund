@@ -1,10 +1,53 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
+import ConfirmModal from './ConfirmModal';
 import { CloseIcon, CloudIcon } from './Icons';
 
 export default function CloudConfigModal({ onConfirm, onCancel, type = 'empty' }) {
+  const [pendingAction, setPendingAction] = useState(null); // 'local' | 'cloud' | null
   const isConflict = type === 'conflict';
+
+  const handlePrimaryClick = () => {
+    if (isConflict) {
+      setPendingAction('local');
+    } else {
+      onConfirm?.();
+    }
+  };
+
+  const handleSecondaryClick = () => {
+    if (isConflict) {
+      setPendingAction('cloud');
+    } else {
+      onCancel?.();
+    }
+  };
+
+  const handleConfirmModalCancel = () => {
+    setPendingAction(null);
+  };
+
+  const handleConfirmModalConfirm = () => {
+    if (pendingAction === 'local') {
+      onConfirm?.();
+    } else if (pendingAction === 'cloud') {
+      onCancel?.();
+    }
+    setPendingAction(null);
+  };
+
+  const confirmTitle =
+    pendingAction === 'local'
+      ? '确认使用本地配置覆盖云端？'
+      : '确认使用云端配置覆盖本地？';
+
+  const confirmMessage =
+    pendingAction === 'local'
+      ? '此操作会将当前本地配置同步到云端，覆盖云端原有配置，且可能无法恢复，请谨慎操作。'
+      : '此操作会使用云端配置覆盖当前本地配置，导致本地修改丢失，且可能无法恢复，请谨慎操作。';
+
   return (
     <motion.div
       className="modal-overlay"
@@ -41,14 +84,25 @@ export default function CloudConfigModal({ onConfirm, onCancel, type = 'empty' }
             : '是否将本地配置同步到云端？'}
         </p>
         <div className="row" style={{ flexDirection: 'column', gap: 12 }}>
-          <button className="button" onClick={onConfirm}>
+          <button className="button secondary" onClick={handlePrimaryClick}>
             {isConflict ? '保留本地 (覆盖云端)' : '同步本地到云端'}
           </button>
-          <button className="button secondary" onClick={onCancel}>
+          <button className="button" onClick={handleSecondaryClick}>
             {isConflict ? '使用云端 (覆盖本地)' : '暂不同步'}
           </button>
         </div>
       </motion.div>
+      {pendingAction && (
+        <ConfirmModal
+          title={confirmTitle}
+          message={confirmMessage}
+          onConfirm={handleConfirmModalConfirm}
+          onCancel={handleConfirmModalCancel}
+          confirmText="确认覆盖"
+          icon={<CloudIcon width="20" height="20" />}
+          confirmVariant="danger"
+        />
+      )}
     </motion.div>
   );
 }
