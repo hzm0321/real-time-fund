@@ -105,7 +105,7 @@ docker compose up -d --build
 
 # 或者
 # 构建
-docker compose --build
+docker compose build
 # 重新创建容器
 docker-compose up -d --force-recreate
 
