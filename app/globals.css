@@ -168,6 +168,13 @@ body::before {
   width: 1200px;
   margin: 0 auto;
   padding: 24px;
+  /* 隐藏 y 轴滚动条，保留滚动能力 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.container::-webkit-scrollbar {
+  width: 0;
+  display: none;
 }
 
 .page-width-slider {
@@ -978,6 +985,13 @@ input[type="number"] {
     width: 100%;
     max-width: 100%;
     overflow-x: clip;
+    /* 移动端同样隐藏 y 轴滚动条 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .container::-webkit-scrollbar {
+    width: 0;
+    display: none;
   }
 
   .grid {
@@ -1890,7 +1904,6 @@ input[type="number"] {
 @media (max-width: 640px) {
   .filter-bar {
     position: sticky;
-    top: 60px; /* Navbar height */
     z-index: 40;
     width: calc(100% + 32px);
     background: rgba(15, 23, 42, 0.9);

@@ -59,6 +59,7 @@ import UpdatePromptModal from "./components/UpdatePromptModal";
 import RefreshButton from "./components/RefreshButton";
 import WeChatModal from "./components/WeChatModal";
 import DcaModal from "./components/DcaModal";
+import MarketIndexAccordion from "./components/MarketIndexAccordion";
 import githubImg from "./assets/github.svg";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { toast as sonnerToast } from 'sonner';
@@ -243,6 +244,7 @@ export default function HomePage() {
   const containerRef = useRef(null);
   const [navbarHeight, setNavbarHeight] = useState(0);
   const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const [marketIndexAccordionHeight, setMarketIndexAccordionHeight] = useState(0);
   // 主题初始固定为 dark，避免 SSR 与客户端首屏不一致导致 hydration 报错；真实偏好由 useLayoutEffect 在首帧前恢复
   const [theme, setTheme] = useState('dark');
   const [showThemeTransition, setShowThemeTransition] = useState(false);
@@ -3784,10 +3786,15 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
+      <MarketIndexAccordion
+        navbarHeight={navbarHeight}
+        onHeightChange={setMarketIndexAccordionHeight}
+        isMobile={isMobile}
+        onCustomSettingsChange={triggerCustomSettingsSync}
+      />
       <div className="grid">
         <div className="col-12">
-          <div ref={filterBarRef} className="filter-bar" style={{ ...(isMobile ? {} : { top: navbarHeight }), marginTop: navbarHeight, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div ref={filterBarRef} className="filter-bar" style={{ top: navbarHeight + marketIndexAccordionHeight, marginTop: 0, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div className="tabs-container">
               <div
                 className="tabs-scroll-area"
@@ -3947,7 +3954,7 @@ export default function HomePage() {
                   holdings={holdings}
                   groupName={getGroupName()}
                   getProfit={getHoldingProfit}
-                  stickyTop={navbarHeight + filterBarHeight + (isMobile ? -14 : 0)}
+                  stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight + (isMobile ? -14 : 0)}
                   masked={maskAmounts}
                   onToggleMasked={() => setMaskAmounts((v) => !v)}
                 />
@@ -4007,7 +4014,7 @@ export default function HomePage() {
                           <div className="table-scroll-area">
                             <div className="table-scroll-area-inner">
                               <PcFundTable
-                                stickyTop={navbarHeight + filterBarHeight}
+                                stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight}
                                 data={pcFundTableData}
                                 refreshing={refreshing}
                                 currentTab={currentTab}
@@ -4089,7 +4096,7 @@ export default function HomePage() {
                         currentTab={currentTab}
                         favorites={favorites}
                         sortBy={sortBy}
-                        stickyTop={navbarHeight + filterBarHeight - 14}
+                        stickyTop={navbarHeight + filterBarHeight + marketIndexAccordionHeight}
                         blockDrawerClose={!!fundDeleteConfirm}
                         closeDrawerRef={fundDetailDrawerCloseRef}
                         onReorder={handleReorder}
