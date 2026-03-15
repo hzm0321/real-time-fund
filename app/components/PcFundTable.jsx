@@ -954,7 +954,7 @@ export default function PcFundTable({
       left: isLeft ? `${column.getStart('left')}px` : undefined,
       right: isRight ? `${column.getAfter('right')}px` : undefined,
       zIndex: isHeader ? 11 : 10,
-      backgroundColor: isHeader ? 'var(--table-pinned-header-bg)' : 'var(--row-bg)',
+      backgroundColor: isHeader ? 'var(--table-pinned-header-bg)' : 'var(--row-bg, var(--bg))',
       boxShadow: 'none',
       textAlign: isNameColumn ? 'left' : 'center',
       justifyContent: isNameColumn ? 'flex-start' : 'center',
@@ -1005,10 +1005,43 @@ export default function PcFundTable({
       <style>{`
         .table-row-scroll {
           --row-bg: var(--bg);
-          background-color: var(--row-bg);
+          background-color: var(--row-bg) !important;
+        }
+        .table-row-scroll:nth-child(even),
+        .table-row-scroll.row-even {
+          background-color: var(--table-row-alt-bg) !important;
         }
         .table-row-scroll:hover {
           --row-bg: var(--table-row-hover-bg);
+          background-color: var(--row-bg) !important;
+        }
+
+        /* Pinned cells inherit from parent row */
+        .table-row-scroll .pinned-cell {
+          background-color: var(--row-bg) !important;
+        }
+        .table-row-scroll:nth-child(even) .pinned-cell,
+        .table-row-scroll.row-even .pinned-cell {
+          background-color: var(--table-row-alt-bg) !important;
+        }
+        .table-row-scroll:hover .pinned-cell {
+          background-color: var(--table-row-hover-bg) !important;
+        }
+        .table-row-scroll:nth-child(even) {
+          background-color: var(--table-row-alt-bg);
+        }
+        .table-row-scroll:hover {
+          --row-bg: var(--table-row-hover-bg);
+        }
+
+        /* Pinned cells in even rows */
+        .row-even .pinned-cell {
+          background-color: var(--table-row-alt-bg) !important;
+        }
+
+        /* Pinned cells on hover */
+        .table-row-scroll:hover .pinned-cell {
+          background-color: var(--table-row-hover-bg) !important;
         }
 
         /* 覆盖 grid 布局为 flex 以支持动态列宽 */
@@ -1092,10 +1125,10 @@ export default function PcFundTable({
           strategy={verticalListSortingStrategy}
         >
           <AnimatePresence mode="popLayout">
-            {table.getRowModel().rows.map((row) => (
+            {table.getRowModel().rows.map((row, index) => (
               <SortableRow key={row.original.code || row.id} row={row} isTableDragging={!!activeId} disabled={sortBy !== 'default'}>
                 <div
-                  className="table-row table-row-scroll"
+                  className={`table-row table-row-scroll ${index % 2 === 1 ? 'row-even' : ''}`}
                 >
                   {row.getVisibleCells().map((cell) => {
                     const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
@@ -1118,10 +1151,11 @@ export default function PcFundTable({
                     const cellClassName =
                       (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
                     const style = getCommonPinningStyles(cell.column, false);
+                    const isPinned = cell.column.getIsPinned();
                     return (
                       <div
                         key={cell.id}
-                        className={`table-cell ${align} ${cellClassName}`}
+                        className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
                         style={style}
                       >
                         {flexRender(

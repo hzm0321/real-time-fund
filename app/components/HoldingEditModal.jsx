@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CloseIcon, SettingsIcon } from './Icons';
 import {
   Dialog,
@@ -12,11 +12,20 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
   const [mode, setMode] = useState('amount'); // 'amount' | 'share'
 
   const dwjz = fund?.dwjz || fund?.gsz || 0;
+  const dwjzRef = useRef(dwjz);
+  useEffect(() => {
+    dwjzRef.current = dwjz;
+  }, [dwjz]);
 
   const [share, setShare] = useState('');
   const [cost, setCost] = useState('');
   const [amount, setAmount] = useState('');
   const [profit, setProfit] = useState('');
+
+  const holdingSig = useMemo(() => {
+    if (!holding) return '';
+    return `${holding.id ?? ''}|${holding.share ?? ''}|${holding.cost ?? ''}`;
+  }, [holding]);
 
   useEffect(() => {
     if (holding) {
@@ -25,14 +34,17 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
       setShare(String(s));
       setCost(String(c));
 
-      if (dwjz > 0) {
-        const a = s * dwjz;
-        const p = (dwjz - c) * s;
+      const price = dwjzRef.current;
+      if (price > 0) {
+        const a = s * price;
+        const p = (price - c) * s;
         setAmount(a.toFixed(2));
         setProfit(p.toFixed(2));
       }
     }
-  }, [holding, fund, dwjz]);
+    // 只在“切换持仓/初次打开”时初始化，避免净值刷新覆盖用户输入
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdingSig]);
 
   const handleModeChange = (newMode) => {
     if (newMode === mode) return;

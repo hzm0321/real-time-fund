@@ -16,7 +16,8 @@ import {
   Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import {cachedRequest} from "../lib/cacheRequest";
+import { cachedRequest } from '../lib/cacheRequest';
+import FundHistoryNetValue from './FundHistoryNetValue';
 
 ChartJS.register(
   CategoryScale,
@@ -522,6 +523,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           </button>
         ))}
       </div>
+
+      <FundHistoryNetValue code={code} range={range} theme={theme} />
     </>
   );
 

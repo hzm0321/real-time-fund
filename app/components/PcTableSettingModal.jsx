@@ -206,7 +206,14 @@ export default function PcTableSettingModal({
                         >
                           <DragIcon width="18" height="18" />
                         </div>
-                        <span style={{ flex: 1, fontSize: '14px' }}>{item.header}</span>
+                        <div style={{ flex: 1, fontSize: '14px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span>{item.header}</span>
+                          {item.id === 'totalChangePercent' && (
+                            <span className="muted" style={{ fontSize: '12px' }}>
+                              估值涨幅与持有收益的汇总
+                            </span>
+                          )}
+                        </div>
                         {onToggleColumnVisibility && (
                           <button
                             type="button"

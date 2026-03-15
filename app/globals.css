@@ -16,6 +16,7 @@
   --border: #1f2937;
   --table-pinned-header-bg: #2a394b;
   --table-row-hover-bg: #2a394b;
+  --table-row-alt-bg: #1a2535;
   --radius: 0.625rem;
   --background: #0f172a;
   --foreground: #e5e7eb;
@@ -65,6 +66,7 @@
   --border: #e2e8f0;
   --table-pinned-header-bg: #e2e8f0;
   --table-row-hover-bg: #e2e8f0;
+  --table-row-alt-bg: #f8fafc;
   --background: #ffffff;
   --foreground: #0f172a;
   --card-foreground: #0f172a;
@@ -166,6 +168,13 @@ body::before {
   width: 1200px;
   margin: 0 auto;
   padding: 24px;
+  /* 隐藏 y 轴滚动条，保留滚动能力 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.container::-webkit-scrollbar {
+  width: 0;
+  display: none;
 }
 
 .page-width-slider {
@@ -449,9 +458,18 @@ body::before {
   background: #e2e8f0;
 }
 
+[data-theme="light"] .table-row:nth-child(even) {
+  background: var(--table-row-alt-bg);
+}
+
 [data-theme="light"] .table-row-scroll:hover,
 [data-theme="light"] .table-row-scroll.row-hovered {
   background: #e2e8f0;
+}
+
+[data-theme="light"] .table-row-scroll:nth-child(even),
+[data-theme="light"] .table-row-scroll.row-even {
+  background: var(--table-row-alt-bg) !important;
 }
 
 [data-theme="light"] .table-fixed-row.row-hovered {
@@ -967,6 +985,13 @@ input[type="number"] {
     width: 100%;
     max-width: 100%;
     overflow-x: clip;
+    /* 移动端同样隐藏 y 轴滚动条 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .container::-webkit-scrollbar {
+    width: 0;
+    display: none;
   }
 
   .grid {
@@ -1404,6 +1429,11 @@ input[type="number"] {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.table-row-scroll:nth-child(even),
+.table-row-scroll.row-even {
+  background: var(--table-row-alt-bg) !important;
+}
+
 .table-fixed-row.row-hovered {
   background: rgba(255, 255, 255, 0.08);
 }
@@ -1456,6 +1486,10 @@ input[type="number"] {
 
 .table-row:hover {
   background: #2a394b;
+}
+
+.table-row:nth-child(even) {
+  background: var(--table-row-alt-bg);
 }
 
 .table-row:last-child {
@@ -1870,7 +1904,6 @@ input[type="number"] {
 @media (max-width: 640px) {
   .filter-bar {
     position: sticky;
-    top: 60px; /* Navbar height */
     z-index: 40;
     width: calc(100% + 32px);
     background: rgba(15, 23, 42, 0.9);
@@ -1997,6 +2030,11 @@ input[type="number"] {
   border: 1px solid var(--border);
   border-right: none;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+}
+
+/* 指数个性化设置侧弹框：加宽以一行展示 5 个指数卡片 */
+.pc-market-setting-drawer.pc-table-setting-drawer {
+  width: 560px;
 }
 
 .pc-table-setting-header {

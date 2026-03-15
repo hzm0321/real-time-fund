@@ -40,6 +40,7 @@ export default function MobileSettingModal({
   onToggleShowFullFundName,
 }) {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
 
   useEffect(() => {
     if (!open) setResetConfirmOpen(false);
@@ -58,6 +59,7 @@ export default function MobileSettingModal({
           if (!v) onClose();
         }}
         direction="bottom"
+        handleOnly={isReordering}
       >
         <DrawerContent
           className="glass"
@@ -142,6 +144,8 @@ export default function MobileSettingModal({
                 values={columns}
                 onReorder={handleReorder}
                 className="mobile-setting-list"
+                layoutScroll
+                style={{ touchAction: 'none' }}
               >
                 <AnimatePresence mode="popLayout">
                   {columns.map((item, index) => (
@@ -153,6 +157,8 @@ export default function MobileSettingModal({
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.98 }}
+                      onDragStart={() => setIsReordering(true)}
+                      onDragEnd={() => setIsReordering(false)}
                       transition={{
                         type: 'spring',
                         stiffness: 500,
@@ -160,6 +166,7 @@ export default function MobileSettingModal({
                         mass: 1,
                         layout: { duration: 0.2 },
                       }}
+                      style={{ touchAction: 'none' }}
                     >
                       <div
                         className="drag-handle"
@@ -173,7 +180,14 @@ export default function MobileSettingModal({
                       >
                         <DragIcon width="18" height="18" />
                       </div>
-                      <span style={{ flex: 1, fontSize: '14px' }}>{item.header}</span>
+                      <div style={{ flex: 1, fontSize: '14px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span>{item.header}</span>
+                        {item.id === 'totalChangePercent' && (
+                          <span className="muted" style={{ fontSize: '12px' }}>
+                            估值涨幅与持有收益的汇总
+                          </span>
+                        )}
+                      </div>
                       {onToggleColumnVisibility && (
                         <Switch
                           checked={columnVisibility?.[item.id] !== false}

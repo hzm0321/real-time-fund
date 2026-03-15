@@ -1013,7 +1013,7 @@ export default function MobileFundTable({
                 strategy={verticalListSortingStrategy}
               >
                 <AnimatePresence mode="popLayout">
-                  {table.getRowModel().rows.map((row) => (
+                  {table.getRowModel().rows.map((row, index) => (
                     <SortableRow
                       key={row.original.code || row.id}
                       row={row}
@@ -1025,7 +1025,7 @@ export default function MobileFundTable({
                           ref={sortBy === 'default' && !isNameSortMode ? setActivatorNodeRef : undefined}
                           className="table-row"
                           style={{
-                            background: 'var(--bg)',
+                            background: index % 2 === 0 ? 'var(--bg)' : 'var(--table-row-alt-bg)',
                             position: 'relative',
                             zIndex: 1,
                             ...(mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : {}),
@@ -1039,11 +1039,19 @@ export default function MobileFundTable({
                             const alignClass = getAlignClass(columnId);
                             const cellClassName = cell.column.columnDef.meta?.cellClassName || '';
                             const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
+                            const style = isLastColumn ? {paddingRight: LAST_COLUMN_EXTRA} : {};
+                            if (cellIndex  === 0) {
+                              if (index % 2 !== 0) {
+                                style.background = 'var(--table-row-alt-bg)';
+                              }else {
+                                style.background = 'var(--bg)';
+                              }
+                            }
                             return (
                               <div
                                 key={cell.id}
                                 className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`}
-                                style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
+                                style={style}
                               >
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                               </div>

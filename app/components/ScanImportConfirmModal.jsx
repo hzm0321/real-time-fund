@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 export default function ScanImportConfirmModal({
   scannedFunds,
@@ -22,9 +23,10 @@ export default function ScanImportConfirmModal({
   isOcrScan = false
 }) {
   const [selectedGroupId, setSelectedGroupId] = useState('all');
+  const [expandAfterAdd, setExpandAfterAdd] = useState(true);
 
   const handleConfirm = () => {
-    onConfirm(selectedGroupId);
+    onConfirm(selectedGroupId, expandAfterAdd);
   };
 
   const formatAmount = (val) => {
@@ -125,6 +127,13 @@ export default function ScanImportConfirmModal({
                   </div>
                 );
               })}
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span className="muted" style={{ fontSize: 13 }}>添加后展开详情</span>
+              <Switch
+                checked={expandAfterAdd}
+                onCheckedChange={(checked) => setExpandAfterAdd(!!checked)}
+              />
             </div>
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>添加到分组：</span>

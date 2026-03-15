@@ -59,6 +59,8 @@ import UpdatePromptModal from "./components/UpdatePromptModal";
 import RefreshButton from "./components/RefreshButton";
 import WeChatModal from "./components/WeChatModal";
 import DcaModal from "./components/DcaModal";
+import MarketIndexAccordion from "./components/MarketIndexAccordion";
+import SortSettingModal from "./components/SortSettingModal";
 import githubImg from "./assets/github.svg";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { toast as sonnerToast } from 'sonner';
@@ -161,10 +163,22 @@ export default function HomePage() {
   const [groupManageOpen, setGroupManageOpen] = useState(false);
   const [addFundToGroupOpen, setAddFundToGroupOpen] = useState(false);
 
+  const DEFAULT_SORT_RULES = [
+    { id: 'default', label: '默认', enabled: true },
+    // 估值涨幅为原始名称，“涨跌幅”为别名
+    { id: 'yield', label: '估值涨幅', alias: '涨跌幅', enabled: true },
+    // 持仓金额排序：默认隐藏
+    { id: 'holdingAmount', label: '持仓金额', enabled: false },
+    { id: 'holding', label: '持有收益', enabled: true },
+    { id: 'name', label: '基金名称', alias: '名称', enabled: true },
+  ];
+
   // 排序状态
-  const [sortBy, setSortBy] = useState('default'); // default, name, yield, holding
+  const [sortBy, setSortBy] = useState('default'); // default, name, yield, holding, holdingAmount
   const [sortOrder, setSortOrder] = useState('desc'); // asc | desc
   const [isSortLoaded, setIsSortLoaded] = useState(false);
+  const [sortRules, setSortRules] = useState(DEFAULT_SORT_RULES);
+  const [sortSettingOpen, setSortSettingOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -172,6 +186,46 @@ export default function HomePage() {
       const savedSortOrder = window.localStorage.getItem('localSortOrder');
       if (savedSortBy) setSortBy(savedSortBy);
       if (savedSortOrder) setSortOrder(savedSortOrder);
+
+      // 1）优先从 customSettings.localSortRules 读取
+      // 2）兼容旧版独立 localSortRules 字段
+      let rulesFromSettings = null;
+      try {
+        const rawSettings = window.localStorage.getItem('customSettings');
+        if (rawSettings) {
+          const parsed = JSON.parse(rawSettings);
+          if (parsed && Array.isArray(parsed.localSortRules)) {
+            rulesFromSettings = parsed.localSortRules;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!rulesFromSettings) {
+        const legacy = window.localStorage.getItem('localSortRules');
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy);
+            if (Array.isArray(parsed)) {
+              rulesFromSettings = parsed;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      if (rulesFromSettings && rulesFromSettings.length) {
+        const merged = DEFAULT_SORT_RULES.map((rule) => {
+          const found = rulesFromSettings.find((r) => r.id === rule.id);
+          return found
+            ? { ...rule, enabled: found.enabled !== false }
+            : rule;
+        });
+        setSortRules(merged);
+      }
+
       setIsSortLoaded(true);
     }
   }, []);
@@ -180,8 +234,36 @@ export default function HomePage() {
     if (typeof window !== 'undefined' && isSortLoaded) {
       window.localStorage.setItem('localSortBy', sortBy);
       window.localStorage.setItem('localSortOrder', sortOrder);
+      try {
+        const raw = window.localStorage.getItem('customSettings');
+        const parsed = raw ? JSON.parse(raw) : {};
+        const next = {
+          ...(parsed && typeof parsed === 'object' ? parsed : {}),
+          localSortRules: sortRules,
+        };
+        window.localStorage.setItem('customSettings', JSON.stringify(next));
+        // 更新后标记 customSettings 脏并触发云端同步
+        triggerCustomSettingsSync();
+      } catch {
+        // ignore
+      }
     }
-  }, [sortBy, sortOrder, isSortLoaded]);
+  }, [sortBy, sortOrder, sortRules, isSortLoaded]);
+
+  // 当用户关闭某个排序规则时，如果当前 sortBy 不再可用，则自动切换到第一个启用的规则
+  useEffect(() => {
+    const enabledRules = (sortRules || []).filter((r) => r.enabled);
+    const enabledIds = enabledRules.map((r) => r.id);
+    if (!enabledIds.length) {
+      // 至少保证默认存在
+      setSortRules(DEFAULT_SORT_RULES);
+      setSortBy('default');
+      return;
+    }
+    if (!enabledIds.includes(sortBy)) {
+      setSortBy(enabledIds[0]);
+    }
+  }, [sortRules, sortBy]);
 
   // 视图模式
   const [viewMode, setViewMode] = useState('list'); // card, list
@@ -243,6 +325,7 @@ export default function HomePage() {
   const containerRef = useRef(null);
   const [navbarHeight, setNavbarHeight] = useState(0);
   const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const [marketIndexAccordionHeight, setMarketIndexAccordionHeight] = useState(0);
   // 主题初始固定为 dark，避免 SSR 与客户端首屏不一致导致 hydration 报错；真实偏好由 useLayoutEffect 在首帧前恢复
   const [theme, setTheme] = useState('dark');
   const [showThemeTransition, setShowThemeTransition] = useState(false);
@@ -541,9 +624,42 @@ export default function HomePage() {
 
       return filtered.sort((a, b) => {
         if (sortBy === 'yield') {
-          const valA = isNumber(a.estGszzl) ? a.estGszzl : (a.gszzl ?? a.zzl ?? 0);
-          const valB = isNumber(b.estGszzl) ? b.estGszzl : (b.gszzl ?? a.zzl ?? 0);
+          const getYieldValue = (fund) => {
+            // 与 estimateChangePercent 展示逻辑对齐：
+            // - noValuation 为 true 一律视为无“估值涨幅”
+            // - 有估值覆盖时用 estGszzl
+            // - 否则仅在 gszzl 为数字时使用 gszzl
+            if (fund.noValuation) {
+              return { value: 0, hasValue: false };
+            }
+            if (fund.estPricedCoverage > 0.05) {
+              if (isNumber(fund.estGszzl)) {
+                return { value: fund.estGszzl, hasValue: true };
+              }
+              return { value: 0, hasValue: false };
+            }
+            if (isNumber(fund.gszzl)) {
+              return { value: Number(fund.gszzl), hasValue: true };
+            }
+            return { value: 0, hasValue: false };
+          };
+
+          const { value: valA, hasValue: hasA } = getYieldValue(a);
+          const { value: valB, hasValue: hasB } = getYieldValue(b);
+
+          // 无“估值涨幅”展示值（界面为 `—`）的基金统一排在最后
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+
           return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'holdingAmount') {
+          const pa = getHoldingProfit(a, holdings[a.code]);
+          const pb = getHoldingProfit(b, holdings[b.code]);
+          const amountA = pa?.amount ?? Number.NEGATIVE_INFINITY;
+          const amountB = pb?.amount ?? Number.NEGATIVE_INFINITY;
+          return sortOrder === 'asc' ? amountA - amountB : amountB - amountA;
         }
         if (sortBy === 'holding') {
           const pa = getHoldingProfit(a, holdings[a.code]);
@@ -1281,7 +1397,7 @@ export default function HomePage() {
     });
   };
 
-  const confirmScanImport = async (targetGroupId = 'all') => {
+  const confirmScanImport = async (targetGroupId = 'all', expandAfterAdd = true) => {
     const codes = Array.from(selectedScannedCodes);
     if (codes.length === 0) {
       showToast('请至少选择一个基金代码', 'error');
@@ -1337,6 +1453,8 @@ export default function HomePage() {
       }
 
       if (newFunds.length > 0) {
+        const newCodesSet = new Set(newFunds.map((f) => f.code));
+
         setFunds(prev => {
           const updated = dedupeByCode([...newFunds, ...prev]);
           storageHelper.setItem('funds', JSON.stringify(updated));
@@ -1358,6 +1476,22 @@ export default function HomePage() {
           }
         });
         if (Object.keys(nextSeries).length > 0) setValuationSeries(prev => ({ ...prev, ...nextSeries }));
+
+        if (!expandAfterAdd) {
+          // 用户关闭“添加后展开详情”：将新添加基金的卡片和业绩走势都标记为收起
+          setCollapsedCodes(prev => {
+            const next = new Set(prev);
+            newCodesSet.forEach((code) => next.add(code));
+            storageHelper.setItem('collapsedCodes', JSON.stringify(Array.from(next)));
+            return next;
+          });
+          setCollapsedTrends(prev => {
+            const next = new Set(prev);
+            newCodesSet.forEach((code) => next.add(code));
+            storageHelper.setItem('collapsedTrends', JSON.stringify(Array.from(next)));
+            return next;
+          });
+        }
 
         if (targetGroupId === 'fav') {
           setFavorites(prev => {
@@ -3775,10 +3909,15 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
+      <MarketIndexAccordion
+        navbarHeight={navbarHeight}
+        onHeightChange={setMarketIndexAccordionHeight}
+        isMobile={isMobile}
+        onCustomSettingsChange={triggerCustomSettingsSync}
+      />
       <div className="grid">
         <div className="col-12">
-          <div ref={filterBarRef} className="filter-bar" style={{ ...(isMobile ? {} : { top: navbarHeight }), marginTop: navbarHeight, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div ref={filterBarRef} className="filter-bar" style={{ top: navbarHeight + marketIndexAccordionHeight, marginTop: 0, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div className="tabs-container">
               <div
                 className="tabs-scroll-area"
@@ -3878,17 +4017,29 @@ export default function HomePage() {
               <div className="divider" style={{ width: '1px', height: '20px', background: 'var(--border)' }} />
 
               <div className="sort-items" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="muted" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <SortIcon width="14" height="14" />
-                  排序
-                </span>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => setSortSettingOpen(true)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: '12px',
+                    color: 'var(--muted-foreground)',
+                    cursor: 'pointer',
+                    width: '50px',
+                  }}
+                  title="排序个性化设置"
+                >
+                  <span className="muted">排序</span>
+                  <SettingsIcon width="14" height="14" />
+                </button>
                 <div className="chips">
-                  {[
-                    { id: 'default', label: '默认' },
-                    { id: 'yield', label: '涨跌幅' },
-                    { id: 'holding', label: '持有收益' },
-                    { id: 'name', label: '名称' },
-                  ].map((s) => (
+                  {sortRules.filter((s) => s.enabled).map((s) => (
                     <button
                       key={s.id}
                       className={`chip ${sortBy === s.id ? 'active' : ''}`}
@@ -3904,7 +4055,7 @@ export default function HomePage() {
                       }}
                       style={{ height: '28px', fontSize: '12px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: 4 }}
                     >
-                      <span>{s.label}</span>
+                      <span>{s.alias || s.label}</span>
                       {s.id !== 'default' && sortBy === s.id && (
                         <span
                           style={{
@@ -3938,7 +4089,7 @@ export default function HomePage() {
                   holdings={holdings}
                   groupName={getGroupName()}
                   getProfit={getHoldingProfit}
-                  stickyTop={navbarHeight + filterBarHeight + (isMobile ? -14 : 0)}
+                  stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight + (isMobile ? -14 : 0)}
                   masked={maskAmounts}
                   onToggleMasked={() => setMaskAmounts((v) => !v)}
                 />
@@ -3998,7 +4149,7 @@ export default function HomePage() {
                           <div className="table-scroll-area">
                             <div className="table-scroll-area-inner">
                               <PcFundTable
-                                stickyTop={navbarHeight + filterBarHeight}
+                                stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight}
                                 data={pcFundTableData}
                                 refreshing={refreshing}
                                 currentTab={currentTab}
@@ -4080,7 +4231,7 @@ export default function HomePage() {
                         currentTab={currentTab}
                         favorites={favorites}
                         sortBy={sortBy}
-                        stickyTop={navbarHeight + filterBarHeight - 14}
+                        stickyTop={navbarHeight + filterBarHeight + marketIndexAccordionHeight}
                         blockDrawerClose={!!fundDeleteConfirm}
                         closeDrawerRef={fundDetailDrawerCloseRef}
                         onReorder={handleReorder}
@@ -4580,6 +4731,16 @@ export default function HomePage() {
           handleVerifyEmailOtp={handleVerifyEmailOtp}
         />
       )}
+
+      {/* 排序个性化设置弹框 */}
+      <SortSettingModal
+        open={sortSettingOpen}
+        onClose={() => setSortSettingOpen(false)}
+        isMobile={isMobile}
+        rules={sortRules}
+        onChangeRules={setSortRules}
+        onResetRules={() => setSortRules(DEFAULT_SORT_RULES)}
+      />
 
       {/* 全局轻提示 Toast */}
       <AnimatePresence>
