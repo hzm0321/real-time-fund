@@ -3,10 +3,9 @@ import './globals.css';
 import AnalyticsGate from './components/AnalyticsGate';
 import PwaRegister from './components/PwaRegister';
 import ThemeColorSync from './components/ThemeColorSync';
-import packageJson from '../package.json';
 
 export const metadata = {
-  title: `优基库 V${packageJson.version}`,
+  title: `优基库`,
   description: '输入基金编号添加基金，实时显示估值与前10重仓'
 };
 
