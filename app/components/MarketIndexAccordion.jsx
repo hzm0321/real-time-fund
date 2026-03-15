@@ -317,8 +317,8 @@ export default function MarketIndexAccordion({
     position: 'sticky',
     top: topMargin,
     zIndex: 10,
-    width: 'calc(100% + 24px)',
-    marginLeft: -12,
+    width: isMobile ? 'calc(100% + 24px)' : '100%',
+    marginLeft: isMobile ? -12 : 0,
   };
 
   if (loading && indices.length === 0) {
@@ -454,7 +454,11 @@ export default function MarketIndexAccordion({
               {visibleIndices.map((item, i) => (
                 <div
                   key={item.code || i}
-                  style={{ flex: '0 0 calc((100% - 24px) / 3)' }}
+                  style={{
+                    flex: isMobile
+                      ? '0 0 calc((100% - 24px) / 3)'
+                      : '0 0 calc((100% - 48px) / 5)',
+                  }}
                 >
                   <IndexCard item={item} />
                 </div>

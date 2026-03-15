@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   DndContext,
   KeyboardSensor,
@@ -25,18 +26,11 @@ import {
   DrawerTitle,
   DrawerClose,
 } from "@/components/ui/drawer";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { CloseIcon, MinusIcon, ResetIcon, SettingsIcon } from "./Icons";
 import ConfirmModal from "./ConfirmModal";
 import { cn } from "@/lib/utils";
 
-function SortableIndexItem({ item, canRemove, onRemove }) {
+function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
   const {
     attributes,
     listeners,
@@ -50,7 +44,9 @@ function SortableIndexItem({ item, canRemove, onRemove }) {
     transform: CSS.Transform.toString(transform),
     transition,
     cursor: isDragging ? "grabbing" : "grab",
-    flex: "0 0 calc((100% - 24px) / 3)",
+    flex: isMobile
+      ? "0 0 calc((100% - 24px) / 3)"
+      : "0 0 calc((100% - 48px) / 5)",
     touchAction: "none",
     ...(isDragging && {
       position: "relative",
@@ -164,6 +160,19 @@ export default function MarketSettingModal({
 
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) setResetConfirmOpen(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor)
@@ -244,6 +253,7 @@ export default function MarketSettingModal({
                     item={item}
                     canRemove={selectedCodes.length > 1}
                     onRemove={handleToggleCode}
+                    isMobile={isMobile}
                   />
                 ))}
               </div>
@@ -390,65 +400,75 @@ export default function MarketSettingModal({
     );
   }
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) onClose?.();
-      }}
-    >
-      <DialogContent
-        className="!p-0 max-w-xl"
-        overlayClassName="modal-overlay"
-        showCloseButton={false}
-      >
-        <div className="glass card modal">
-          <DialogHeader
-            className="flex flex-row items-center justify-between gap-2 mb-3"
+  const pcContent = (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="market-index-setting-overlay"
+          className="pc-table-setting-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="指数个性化设置"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={onClose}
+          style={{ zIndex: 10001 }}
+        >
+          <motion.aside
+            className="pc-market-setting-drawer pc-table-setting-drawer glass"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 690 }}
           >
-            <div className="flex items-center gap-2.5">
-              <SettingsIcon width="20" height="20" />
-              <DialogTitle>指数个性化设置</DialogTitle>
-            </div>
-            <DialogClose asChild>
+            <div className="pc-table-setting-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <SettingsIcon width="20" height="20" />
+                <span>指数个性化设置</span>
+              </div>
               <button
                 type="button"
-                className="icon-button border-none bg-transparent p-1"
+                className="icon-button"
+                onClick={onClose}
                 title="关闭"
+                style={{ border: "none", background: "transparent" }}
               >
                 <CloseIcon width="20" height="20" />
               </button>
-            </DialogClose>
-          </DialogHeader>
-          <div
-            className="flex flex-col gap-4"
-            style={{ maxHeight: "70vh", overflowY: "auto" }}
-          >
-            {body}
-          </div>
-        </div>
-        {resetConfirmOpen && (
-          <ConfirmModal
-            title="恢复默认指数"
-            message="是否恢复已添加指数为默认配置？"
-            icon={
-              <ResetIcon
-                width="20"
-                height="20"
-                className="shrink-0 text-[var(--primary)]"
-              />
-            }
-            confirmVariant="primary"
-            confirmText="恢复默认"
-            onConfirm={() => {
-              onResetDefault?.();
-              setResetConfirmOpen(false);
-            }}
-            onCancel={() => setResetConfirmOpen(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+            </div>
+            <div className="pc-table-setting-body">{body}</div>
+          </motion.aside>
+        </motion.div>
+      )}
+      {resetConfirmOpen && (
+        <ConfirmModal
+          key="pc-index-reset-confirm"
+          title="恢复默认指数"
+          message="是否恢复已添加指数为默认配置？"
+          icon={
+            <ResetIcon
+              width="20"
+              height="20"
+              className="shrink-0 text-[var(--primary)]"
+            />
+          }
+          confirmVariant="primary"
+          confirmText="恢复默认"
+          onConfirm={() => {
+            onResetDefault?.();
+            setResetConfirmOpen(false);
+          }}
+          onCancel={() => setResetConfirmOpen(false)}
+        />
+      )}
+    </AnimatePresence>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(pcContent, document.body);
 }
 

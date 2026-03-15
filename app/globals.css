@@ -2032,6 +2032,11 @@ input[type="number"] {
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
 }
 
+/* 指数个性化设置侧弹框：加宽以一行展示 5 个指数卡片 */
+.pc-market-setting-drawer.pc-table-setting-drawer {
+  width: 560px;
+}
+
 .pc-table-setting-header {
   display: flex;
   align-items: center;
