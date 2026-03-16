@@ -2093,9 +2093,11 @@ input[type="number"] {
   flex-shrink: 0;
 }
 
+/* 亮色主题下，PC 右侧抽屉里的 Switch 拇指使用浅色，以保证对比度 */
 [data-theme="light"] .pc-table-setting-drawer .dca-toggle-thumb {
   background: #fff;
 }
+
 
 /* 移动端表格设置底部抽屉 */
 .mobile-setting-overlay {
@@ -2536,6 +2538,13 @@ input[type="number"] {
   border-radius: 50%;
   background: #0f172a;
   transition: left 0.2s;
+}
+
+/* 亮色主题下：所有使用 dca-toggle 的拇指在浅底上统一用白色，保证对比度
+   - PC 右侧排序设置抽屉
+   - 移动端排序个性化设置 Drawer（以及其它区域） */
+[data-theme="light"] .dca-toggle-thumb {
+  background: #ffffff;
 }
 
 .dca-option-group {

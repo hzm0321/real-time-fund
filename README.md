@@ -113,6 +113,29 @@ docker-compose up -d --force-recreate
 docker image prune -f
 ```
 
+### Docker Hub
+
+镜像已发布至 Docker Hub，可直接拉取运行，无需本地构建。
+
+1. **拉取镜像**
+   ```bash
+   docker pull hzm0321/real-time-fund:latest
+   ```
+
+2. **启动容器**  
+   访问 [http://localhost:3000](http://localhost:3000) 即可使用。
+   ```bash
+   docker run -d -p 3000:3000 --name real-time-fund --restart always hzm0321/real-time-fund:latest
+   ```
+
+3. **使用自定义环境变量（运行时替换）**  
+   镜像内已预置占位符，启动时通过环境变量即可覆盖，无需重新构建。例如使用本地 `.env`：
+   ```bash
+   docker run -d -p 3000:3000 --name real-time-fund --restart always --env-file .env hzm0321/real-time-fund:latest
+   ```
+   或单独指定变量：`-e NEXT_PUBLIC_SUPABASE_URL=xxx -e NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx`。  
+   变量名与本地开发一致：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`、`NEXT_PUBLIC_GA_ID`、`NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL`。
+
 ## 📖 使用说明
 
 1. **添加基金**：在顶部输入框输入 6 位基金代码（如 `110022`），点击“添加”。

@@ -47,7 +47,7 @@ export default function MobileFundCardDrawer({
         {children}
       </DrawerTrigger>
       <DrawerContent
-        className="h-[77vh] max-h-[88vh] mt-0 flex flex-col"
+        className="h-[85vh] max-h-[90vh] mt-0 flex flex-col"
         onPointerDownOutside={(e) => {
           if (blockDrawerClose) return;
           if (e?.target?.closest?.('[data-slot="dialog-content"], [role="dialog"]')) {

@@ -382,6 +382,15 @@ export default function FundCard({
           </TabsList>
           {hasHoldings && (
             <TabsContent value="holdings" className="mt-3 outline-none">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  marginBottom: 4,
+                }}
+              >
+                <span className="muted">涨跌幅 / 占比</span>
+              </div>
               <div className="list">
                 {f.holdings.map((h, idx) => (
                   <div className="item" key={idx}>
@@ -409,7 +418,8 @@ export default function FundCard({
               code={f.code}
               isExpanded
               onToggleExpand={() => onToggleTrendCollapse?.(f.code)}
-              transactions={transactions?.[f.code] || []}
+              // 未设置持仓金额时，不展示买入/卖出标记与标签
+              transactions={profit ? (transactions?.[f.code] || []) : []}
               theme={theme}
               hideHeader
             />
@@ -480,7 +490,8 @@ export default function FundCard({
             code={f.code}
             isExpanded={!collapsedTrends?.has(f.code)}
             onToggleExpand={() => onToggleTrendCollapse?.(f.code)}
-            transactions={transactions?.[f.code] || []}
+            // 未设置持仓金额时，不展示买入/卖出标记与标签
+            transactions={profit ? (transactions?.[f.code] || []) : []}
             theme={theme}
           />
         </>

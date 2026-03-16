@@ -198,6 +198,7 @@ export default function MarketIndexAccordion({
   onHeightChange,
   isMobile,
   onCustomSettingsChange,
+  refreshing = false,
 }) {
   const [indices, setIndices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +207,7 @@ export default function MarketIndexAccordion({
   const [settingOpen, setSettingOpen] = useState(false);
   const [tickerIndex, setTickerIndex] = useState(0);
   const rootRef = useRef(null);
+  const hasInitializedSelectedCodes = useRef(false);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -222,8 +224,9 @@ export default function MarketIndexAccordion({
     };
   }, [onHeightChange, loading, indices.length]);
 
-  useEffect(() => {
+  const loadIndices = () => {
     let cancelled = false;
+    setLoading(true);
     fetchMarketIndices()
       .then((data) => {
         if (!cancelled) setIndices(Array.isArray(data) ? data : []);
@@ -234,12 +237,28 @@ export default function MarketIndexAccordion({
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
+  };
+
+  useEffect(() => {
+    // 初次挂载时加载一次指数
+    const cleanup = loadIndices();
+    return cleanup;
   }, []);
+
+  useEffect(() => {
+    // 跟随基金刷新节奏：每次开始刷新时重新拉取指数
+    if (!refreshing) return;
+    const cleanup = loadIndices();
+    return cleanup;
+  }, [refreshing]);
 
   // 初始化选中指数（本地偏好 > 默认集合）
   useEffect(() => {
     if (!indices.length || typeof window === 'undefined') return;
+    if (hasInitializedSelectedCodes.current) return;
     try {
       const stored = window.localStorage.getItem('marketIndexSelected');
       const availableCodes = new Set(indices.map((it) => it.code));
@@ -249,6 +268,7 @@ export default function MarketIndexAccordion({
           const filtered = parsed.filter((c) => availableCodes.has(c));
           if (filtered.length) {
             setSelectedCodes(filtered);
+            hasInitializedSelectedCodes.current = true;
             return;
           }
         }
@@ -344,7 +364,7 @@ export default function MarketIndexAccordion({
           display: none;
         }
         :global([data-theme='dark'] .market-index-accordion-root) {
-          background-color: rgba(15, 23, 42, 0.9);
+          background-color: rgba(15, 23, 42);
         }
         .market-index-ticker {
           overflow: hidden;

@@ -217,12 +217,37 @@ export default function HomePage() {
       }
 
       if (rulesFromSettings && rulesFromSettings.length) {
-        const merged = DEFAULT_SORT_RULES.map((rule) => {
-          const found = rulesFromSettings.find((r) => r.id === rule.id);
-          return found
-            ? { ...rule, enabled: found.enabled !== false }
-            : rule;
+        // 1）先按本地存储的顺序还原（包含 alias、enabled 等字段）
+        const defaultMap = new Map(
+          DEFAULT_SORT_RULES.map((rule) => [rule.id, rule])
+        );
+        const merged = [];
+
+        // 先遍历本地配置，保持用户自定义的顺序和别名/开关
+        for (const stored of rulesFromSettings) {
+          const base = defaultMap.get(stored.id);
+          if (!base) continue;
+          merged.push({
+            ...base,
+            // 只用本地的 enabled / alias 等个性化字段，基础 label 仍以内置为准
+            enabled:
+              typeof stored.enabled === "boolean"
+                ? stored.enabled
+                : base.enabled,
+            alias:
+              typeof stored.alias === "string" && stored.alias.trim()
+                ? stored.alias.trim()
+                : base.alias,
+          });
+        }
+
+        // 再把本次版本新增、但本地还没记录过的规则追加到末尾
+        DEFAULT_SORT_RULES.forEach((rule) => {
+          if (!merged.some((r) => r.id === rule.id)) {
+            merged.push(rule);
+          }
         });
+
         setSortRules(merged);
       }
 
@@ -1624,7 +1649,9 @@ export default function HomePage() {
         if (key === 'funds') {
           const prevSig = getFundCodesSignature(prevValue);
           const nextSig = getFundCodesSignature(nextValue);
-          if (prevSig === nextSig) return;
+          if (prevSig === nextSig) {
+            return;
+          }
         }
         if (!skipSyncRef.current) {
           const now = nowInTz().toISOString();
@@ -3686,7 +3713,7 @@ export default function HomePage() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="search-dropdown glass"
+                  className="search-dropdown glass scrollbar-y-styled"
                 >
                   {searchResults.length > 0 ? (
                     <div className="search-results">
@@ -3914,6 +3941,7 @@ export default function HomePage() {
         onHeightChange={setMarketIndexAccordionHeight}
         isMobile={isMobile}
         onCustomSettingsChange={triggerCustomSettingsSync}
+        refreshing={refreshing}
       />
       <div className="grid">
         <div className="col-12">

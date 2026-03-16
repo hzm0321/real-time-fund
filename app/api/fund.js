@@ -770,14 +770,18 @@ export const fetchFundHistory = async (code, range = '1m') => {
     default: start = start.subtract(1, 'month');
   }
 
-  // 业绩走势统一走 pingzhongdata.Data_netWorthTrend
+  // 业绩走势统一走 pingzhongdata.Data_netWorthTrend，
+  // 同时附带 Data_grandTotal（若存在，格式为 [{ name, data: [[ts, val], ...] }, ...]）
   try {
     const pz = await fetchFundPingzhongdata(code);
     const trend = pz?.Data_netWorthTrend;
+    const grandTotal = pz?.Data_grandTotal;
+
     if (Array.isArray(trend) && trend.length) {
       const startMs = start.startOf('day').valueOf();
       // end 可能是当日任意时刻，这里用 end-of-day 包含最后一天
       const endMs = end.endOf('day').valueOf();
+
       const out = trend
         .filter((d) => d && typeof d.x === 'number' && d.x >= startMs && d.x <= endMs)
         .map((d) => {
@@ -787,6 +791,33 @@ export const fetchFundHistory = async (code, range = '1m') => {
           return { date, value };
         })
         .filter(Boolean);
+
+      // 解析 Data_grandTotal 为多条对比曲线，保存在数组属性 out.grandTotalSeries 上
+      if (Array.isArray(grandTotal) && grandTotal.length) {
+        const grandTotalSeries = grandTotal
+          .map((series) => {
+            if (!series || !series.data || !Array.isArray(series.data)) return null;
+            const name = series.name || '';
+            const points = series.data
+              .filter((item) => Array.isArray(item) && typeof item[0] === 'number')
+              .map(([ts, val]) => {
+                if (ts < startMs || ts > endMs) return null;
+                const numVal = Number(val);
+                if (!Number.isFinite(numVal)) return null;
+                const date = dayjs(ts).tz(TZ).format('YYYY-MM-DD');
+                return { ts, date, value: numVal };
+              })
+              .filter(Boolean);
+            if (!points.length) return null;
+            return { name, points };
+          })
+          .filter(Boolean);
+
+        if (grandTotalSeries.length) {
+          // 给数组挂一个属性，供前端图表组件读取
+          out.grandTotalSeries = grandTotalSeries;
+        }
+      }
 
       if (out.length) return out;
     }
