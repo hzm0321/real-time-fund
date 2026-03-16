@@ -291,7 +291,7 @@ export default function HomePage() {
   }, [sortRules, sortBy]);
 
   // 视图模式
-  const [viewMode, setViewMode] = useState('card'); // card, list
+  const [viewMode, setViewMode] = useState('list'); // card, list
   // 全局隐藏金额状态（影响分组汇总、列表和卡片）
   const [maskAmounts, setMaskAmounts] = useState(false);
 
@@ -1640,7 +1640,7 @@ export default function HomePage() {
 
   const storageHelper = useMemo(() => {
     // 仅以下 key 参与云端同步；fundValuationTimeseries 不同步到云端（测试中功能，暂不同步）
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings', 'viewMode']);
     const triggerSync = (key, prevValue, nextValue) => {
       if (keys.has(key)) {
         // 标记为脏数据
@@ -1689,7 +1689,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // 仅以下 key 的变更会触发云端同步；fundValuationTimeseries 不在其中
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'dcaPlans', 'customSettings']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'refreshMs', 'holdings', 'pendingTrades', 'dcaPlans', 'customSettings', 'viewMode']);
     const onStorage = (e) => {
       if (!e.key) return;
       if (e.key === 'localUpdatedAt') {
@@ -2330,11 +2330,13 @@ export default function HomePage() {
       });
       if (error) throw error;
       if (data?.user) {
+        setUser(data.user);
         setLoginModalOpen(false);
         setLoginEmail('');
         setLoginOtp('');
         setLoginSuccess('');
         setLoginError('');
+        fetchCloudConfig(data.user.id, true);
       }
     } catch (err) {
       setLoginError(err.message || '验证失败，请检查验证码或稍后再试');
@@ -2921,6 +2923,8 @@ export default function HomePage() {
 
     const customSettings = isPlainObject(payload.customSettings) ? payload.customSettings : {};
 
+    const viewMode = (payload.viewMode === 'list' || payload.viewMode === 'card') ? payload.viewMode : 'list';
+
     return JSON.stringify({
       funds: uniqueFundCodes,
       favorites,
@@ -2932,7 +2936,8 @@ export default function HomePage() {
       pendingTrades,
       transactions,
       dcaPlans,
-      customSettings
+      customSettings,
+      viewMode
     });
   }
 
@@ -2976,6 +2981,10 @@ export default function HomePage() {
         } catch {
           all.customSettings = {};
         }
+      }
+      if (!keys || keys.has('viewMode')) {
+        const storedViewMode = localStorage.getItem('viewMode');
+        all.viewMode = (storedViewMode === 'list' || storedViewMode === 'card') ? storedViewMode : 'list';
       }
 
       // 如果是全量收集（keys 为 null），进行完整的数据清洗和验证逻辑
@@ -3046,7 +3055,8 @@ export default function HomePage() {
           pendingTrades: all.pendingTrades,
           transactions: all.transactions,
           dcaPlans: cleanedDcaPlans,
-          customSettings: isPlainObject(all.customSettings) ? all.customSettings : {}
+          customSettings: isPlainObject(all.customSettings) ? all.customSettings : {},
+          viewMode: all.viewMode || 'list'
         };
       }
 
@@ -3067,6 +3077,7 @@ export default function HomePage() {
         transactions: {},
         dcaPlans: {},
         customSettings: {},
+        viewMode: 'card',
         exportedAt: nowInTz().toISOString()
       };
     }
@@ -3254,7 +3265,7 @@ export default function HomePage() {
                 updated_at: now
               },
               { onConflict: 'user_id' }
-            );
+            ).select();
           if (error) throw error;
         }
       } else {
@@ -3268,7 +3279,7 @@ export default function HomePage() {
               updated_at: now
             },
             { onConflict: 'user_id' }
-          );
+          ).select();
         if (error) throw error;
       }
 
@@ -3588,7 +3599,7 @@ export default function HomePage() {
           </motion.div>
         )}
       </AnimatePresence>
-      <Announcement />
+      {/* <Announcement /> */}
       <div className="navbar glass" ref={navbarRef}>
         {refreshing && <div className="loading-bar"></div>}
         <div className={`brand ${(isSearchFocused || selectedFunds.length > 0) ? 'search-focused-sibling' : ''}`}>
@@ -3628,26 +3639,9 @@ export default function HomePage() {
               <path d="M12 12v9" stroke="var(--accent)" />
               <path d="m16 16-4-4-4 4" stroke="var(--accent)" />
             </svg>
-            {/* 默认图标 */}
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                margin: 'auto',
-                opacity: isSyncing ? 0 : 1,
-                transform: isSyncing ? 'translateY(-4px)' : 'translateY(0px)',
-                transition: 'opacity 0.25s ease, transform 0.25s ease',
-              }}
-            >
-              <circle cx="12" cy="12" r="10" stroke="var(--accent)" strokeWidth="2" />
-              <path d="M5 14c2-4 7-6 14-5" stroke="var(--primary)" strokeWidth="2" />
-            </svg>
+            <svg t="1773153853499" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12577" width="32" height="32"><path d="M333.248 85.312c-155.328 0-247.936 92.608-247.936 247.936v357.12c0 155.712 92.608 248.32 247.936 248.32h357.12c155.264 0 247.872-92.608 247.872-247.936V333.248c0.448-155.328-92.16-247.936-247.488-247.936H333.248z m304.64 466.816a72.832 72.832 0 0 1-49.92 28.16c-20.096 2.56-39.68-3.008-55.488-15.36l-78.08-61.44a9.344 9.344 0 0 0-8.128-2.176c-1.664 0-4.672 0.896-7.232 4.288L337.472 637.44a32.128 32.128 0 0 1-25.152 12.352 31.36 31.36 0 0 1-19.648-6.784 32 32 0 0 1-5.952-44.8l101.568-131.84a75.008 75.008 0 0 1 105.344-13.248l78.08 61.44c3.008 2.56 6.016 2.56 8.128 2.112 1.728 0 4.672-0.832 7.232-4.224l98.56-127.168a31.552 31.552 0 0 1 44.8-5.568c14.08 11.52 16.64 31.616 6.016 45.248l-98.56 127.168z" fill="#435EBE" p-id="12578"></path></svg>
           </div>
-          <span>基估宝</span>
+          <span>优基库</span>
         </div>
         <div className={`glass add-fund-section navbar-add-fund ${(isSearchFocused || selectedFunds.length > 0) ? 'search-focused' : ''}`} role="region" aria-label="添加基金">
           <div className="search-container" ref={dropdownRef}>
@@ -3771,9 +3765,6 @@ export default function HomePage() {
               <UpdateIcon width="14" height="14" />
             </div>
           )}
-          <span className="github-icon-wrap">
-            <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} />
-          </span>
           {isMobile && (
             <button
               className="icon-button mobile-search-btn"
@@ -4032,7 +4023,7 @@ export default function HomePage() {
             </div>
 
             <div className="sort-group" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div className="view-toggle" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '2px' }}>
+              {/* <div className="view-toggle" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '2px' }}>
                 <button
                   className={`icon-button ${viewMode === 'card' ? 'active' : ''}`}
                   onClick={() => { applyViewMode('card'); }}
@@ -4049,7 +4040,7 @@ export default function HomePage() {
                 >
                   <ListIcon width="16" height="16" />
                 </button>
-              </div>
+              </div> */}
 
               <div className="divider" style={{ width: '1px', height: '20px', background: 'var(--border)' }} />
 
@@ -4424,20 +4415,18 @@ export default function HomePage() {
         <p style={{ marginBottom: 12 }}>注：估算数据与真实结算数据会有1%左右误差，非股票型基金误差较大</p>
         <div style={{ marginTop: 12, opacity: 0.8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <p style={{ margin: 0 }}>
-            遇到任何问题或需求建议可
+            该项目基于开源项目开发，项目地址：
             <button
               className="link-button"
               onClick={() => {
-                if (!user?.id) {
-                  sonnerToast.error('请先登录后再提交反馈');
-                  return;
-                }
-                setFeedbackNonce((n) => n + 1);
-                setFeedbackOpen(true);
+                window.open(
+                  `https://github.com/hzm0321/real-time-fund`,
+                  '_blank',
+                );
               }}
               style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '0 4px', textDecoration: 'underline', fontSize: 'inherit', fontWeight: 600 }}
             >
-              点此提交反馈
+              点此跳转
             </button>
           </p>
           <button

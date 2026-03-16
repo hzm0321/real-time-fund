@@ -98,46 +98,19 @@
 更多 Supabase 相关内容查阅官方文档。
 
 ### 构建与部署
-
-本项目已配置 GitHub Actions。每次推送到 `main` 分支时，会自动执行构建并部署到 GitHub Pages。
-如需使用 GitHub Actions 部署，请在 GitHub 项目 Settings → Secrets and variables → Actions 中创建对应的 Repository secrets（字段名称与 `.env.local` 保持一致）。
-包括：`NEXT_PUBLIC_Supabase_URL`、`NEXT_PUBLIC_Supabase_ANON_KEY`、`NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`、`NEXT_PUBLIC_GA_ID`、`NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL`。
-
-若要手动构建：
-```bash
-npm run build
-```
-静态文件将生成在 `out` 目录下。
-
-### Docker运行
-
-镜像支持两种配置方式：
-
-- **构建时写入**：构建时通过 `--build-arg` 或 `.env` 传入 `NEXT_PUBLIC_*`，值会打进镜像，运行时无需再传。
-- **运行时替换**：构建时不传（或使用默认占位符），启动容器时通过 `-e` 或 `--env-file` 传入，入口脚本会在启动 Nginx 前替换静态资源中的占位符。
-
-可复制 `env.example` 为 `.env` 并填入实际值；若不用登录/反馈功能可留空。
-
-1. 构建镜像
-```bash
-# 方式 A：运行时再注入配置（镜像内为占位符）
-docker build -t real-time-fund .
-
-# 方式 B：构建时写入配置
-docker build -t real-time-fund --build-arg NEXT_PUBLIC_SUPABASE_URL=xxx --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx .
-# 或依赖同目录 .env：docker compose build
-```
-
-2. 启动容器
-```bash
-# 若构建时未写入配置，可在此注入（与 --env-file .env 二选一）
-docker run -d -p 3000:3000 --name fund --env-file .env real-time-fund
-```
-
 #### docker-compose（会读取同目录 `.env` 作为 build-arg 与运行环境）
 ```bash
 # 建议先：cp env.example .env 并编辑 .env
-docker compose up -d
+docker compose up -d --build
+
+# 或者
+# 构建
+docker compose build
+# 重新创建容器
+docker-compose up -d --force-recreate
+
+# 清理旧镜像
+docker image prune -f
 ```
 
 ### Docker Hub
