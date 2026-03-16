@@ -111,18 +111,27 @@ npm run build
 
 ### Docker运行
 
-需先配置环境变量（与本地开发一致），否则构建出的镜像中 Supabase 等配置为空。可复制 `env.example` 为 `.env` 并填入实际值；若不用登录/反馈功能可留空。
+镜像支持两种配置方式：
 
-1. 构建镜像（构建时会读取当前环境或同目录 `.env` 中的变量）
+- **构建时写入**：构建时通过 `--build-arg` 或 `.env` 传入 `NEXT_PUBLIC_*`，值会打进镜像，运行时无需再传。
+- **运行时替换**：构建时不传（或使用默认占位符），启动容器时通过 `-e` 或 `--env-file` 传入，入口脚本会在启动 Nginx 前替换静态资源中的占位符。
+
+可复制 `env.example` 为 `.env` 并填入实际值；若不用登录/反馈功能可留空。
+
+1. 构建镜像
 ```bash
+# 方式 A：运行时再注入配置（镜像内为占位符）
 docker build -t real-time-fund .
-# 或通过 --build-arg 传入，例如：
-# docker build -t real-time-fund --build-arg NEXT_PUBLIC_Supabase_URL=xxx --build-arg NEXT_PUBLIC_Supabase_ANON_KEY=xxx --build-arg NEXT_PUBLIC_GA_ID=G-xxxx .
+
+# 方式 B：构建时写入配置
+docker build -t real-time-fund --build-arg NEXT_PUBLIC_SUPABASE_URL=xxx --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx .
+# 或依赖同目录 .env：docker compose build
 ```
 
 2. 启动容器
 ```bash
-docker run -d -p 3000:3000 --name fund real-time-fund
+# 若构建时未写入配置，可在此注入（与 --env-file .env 二选一）
+docker run -d -p 3000:3000 --name fund --env-file .env real-time-fund
 ```
 
 #### docker-compose（会读取同目录 `.env` 作为 build-arg 与运行环境）
@@ -130,6 +139,29 @@ docker run -d -p 3000:3000 --name fund real-time-fund
 # 建议先：cp env.example .env 并编辑 .env
 docker compose up -d
 ```
+
+### Docker Hub
+
+镜像已发布至 Docker Hub，可直接拉取运行，无需本地构建。
+
+1. **拉取镜像**
+   ```bash
+   docker pull hzm0321/real-time-fund:latest
+   ```
+
+2. **启动容器**  
+   访问 [http://localhost:3000](http://localhost:3000) 即可使用。
+   ```bash
+   docker run -d -p 3000:3000 --name real-time-fund --restart always hzm0321/real-time-fund:latest
+   ```
+
+3. **使用自定义环境变量（运行时替换）**  
+   镜像内已预置占位符，启动时通过环境变量即可覆盖，无需重新构建。例如使用本地 `.env`：
+   ```bash
+   docker run -d -p 3000:3000 --name real-time-fund --restart always --env-file .env hzm0321/real-time-fund:latest
+   ```
+   或单独指定变量：`-e NEXT_PUBLIC_SUPABASE_URL=xxx -e NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx`。  
+   变量名与本地开发一致：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`、`NEXT_PUBLIC_GA_ID`、`NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL`。
 
 ## 📖 使用说明
 
