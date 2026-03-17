@@ -117,7 +117,8 @@ export default function GroupSummary({
         hasHolding = true;
         totalAsset += profit.amount;
         if (profit.profitToday != null) {
-          totalProfitToday += Math.round(profit.profitToday * 100) / 100;
+          // 先累加原始当日收益，最后统一做一次四舍五入，避免逐笔四舍五入造成的总计误差
+          totalProfitToday += profit.profitToday;
           hasAnyTodayData = true;
         }
         if (profit.profitTotal !== null) {
@@ -129,11 +130,14 @@ export default function GroupSummary({
       }
     });
 
+    // 将当日收益总和四舍五入到两位小数，和卡片展示保持一致
+    const roundedTotalProfitToday = Math.round(totalProfitToday * 100) / 100;
+
     const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
 
     return {
       totalAsset,
-      totalProfitToday,
+      totalProfitToday: roundedTotalProfitToday,
       totalHoldingReturn,
       hasHolding,
       returnRate,

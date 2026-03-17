@@ -3165,9 +3165,10 @@ export default function HomePage() {
   const fetchCloudConfig = async (userId, checkConflict = false) => {
     if (!userId) return;
     try {
+      // 一次查询同时拿到 meta 与 data，方便两种模式复用
       const { data: meta, error: metaError } = await supabase
         .from('user_configs')
-        .select(`id, updated_at${checkConflict ? ', data' : ''}`)
+        .select('id, data, updated_at')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -3181,44 +3182,19 @@ export default function HomePage() {
         setCloudConfigModal({ open: true, userId, type: 'empty' });
         return;
       }
+
+      // 冲突检查模式：使用 meta.data 弹出冲突确认弹窗
       if (checkConflict) {
         setCloudConfigModal({ open: true, userId, type: 'conflict', cloudData: meta.data });
         return;
       }
 
-      const localUpdatedAt = window.localStorage.getItem('localUpdatedAt');
-      if (localUpdatedAt && meta.updated_at && new Date(meta.updated_at) < new Date(localUpdatedAt)) {
+      // 非冲突检查模式：直接复用上方查询到的 meta 数据，覆盖本地
+      if (meta.data && isPlainObject(meta.data) && Object.keys(meta.data).length > 0) {
+        await applyCloudConfig(meta.data, meta.updated_at);
         return;
       }
 
-      const { data, error } = await supabase
-        .from('user_configs')
-        .select('id, data, updated_at')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data?.data && isPlainObject(data.data) && Object.keys(data.data).length > 0) {
-        const localPayload = collectLocalPayload();
-        const localComparable = getComparablePayload(localPayload);
-        const cloudComparable = getComparablePayload(data.data);
-
-        if (localComparable !== cloudComparable) {
-          // 如果数据不一致
-          if (checkConflict) {
-            // 只有明确要求检查冲突时才提示（例如刚登录时）
-            setCloudConfigModal({ open: true, userId, type: 'conflict', cloudData: data.data });
-            return;
-          }
-          // 否则直接覆盖本地（例如已登录状态下的刷新）
-          await applyCloudConfig(data.data, data.updated_at);
-          return;
-        }
-
-        await applyCloudConfig(data.data, data.updated_at);
-        return;
-      }
       setCloudConfigModal({ open: true, userId, type: 'empty' });
     } catch (e) {
       console.error('获取云端配置失败', e);
