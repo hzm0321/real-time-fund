@@ -2415,6 +2415,29 @@ export default function HomePage() {
     setLoginLoading(false);
   };
 
+  const handleGithubLogin = async () => {
+    setLoginError('');
+    if (!isSupabaseConfigured) {
+      showToast('未配置 Supabase，无法登录', 'error');
+      return;
+    }
+    try {
+      isExplicitLoginRef.current = true;
+      setLoginLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      setLoginError(err.message || 'GitHub 登录失败，请稍后再试');
+      isExplicitLoginRef.current = false;
+      setLoginLoading(false);
+    }
+  };
+
   // 登出
   const handleLogout = async () => {
     isLoggingOutRef.current = true;
@@ -3560,7 +3583,6 @@ export default function HomePage() {
 
   useEffect(() => {
     const isAnyModalOpen =
-      settingsOpen ||
       feedbackOpen ||
       addResultOpen ||
       addFundToGroupOpen ||
@@ -3596,7 +3618,6 @@ export default function HomePage() {
       containerRef.current.style.overflow = '';
     };
   }, [
-    settingsOpen,
     feedbackOpen,
     addResultOpen,
     addFundToGroupOpen,
@@ -4882,6 +4903,7 @@ export default function HomePage() {
             setLoginSuccess('');
             setLoginEmail('');
             setLoginOtp('');
+            setLoginLoading(false);
           }}
           loginEmail={loginEmail}
           setLoginEmail={setLoginEmail}
@@ -4892,6 +4914,7 @@ export default function HomePage() {
           loginSuccess={loginSuccess}
           handleSendOtp={handleSendOtp}
           handleVerifyEmailOtp={handleVerifyEmailOtp}
+          handleGithubLogin={isSupabaseConfigured ? handleGithubLogin : undefined}
         />
       )}
 
