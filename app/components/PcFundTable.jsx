@@ -43,11 +43,13 @@ const NON_FROZEN_COLUMN_IDS = [
   'estimateChangePercent',
   'totalChangePercent',
   'holdingAmount',
+  'holdingDays',
   'todayProfit',
   'holdingProfit',
   'latestNav',
   'estimateNav',
 ];
+
 const COLUMN_HEADERS = {
   relatedSector: '关联板块',
   latestNav: '最新净值',
@@ -56,6 +58,7 @@ const COLUMN_HEADERS = {
   estimateChangePercent: '估值涨幅',
   totalChangePercent: '估算收益',
   holdingAmount: '持仓金额',
+  holdingDays: '持有天数',
   todayProfit: '当日收益',
   holdingProfit: '持有收益',
 };
@@ -288,13 +291,15 @@ export default function PcFundTable({
     if (vis && typeof vis === 'object' && Object.keys(vis).length > 0) {
       const next = { ...vis };
       if (next.relatedSector === undefined) next.relatedSector = false;
+      if (next.holdingDays === undefined) next.holdingDays = false;
       return next;
     }
     const allVisible = {};
     NON_FROZEN_COLUMN_IDS.forEach((id) => { allVisible[id] = true; });
     // 新增列：默认隐藏（用户可在表格设置中开启）
-    allVisible.relatedSector = false;
-    return allVisible;
+      allVisible.relatedSector = false;
+      allVisible.holdingDays = false;
+      return allVisible;
   })();
   const columnSizing = (() => {
     const s = currentGroupPc?.pcTableColumns;
@@ -366,6 +371,7 @@ export default function PcFundTable({
       allVisible[id] = true;
     });
     allVisible.relatedSector = false;
+    allVisible.holdingDays = false;
     setColumnVisibility(allVisible);
   };
   const handleToggleColumnVisibility = (columnId, visible) => {
@@ -466,7 +472,7 @@ export default function PcFundTable({
       while (queue.length) {
         const item = queue.shift();
         if (item == null) continue;
-        // eslint-disable-next-line no-await-in-loop
+         
         results.push(await worker(item));
       }
     });
@@ -849,6 +855,28 @@ export default function PcFundTable({
         },
       },
       {
+        accessorKey: 'holdingDays',
+        header: '持有天数',
+        size: 100,
+        minSize: 80,
+        cell: (info) => {
+          const original = info.row.original || {};
+          const value = original.holdingDaysValue;
+          if (value == null) {
+            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+          }
+          return (
+            <div style={{ fontWeight: 700, textAlign: 'right' }}>
+              {value}
+            </div>
+          );
+        },
+        meta: {
+          align: 'right',
+          cellClassName: 'holding-days-cell',
+        },
+      },
+      {
         accessorKey: 'todayProfit',
         header: '当日收益',
         size: 135,
@@ -866,7 +894,7 @@ export default function PcFundTable({
               <FitText className={cls} style={{ fontWeight: 700, display: 'block' }} maxFontSize={14} minFontSize={10}>
                 {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
               </FitText>
-              {percentStr && !isUpdated && !masked ? (
+              {percentStr && !masked ? (
                 <span className={`${cls} today-profit-percent`} style={{ display: 'block', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
                   <FitText maxFontSize={11} minFontSize={9}>
                     {percentStr}
@@ -1046,19 +1074,22 @@ export default function PcFundTable({
           const isNameColumn =
             header.column.id === 'fundName' ||
             header.column.columnDef?.accessorKey === 'fundName';
-          const align = isNameColumn ? '' : 'text-center';
+          const isRightAligned = NON_FROZEN_COLUMN_IDS.includes(header.column.id);
+          const align = isNameColumn ? '' : isRightAligned ? 'text-right' : 'text-center';
           return (
             <div
               key={header.id}
               className={`table-header-cell ${align}`}
               style={style}
             >
-              {header.isPlaceholder
-                ? null
-                : flexRender(
-                  header.column.columnDef.header,
-                  header.getContext(),
-                )}
+              <div style={{ paddingRight: isRightAligned ? '20px' : '0' }}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(
+                    header.column.columnDef.header,
+                    header.getContext(),
+                  )}
+              </div>
               {!forPortal && (
                 <div
                   onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
@@ -1201,19 +1232,9 @@ export default function PcFundTable({
                     {row.getVisibleCells().map((cell) => {
                       const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
                       const isNameColumn = columnId === 'fundName';
-                      const rightAlignedColumns = new Set([
-                        'latestNav',
-                        'estimateNav',
-                        'yesterdayChangePercent',
-                        'estimateChangePercent',
-                        'totalChangePercent',
-                        'holdingAmount',
-                        'todayProfit',
-                        'holdingProfit',
-                      ]);
                       const align = isNameColumn
                         ? ''
-                        : rightAlignedColumns.has(columnId)
+                        : NON_FROZEN_COLUMN_IDS.includes(columnId)
                           ? 'text-right'
                           : 'text-center';
                       const cellClassName =
@@ -1281,19 +1302,22 @@ export default function PcFundTable({
                 const isNameColumn =
                   header.column.id === 'fundName' ||
                   header.column.columnDef?.accessorKey === 'fundName';
-                const align = isNameColumn ? '' : 'text-center';
+                const isRightAligned = NON_FROZEN_COLUMN_IDS.includes(header.column.id);
+                const align = isNameColumn ? '' : isRightAligned ? 'text-right' : 'text-center';
                 return (
                   <div
                     key={header.id}
                     className={`table-header-cell ${align}`}
                     style={style}
                   >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
+                    <div style={{ paddingRight: isRightAligned ? '20px' : '0' }}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                    </div>
                   </div>
                 );
               })}

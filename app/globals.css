@@ -3348,6 +3348,35 @@ input[type="number"] {
   color: var(--success);
 }
 
+/* ========== GitHub 登录按钮样式 ========== */
+.github-login-btn {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.github-login-btn:hover {
+  border-color: var(--primary);
+  background: rgba(34, 211, 238, 0.05);
+}
+
+.github-login-btn:active {
+  transform: scale(0.98);
+}
+
+[data-theme="light"] .github-login-btn {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .github-login-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3af;
+}
+
+[data-theme="light"] .github-login-btn img {
+  filter: brightness(0.2);
+}
+
 .button.secondary {
   background: transparent;
   border: 1px solid var(--border);

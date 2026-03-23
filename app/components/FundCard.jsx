@@ -267,6 +267,20 @@ export default function FundCard({
                 {masked ? '******' : `¥${profit.amount.toFixed(2)}`}
               </span>
             </div>
+            {holding?.firstPurchaseDate && !masked && (() => {
+              const today = dayjs.tz(todayStr, TZ);
+              const purchaseDate = dayjs.tz(holding.firstPurchaseDate, TZ);
+              if (!purchaseDate.isValid()) return null;
+              const days = today.diff(purchaseDate, 'day');
+              return (
+                <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
+                  <span className="label">持有天数</span>
+                  <span className="value">
+                    {days}天
+                  </span>
+                </div>
+              );
+            })()}
             <div className="stat" style={{ flexDirection: 'column', gap: 4 }}>
               <span className="label">当日收益</span>
               <span

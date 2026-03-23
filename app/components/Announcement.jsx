@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v19';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v20';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -75,15 +75,14 @@ export default function Announcement() {
               <span>公告</span>
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
-              <p>v0.2.8 更新内容：</p>
-              <p>1. 增加关联板块列。</p>
-              <p>2. 设置持仓支持今日首次买入。</p>
-              <p>3. 加仓自动获取费率。</p>
+              <p>v0.2.9 更新内容：</p>
+              <p>1. 排序新增按昨日涨幅排序。</p>
+              <p>2. 排序个性化设置支持切换排序形式。</p>
+              <p>3. 全局设置新增显示/隐藏大盘指数。</p>
+              <p>4. 新增持有天数。</p>
+              <p>5. 登录方式支持 Github。</p>
               <br/>
-              <p>下一版本更新内容:</p>
-              <p>1. 关联板块实时估值。</p>
-              <p>2. 收益曲线。</p>
-              <p>3. 估值差异列。</p>
+              关联板块实时估值还在测试，会在近期上线。
               <p>如有建议和问题，欢迎进用户支持群反馈。</p>
             </div>
 

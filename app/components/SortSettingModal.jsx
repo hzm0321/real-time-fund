@@ -10,6 +10,7 @@ import {
   DrawerTitle,
   DrawerClose,
 } from "@/components/ui/drawer";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CloseIcon, DragIcon, ResetIcon, SettingsIcon } from "./Icons";
 import ConfirmModal from "./ConfirmModal";
 
@@ -33,6 +34,8 @@ export default function SortSettingModal({
   rules = [],
   onChangeRules,
   onResetRules,
+  sortDisplayMode = "buttons",
+  onChangeSortDisplayMode,
 }) {
   const [localRules, setLocalRules] = useState(rules);
   const [editingId, setEditingId] = useState(null);
@@ -120,6 +123,59 @@ export default function SortSettingModal({
           : "pc-table-setting-body"
       }
     >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        <h3
+          className="pc-table-setting-subtitle"
+          style={{ margin: 0, fontSize: 14 }}
+        >
+          排序形式
+        </h3>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginLeft: "auto" }}>
+          <RadioGroup
+            value={sortDisplayMode}
+            onValueChange={(value) => onChangeSortDisplayMode?.(value)}
+            className="flex flex-row items-center gap-4"
+          >
+            <label
+              htmlFor="sort-display-mode-buttons"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                color: "var(--text)",
+                cursor: "pointer",
+              }}
+            >
+              <RadioGroupItem id="sort-display-mode-buttons" value="buttons" />
+              <span>按钮</span>
+            </label>
+            <label
+              htmlFor="sort-display-mode-dropdown"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                color: "var(--text)",
+                cursor: "pointer",
+              }}
+            >
+              <RadioGroupItem id="sort-display-mode-dropdown" value="dropdown" />
+              <span>下拉单选</span>
+            </label>
+          </RadioGroup>
+        </div>
+      </div>
+
       <div
         style={{
           display: "flex",

@@ -27,7 +27,7 @@ const nowInTz = () => dayjs().tz(TZ);
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 const formatDate = (input) => toTz(input).format('YYYY-MM-DD');
 
-export function DatePicker({ value, onChange }) {
+export function DatePicker({ value, onChange, position = 'bottom' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => value ? toTz(value) : nowInTz());
 
@@ -83,16 +83,15 @@ export function DatePicker({ value, onChange }) {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: position === 'top' ? -10 : 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            exit={{ opacity: 0, y: position === 'top' ? -10 : 10, scale: 0.95 }}
             className="date-picker-dropdown glass card"
             style={{
               position: 'absolute',
-              top: '100%',
+              ...(position === 'top' ? { bottom: '100%', marginBottom: 8 } : { top: '100%', marginTop: 8 }),
               left: 0,
               width: '100%',
-              marginTop: 8,
               padding: 12,
               zIndex: 10
             }}

@@ -35,6 +35,7 @@ const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'yesterdayChangePercent',
   'estimateChangePercent',
   'totalChangePercent',
+  'holdingDays',
   'todayProfit',
   'holdingProfit',
   'latestNav',
@@ -47,6 +48,7 @@ const MOBILE_COLUMN_HEADERS = {
   yesterdayChangePercent: '昨日涨幅',
   estimateChangePercent: '估值涨幅',
   totalChangePercent: '估算收益',
+  holdingDays: '持有天数',
   todayProfit: '当日收益',
   holdingProfit: '持有收益',
 };
@@ -238,6 +240,7 @@ export default function MobileFundTable({
     MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => { o[id] = true; });
     // 新增列：默认隐藏（用户可在表格设置中开启）
     o.relatedSector = false;
+    o.holdingDays = false;
     return o;
   })();
 
@@ -253,6 +256,7 @@ export default function MobileFundTable({
     if (vis && typeof vis === 'object' && Object.keys(vis).length > 0) {
       const next = { ...vis };
       if (next.relatedSector === undefined) next.relatedSector = false;
+      if (next.holdingDays === undefined) next.holdingDays = false;
       return next;
     }
     return defaultVisibility;
@@ -349,9 +353,14 @@ export default function MobileFundTable({
       if (!stickySummaryWrapper) return stickyTop;
 
       const wrapperRect = stickySummaryWrapper.getBoundingClientRect();
-      const isSummaryStuck = wrapperRect.top <= stickyTop + 1;
+      // 用“实际 DOM 的 top”判断 sticky 是否已生效，避免 mobile 下 stickyTop 入参与 GroupSummary 不一致导致的偏移。
+      const computedTopStr = window.getComputedStyle(stickySummaryWrapper).top;
+      const computedTop = Number.parseFloat(computedTopStr);
+      const baseTop = Number.isFinite(computedTop) ? computedTop : stickyTop;
+      const isSummaryStuck = wrapperRect.top <= baseTop + 1;
 
-      return isSummaryStuck ? stickyTop + stickySummaryWrapper.offsetHeight : stickyTop;
+      // header 使用固定定位(top)，所以也用视口坐标系下的 wrapperRect.top + 高度，确保不重叠
+      return isSummaryStuck ? wrapperRect.top + stickySummaryWrapper.offsetHeight : stickyTop;
     };
 
     const updateVerticalState = () => {
@@ -437,6 +446,7 @@ export default function MobileFundTable({
     yesterdayChangePercent: 72,
     estimateChangePercent: 80,
     totalChangePercent: 80,
+    holdingDays: 64,
     todayProfit: 80,
     holdingProfit: 80,
   };
@@ -453,7 +463,7 @@ export default function MobileFundTable({
       while (queue.length) {
         const item = queue.shift();
         if (item == null) continue;
-        // eslint-disable-next-line no-await-in-loop
+         
         await worker(item);
       }
     });
@@ -510,6 +520,7 @@ export default function MobileFundTable({
       allVisible[id] = true;
     });
     allVisible.relatedSector = false;
+    allVisible.holdingDays = false;
     setMobileColumnVisibility(allVisible);
   };
   const handleToggleMobileColumnVisibility = (columnId, visible) => {
@@ -845,6 +856,23 @@ export default function MobileFundTable({
         meta: { align: 'right', cellClassName: 'total-change-cell', width: columnWidthMap.totalChangePercent },
       },
       {
+        accessorKey: 'holdingDays',
+        header: '持有天数',
+        cell: (info) => {
+          const original = info.row.original || {};
+          const value = original.holdingDaysValue;
+          if (value == null) {
+            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+          }
+          return (
+            <div style={{ fontWeight: 700, textAlign: 'right' }}>
+              {value}
+            </div>
+          );
+        },
+        meta: { align: 'right', cellClassName: 'holding-days-cell', width: columnWidthMap.holdingDays ?? 64 },
+      },
+      {
         accessorKey: 'todayProfit',
         header: '当日收益',
         cell: (info) => {
@@ -854,7 +882,6 @@ export default function MobileFundTable({
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
           const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
           const percentStr = original.todayProfitPercent ?? '';
-          const isUpdated = original.isUpdated;
           return (
             <div style={{ width: '100%' }}>
               <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
@@ -862,7 +889,7 @@ export default function MobileFundTable({
                   {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
                 </FitText>
               </span>
-              {percentStr && !isUpdated && !masked ? (
+              {percentStr && !masked ? (
                 <span className={`${cls} today-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
                   <FitText maxFontSize={11} minFontSize={9}>
                     {percentStr}
@@ -1015,7 +1042,7 @@ export default function MobileFundTable({
 
   const getAlignClass = (columnId) => {
     if (columnId === 'fundName') return '';
-    if (['latestNav', 'estimateNav', 'yesterdayChangePercent', 'estimateChangePercent', 'totalChangePercent', 'todayProfit', 'holdingProfit'].includes(columnId)) return 'text-right';
+    if (['latestNav', 'estimateNav', 'yesterdayChangePercent', 'estimateChangePercent', 'totalChangePercent', 'holdingDays', 'todayProfit', 'holdingProfit'].includes(columnId)) return 'text-right';
     return 'text-right';
   };
 

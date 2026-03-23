@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { Search } from 'lucide-react';
 import { CloseIcon, PlusIcon } from './Icons';
 import {
   Dialog,
@@ -10,8 +11,17 @@ import {
 
 export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdings = {}, onClose, onAdd }) {
   const [selected, setSelected] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const availableFunds = (allFunds || []).filter(f => !(currentGroupCodes || []).includes(f.code));
+  const availableFunds = useMemo(() => {
+    const base = (allFunds || []).filter(f => !(currentGroupCodes || []).includes(f.code));
+    if (!searchQuery.trim()) return base;
+    const query = searchQuery.trim().toLowerCase();
+    return base.filter(f =>
+      (f.name && f.name.toLowerCase().includes(query)) ||
+      (f.code && f.code.includes(query))
+    );
+  }, [allFunds, currentGroupCodes, searchQuery]);
 
   const getHoldingAmount = (fund) => {
     const holding = holdings[fund?.code];
@@ -44,6 +54,22 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
         overlayClassName="modal-overlay"
         style={{ maxWidth: '500px', width: '90vw', zIndex: 99 }}
       >
+        <style>{`
+          .group-manage-list-container::-webkit-scrollbar {
+            width: 6px;
+          }
+          .group-manage-list-container::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .group-manage-list-container::-webkit-scrollbar-thumb {
+            background-color: var(--border);
+            border-radius: 3px;
+            box-shadow: none;
+          }
+          .group-manage-list-container::-webkit-scrollbar-thumb:hover {
+            background-color: var(--muted);
+          }
+        `}</style>
         <DialogTitle className="sr-only">添加基金到分组</DialogTitle>
         <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -55,10 +81,45 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
           </button>
         </div>
 
-        <div className="group-manage-list-container" style={{ maxHeight: '50vh', overflowY: 'auto', paddingRight: '4px' }}>
+        <div style={{ marginBottom: 16, position: 'relative' }}>
+          <Search
+            width="16"
+            height="16"
+            className="muted"
+            style={{
+              position: 'absolute',
+              left: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <input
+            type="text"
+            className="input no-zoom"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索基金名称或编号"
+            style={{
+              width: '100%',
+              paddingLeft: 36,
+            }}
+          />
+        </div>
+
+        <div
+          className="group-manage-list-container"
+          style={{
+            maxHeight: '50vh',
+            overflowY: 'auto',
+            paddingRight: '4px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'var(--border) transparent',
+          }}
+        >
           {availableFunds.length === 0 ? (
             <div className="empty-state muted" style={{ textAlign: 'center', padding: '40px 0' }}>
-              <p>所有基金已在该分组中</p>
+              <p>{searchQuery.trim() ? '未找到匹配的基金' : '所有基金已在该分组中'}</p>
             </div>
           ) : (
             <div className="group-manage-list">

@@ -1,15 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CloseIcon, SettingsIcon } from './Icons';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import { CloseIcon, SettingsIcon, SwitchIcon } from './Icons';
+import { DatePicker } from './Common';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TZ = typeof Intl !== 'undefined' && Intl.DateTimeFormat
+  ? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai')
+  : 'Asia/Shanghai';
+
 export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpenTrade }) {
   const [mode, setMode] = useState('amount'); // 'amount' | 'share'
+  const [dateMode, setDateMode] = useState('date'); // 'date' | 'days'
 
   const dwjz = fund?.dwjz || fund?.gsz || 0;
   const dwjzRef = useRef(dwjz);
@@ -21,10 +33,12 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpe
   const [cost, setCost] = useState('');
   const [amount, setAmount] = useState('');
   const [profit, setProfit] = useState('');
+  const [firstPurchaseDate, setFirstPurchaseDate] = useState('');
+  const [holdingDaysInput, setHoldingDaysInput] = useState('');
 
   const holdingSig = useMemo(() => {
     if (!holding) return '';
-    return `${holding.id ?? ''}|${holding.share ?? ''}|${holding.cost ?? ''}`;
+    return `${holding.id ?? ''}|${holding.share ?? ''}|${holding.cost ?? ''}|${holding.firstPurchaseDate ?? ''}`;
   }, [holding]);
 
   useEffect(() => {
@@ -33,6 +47,14 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpe
       const c = holding.cost || 0;
       setShare(String(s));
       setCost(String(c));
+      setFirstPurchaseDate(holding.firstPurchaseDate || '');
+
+      if (holding.firstPurchaseDate) {
+        const days = dayjs.tz(undefined, TZ).diff(dayjs.tz(holding.firstPurchaseDate, TZ), 'day');
+        setHoldingDaysInput(days > 0 ? String(days) : '');
+      } else {
+        setHoldingDaysInput('');
+      }
 
       const price = dwjzRef.current;
       if (price > 0) {
@@ -42,7 +64,6 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpe
         setProfit(p.toFixed(2));
       }
     }
-    // 只在“切换持仓/初次打开”时初始化，避免净值刷新覆盖用户输入
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdingSig]);
 
@@ -74,6 +95,41 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpe
     }
   };
 
+  const handleDateModeToggle = () => {
+    const newMode = dateMode === 'date' ? 'days' : 'date';
+    setDateMode(newMode);
+
+    if (newMode === 'days' && firstPurchaseDate) {
+      const days = dayjs.tz(undefined, TZ).diff(dayjs.tz(firstPurchaseDate, TZ), 'day');
+      setHoldingDaysInput(days > 0 ? String(days) : '');
+    } else if (newMode === 'date' && holdingDaysInput) {
+      const days = parseInt(holdingDaysInput, 10);
+      if (Number.isFinite(days) && days >= 0) {
+        const date = dayjs.tz(undefined, TZ).subtract(days, 'day').format('YYYY-MM-DD');
+        setFirstPurchaseDate(date);
+      }
+    }
+  };
+
+  const handleHoldingDaysChange = (value) => {
+    setHoldingDaysInput(value);
+    const days = parseInt(value, 10);
+    if (Number.isFinite(days) && days >= 0) {
+      const date = dayjs.tz(undefined, TZ).subtract(days, 'day').format('YYYY-MM-DD');
+      setFirstPurchaseDate(date);
+    }
+  };
+
+  const handleFirstPurchaseDateChange = (value) => {
+    setFirstPurchaseDate(value);
+    if (value) {
+      const days = dayjs.tz(undefined, TZ).diff(dayjs.tz(value, TZ), 'day');
+      setHoldingDaysInput(days > 0 ? String(days) : '');
+    } else {
+      setHoldingDaysInput('');
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -94,9 +150,12 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpe
       finalCost = finalShare > 0 ? principal / finalShare : 0;
     }
 
+    const trimmedDate = firstPurchaseDate ? firstPurchaseDate.trim() : '';
+
     onSave({
       share: finalShare,
-      cost: finalCost
+      cost: finalCost,
+      ...(trimmedDate && { firstPurchaseDate: trimmedDate })
     });
     onClose();
   };
@@ -254,6 +313,49 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave, onOpe
               </div>
             </>
           )}
+
+          <div className="form-group" style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span className="muted" style={{ fontSize: '14px' }}>
+                {dateMode === 'date' ? '首次买入日期' : '持有天数'}
+              </span>
+              <button
+                type="button"
+                onClick={handleDateModeToggle}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  color: 'var(--primary)',
+                  cursor: 'pointer',
+                }}
+                title={dateMode === 'date' ? '切换到持有天数' : '切换到日期'}
+              >
+                <SwitchIcon />
+                {dateMode === 'date' ? '按天数' : '按日期'}
+              </button>
+            </div>
+            {dateMode === 'date' ? (
+              <DatePicker value={firstPurchaseDate} onChange={handleFirstPurchaseDateChange} position="top" />
+            ) : (
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                className="input"
+                value={holdingDaysInput}
+                onChange={(e) => handleHoldingDaysChange(e.target.value)}
+                placeholder="请输入持有天数"
+                style={{ width: '100%' }}
+              />
+            )}
+          </div>
 
           <div className="row" style={{ gap: 12 }}>
             <button type="button" className="button secondary" onClick={onClose} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}>取消</button>

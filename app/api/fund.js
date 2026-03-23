@@ -155,6 +155,38 @@ const parseLatestNetValueFromLsjzContent = (content) => {
   return null;
 };
 
+/**
+ * 解析历史净值数据（支持多条记录）
+ * 返回按日期升序排列的净值数组
+ */
+const parseNetValuesFromLsjzContent = (content) => {
+  if (!content || content.includes('暂无数据')) return [];
+  const rowMatches = content.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  const results = [];
+  for (const row of rowMatches) {
+    const cells = row.match(/<td[^>]*>(.*?)<\/td>/gi) || [];
+    if (!cells.length) continue;
+    const getText = (td) => td.replace(/<[^>]+>/g, '').trim();
+    const dateStr = getText(cells[0] || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    const navStr = getText(cells[1] || '');
+    const nav = parseFloat(navStr);
+    if (!Number.isFinite(nav)) continue;
+    let growth = null;
+    for (const c of cells) {
+      const txt = getText(c);
+      const m = txt.match(/([-+]?\d+(?:\.\d+)?)\s*%/);
+      if (m) {
+        growth = parseFloat(m[1]);
+        break;
+      }
+    }
+    results.push({ date: dateStr, nav, growth });
+  }
+  // 返回按日期升序排列的结果（API返回的是倒序，需要反转）
+  return results.reverse();
+};
+
 const extractHoldingsReportDate = (html) => {
   if (!html) return null;
 
@@ -316,16 +348,19 @@ export const fetchFundData = async (c) => {
         gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl
       };
       const lsjzPromise = new Promise((resolveT) => {
-        const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${c}&page=1&per=1&sdate=&edate=`;
+        const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${c}&page=1&per=2&sdate=&edate=`;
         loadScript(url)
           .then((apidata) => {
             const content = apidata?.content || '';
-            const latest = parseLatestNetValueFromLsjzContent(content);
-            if (latest && latest.nav) {
+            const navList = parseNetValuesFromLsjzContent(content);
+            if (navList.length > 0) {
+              const latest = navList[navList.length - 1];
+              const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
               resolveT({
                 dwjz: String(latest.nav),
                 zzl: Number.isFinite(latest.growth) ? latest.growth : null,
-                jzrq: latest.date
+                jzrq: latest.date,
+                lastNav: previousNav ? String(previousNav.nav) : null
               });
             } else {
               resolveT(null);
@@ -506,6 +541,7 @@ export const fetchFundData = async (c) => {
             gzData.dwjz = tData.dwjz;
             gzData.jzrq = tData.jzrq;
             gzData.zzl = tData.zzl;
+            gzData.lastNav = tData.lastNav;
           }
         }
         resolve({
@@ -909,8 +945,8 @@ export const fetchFundHistory = async (code, range = '1m') => {
 };
 
 const API_KEYS = [
-  'sk-5b03d4e02ec22dd2ba233fb6d2dd549b',
-  'sk-5f14ce9c6e94af922bf592942426285c'
+  'sk-25b8a4a3d88a49e82e87c981d9d8f6b4',
+  'sk-1565f822d5bd745b6529cfdf28b55574'
   // 添加更多 API Key 到这里
 ];
 

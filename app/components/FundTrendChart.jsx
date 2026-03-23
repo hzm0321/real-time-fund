@@ -230,7 +230,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           tension: 0.2,
           order: 2
         },
-        ...grandDatasets,
+        ...(['1y', '3y', 'all'].includes(range) ? [] : grandDatasets),
         {
           type: 'line', // Use line type with showLine: false to simulate scatter on Category scale
           label: '买入',
@@ -261,7 +261,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         }
       ]
     };
-  }, [data, transactions, lineColor, primaryColor, upColor, chartColors, theme, hiddenGrandSeries, percentageData]);
+  }, [data, transactions, lineColor, primaryColor, upColor, chartColors, theme, hiddenGrandSeries, percentageData, range]);
 
   const options = useMemo(() => {
     const colors = getChartThemeColors(theme);
@@ -615,6 +615,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           )}
         </div>
         {Array.isArray(data.grandTotalSeries) &&
+          !['1y', '3y', 'all'].includes(range) &&
           data.grandTotalSeries
             .filter((_, idx) => idx > 0)
             .map((series, displayIdx) => {
@@ -646,7 +647,22 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                 }
               }
 
-              const rawPoint = pointsByDate.get(targetDate);
+              // 注意：Data_grandTotal 某些对比线可能不包含区间最后一天的点。
+              // 旧逻辑是对 `targetDate` 做严格匹配，缺点就会得到 `--`。
+              // 新逻辑：找不到精确日期时，回退到该对比线在区间内最近的可用日期。
+              let rawPoint = pointsByDate.get(targetDate);
+              if ((rawPoint === undefined || rawPoint === null) && baseValue != null) {
+                for (let i = currentIndex; i >= 0; i--) {
+                  const d = data[i];
+                  if (!d) continue;
+                  const v = pointsByDate.get(d.date);
+                  if (typeof v === 'number' && Number.isFinite(v)) {
+                    rawPoint = v;
+                    break;
+                  }
+                }
+              }
+
               if (baseValue != null && typeof rawPoint === 'number' && Number.isFinite(rawPoint)) {
                 const normalized = rawPoint - baseValue;
                 valueText = `${normalized.toFixed(2)}%`;
