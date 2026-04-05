@@ -75,7 +75,66 @@ const CHART_COLORS = {
   }
 };
 
+// 从 CSS 变量中获取当前主题的颜色
+function getThemeColorsFromCSS() {
+  if (typeof window === 'undefined') return null;
+  
+  const styles = getComputedStyle(document.documentElement);
+  const danger = styles.getPropertyValue('--danger').trim();
+  const success = styles.getPropertyValue('--success').trim();
+  const primary = styles.getPropertyValue('--primary').trim();
+  const muted = styles.getPropertyValue('--muted-foreground').trim();
+  const border = styles.getPropertyValue('--border').trim();
+  const text = styles.getPropertyValue('--text').trim();
+  
+  // 如果没有获取到 CSS 变量，返回 null
+  if (!danger || !success || !primary) return null;
+  
+  return { danger, success, primary, muted, border, text };
+}
+
+// 将十六进制颜色转换为 rgba
+function hexToRgba(hex, alpha = 1) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return hex;
+  
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function getChartThemeColors(theme) {
+  // 尝试从 CSS 变量获取当前主题色
+  const cssColors = getThemeColorsFromCSS();
+  
+  if (cssColors) {
+    // 使用 CSS 变量中的主题色
+    return {
+      danger: cssColors.danger,
+      success: cssColors.success,
+      primary: cssColors.primary,
+      muted: cssColors.muted,
+      border: cssColors.border,
+      text: cssColors.text,
+      crosshairText: theme === 'light' ? '#ffffff' : '#0f172a',
+      grandLine: [
+        hexToRgba(cssColors.primary, 0.55),
+        hexToRgba(cssColors.muted, 0.55),
+        hexToRgba('#fb923c', 0.55), // 橙色保持不变
+        hexToRgba(cssColors.text, 0.45),
+      ],
+      grandLegend: [
+        hexToRgba(cssColors.primary, 0.55),
+        hexToRgba(cssColors.muted, 0.55),
+        hexToRgba('#fb923c', 0.55),
+        hexToRgba(cssColors.text, 0.45),
+      ],
+    };
+  }
+  
+  // 回退到默认配置
   return CHART_COLORS[theme] || CHART_COLORS.dark;
 }
 
@@ -89,12 +148,18 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
   const clearActiveIndexRef = useRef(null);
   const [hiddenGrandSeries, setHiddenGrandSeries] = useState(() => new Set());
   const [activeIndex, setActiveIndex] = useState(null);
+  const [cssColorVersion, setCssColorVersion] = useState(0);
 
   useEffect(() => {
     clearActiveIndexRef.current = () => setActiveIndex(null);
   });
 
-  const chartColors = useMemo(() => getChartThemeColors(theme), [theme]);
+  // 监听主题切换，强制重新获取 CSS 变量
+  useEffect(() => {
+    setCssColorVersion(v => v + 1);
+  }, [theme]);
+
+  const chartColors = useMemo(() => getChartThemeColors(theme), [theme, cssColorVersion]);
 
   useEffect(() => {
     // If collapsed, don't fetch data unless we have no data yet

@@ -3501,6 +3501,8 @@ input[type="number"] {
   right: 0;
   margin-top: 8px;
   min-width: 180px;
+  max-height: 400px;
+  overflow-y: auto;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -3508,6 +3510,33 @@ input[type="number"] {
   z-index: 1000;
   padding: 8px 0;
   backdrop-filter: blur(12px);
+}
+
+/* 主题选择器滚动条样式 */
+.theme-selector-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.theme-selector-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.theme-selector-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+}
+
+.theme-selector-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* 亮色主题滚动条 */
+[data-theme="light"] .theme-selector-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .theme-selector-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .theme-selector-header {
