@@ -60,6 +60,7 @@ import RefreshButton from "./components/RefreshButton";
 import WeChatModal from "./components/WeChatModal";
 import DcaModal from "./components/DcaModal";
 import MarketIndexAccordion from "./components/MarketIndexAccordion";
+import ThemeSelector from "./components/ThemeSelector";
 import SortSettingModal from "./components/SortSettingModal";
 import githubImg from "./assets/github.svg";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
@@ -376,25 +377,30 @@ export default function HomePage() {
   const [navbarHeight, setNavbarHeight] = useState(0);
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const [marketIndexAccordionHeight, setMarketIndexAccordionHeight] = useState(0);
-  // 主题初始固定为 dark，避免 SSR 与客户端首屏不一致导致 hydration 报错；真实偏好由 useLayoutEffect 在首帧前恢复
-  const [theme, setTheme] = useState('dark');
+  // 主题初始固定为 original（原始深蓝/青色主题），避免 SSR 与客户端首屏不一致导致 hydration 报错；真实偏好由 useLayoutEffect 在首帧前恢复
+  const [theme, setTheme] = useState('default');
   const [showThemeTransition, setShowThemeTransition] = useState(false);
 
-  const handleThemeToggle = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  // 处理主题切换
+  const handleThemeChange = useCallback((newTheme) => {
+    setTheme(newTheme);
     setShowThemeTransition(true);
+    try {
+      localStorage.setItem('theme', newTheme);
+      document.documentElement.setAttribute('data-theme', newTheme);
+    } catch { }
   }, []);
 
   // 首帧前同步主题（与 layout 中脚本设置的 data-theme 一致），减少图标闪烁
   useLayoutEffect(() => {
     try {
       const fromDom = document.documentElement.getAttribute('data-theme');
-      if (fromDom === 'light' || fromDom === 'dark') {
+      if (fromDom && fromDom !== 'light') {
         setTheme(fromDom);
         return;
       }
       const fromStorage = localStorage.getItem('theme');
-      if (fromStorage === 'light' || fromStorage === 'dark') {
+      if (fromStorage) {
         setTheme(fromStorage);
         document.documentElement.setAttribute('data-theme', fromStorage);
       }
@@ -3935,14 +3941,7 @@ export default function HomePage() {
           {/*>*/}
           {/*  <SettingsIcon width="18" height="18" />*/}
           {/*</button>*/}
-          <button
-            className="icon-button"
-            aria-label={theme === 'dark' ? '切换到亮色主题' : '切换到暗色主题'}
-            onClick={handleThemeToggle}
-            title={theme === 'dark' ? '亮色' : '暗色'}
-          >
-            {theme === 'dark' ? <SunIcon width="18" height="18" /> : <MoonIcon width="18" height="18" />}
-          </button>
+          <ThemeSelector currentTheme={theme} onThemeChange={handleThemeChange} />
           {/* 用户菜单 */}
           <div className="user-menu-container" ref={userMenuRef}>
             <button
@@ -4375,8 +4374,7 @@ export default function HomePage() {
                                     favorites,
                                     dcaPlans,
                                     holdings,
-                            percentModes,
-                            todayPercentModes,
+                                    percentModes,
                                     todayPercentModes,
                                     valuationSeries,
                                     collapsedCodes,

@@ -219,7 +219,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         pointRadius: 0,
         pointHoverRadius: 3,
         fill: false,
-        tension: 0.2,
+        tension: .1,
         order: 2,
       };
     });
@@ -239,11 +239,11 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             gradient.addColorStop(1, `${lineColor}00`); // 0% opacity
             return gradient;
           },
-          borderWidth: 2,
+          borderWidth: 1.5,
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: true,
-          tension: 0.2,
+          tension: .1,
           order: 2
         },
         ...(['1y', '3y', 'all'].includes(range) ? [] : grandDatasets),
@@ -647,7 +647,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
               // 与折线一致：对比线显示“相对当前区间首日”的累计收益率变化
               const pointsArray = Array.isArray(series.points) ? series.points : [];
               const pointsByDate = new Map(pointsArray.map(p => [p.date, p.value]));
-
+              console.log(pointsByDate)
               let baseValue = null;
               for (const d of data) {
                 const v = pointsByDate.get(d.date);
@@ -765,7 +765,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           })}
       </div>
 
-      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+      <div style={{ position: 'relative', height: 350, width: '100%', touchAction: 'pan-y' }}>
         {loading && (
           <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
             <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>
@@ -836,7 +836,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
       {hideHeader && data.length > 0 && (
         <div className="row" style={{ marginBottom: 8, justifyContent: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
+            <span className="muted text-sm">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
             <span style={{ color: lineColor, fontWeight: 600 }}>
               {change > 0 ? '+' : ''}{change.toFixed(2)}%
             </span>

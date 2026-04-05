@@ -1358,7 +1358,7 @@ function FundDetailDialog({ blockDialogClose, cardDialogRow, getFundCardProps, s
       }}
     >
       <DialogContent
-        className="sm:max-w-2xl max-h-[88vh] flex flex-col p-0 overflow-hidden"
+        className="sm:max-w-4xl max-h-[88vh] flex flex-col p-0 overflow-hidden"
         onPointerDownOutside={blockDialogClose ? (e) => e.preventDefault() : undefined}
       >
         <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-6 pb-4 pt-6 text-left border-b border-[var(--border)]">

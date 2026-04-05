@@ -1,0 +1,353 @@
+:root {
+  --bg: #0f172a;
+  --card: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --primary: #22d3ee;
+  --accent: #60a5fa;
+  --success: #34d399;
+  --danger: #f87171;
+  --border: #1f2937;
+  --table-pinned-header-bg: #2a394b;
+  --table-row-hover-bg: #2a394b;
+  --table-row-alt-bg: #1a2535;
+  --radius: 0.625rem;
+  --background: #0f172a;
+  --foreground: #e5e7eb;
+  --card-foreground: #e5e7eb;
+  --popover: #111827;
+  --popover-foreground: #e5e7eb;
+  --primary-foreground: #0f172a;
+  --secondary: #0b1220;
+  --secondary-foreground: #e5e7eb;
+  --muted-foreground: #9ca3af;
+  --accent-foreground: #e5e7eb;
+  --destructive: #f87171;
+  --input: #0b1220;
+  --ring: #22d3ee;
+  --chart-1: #22d3ee;
+  --chart-2: #60a5fa;
+  --chart-3: #34d399;
+  --chart-4: #f472b6;
+  --chart-5: #fbbf24;
+  --sidebar: #111827;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #0f172a;
+  --sidebar-accent: #1f2937;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #1f2937;
+  --sidebar-ring: #22d3ee;
+  --drawer-overlay: rgba(2, 6, 23, 0.5);
+  --dialog-overlay: rgba(2, 6, 23, 0.6);
+  --tabs-list-bg: rgba(255, 255, 255, 0.04);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(34, 211, 238, 0.12);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
+}
+
+[data-theme="tokyonight"] {
+  /* 核心背景色 - Tokyo Night 系列 */
+  --bg: #1a1b26;
+  --background: #1a1b26;
+  --card: #24283b;
+  --popover: #24283b;
+  --sidebar: #24283b;
+  --secondary: #414868;
+  --input: #414868;
+
+  /* 文字颜色 - Tokyo Night 文本系列 */
+  --text: #a9b1d6;
+  --foreground: #a9b1d6;
+  --card-foreground: #a9b1d6;
+  --popover-foreground: #a9b1d6;
+  --primary-foreground: #1a1b26;
+  --secondary-foreground: #a9b1d6;
+  --muted-foreground: #565f89;
+  --accent-foreground: #a9b1d6;
+  --sidebar-foreground: #a9b1d6;
+  --sidebar-primary-foreground: #1a1b26;
+  --sidebar-accent-foreground: #a9b1d6;
+
+  /* 强调色 - Tokyo Night 霓虹色 */
+  --primary: #7aa2f7;
+  --accent: #bb9af7;
+  --ring: #7aa2f7;
+  --sidebar-primary: #7aa2f7;
+  --sidebar-ring: #7aa2f7;
+  --sidebar-accent: #565f89;
+
+  /* 状态色 - Tokyo Night 语义色 */
+  --success: #9ece6a;
+  --danger: #f7768e;
+  --destructive: #f7768e;
+
+  /* 边框与分隔 */
+  --border: #414868;
+  --sidebar-border: #414868;
+
+  /* 表格样式 */
+  --table-row-hover-bg: #2f3f5f;
+  --table-row-alt-bg: #24283b;
+
+  /* 图表颜色 - Tokyo Night 霓虹调色板 */
+  --chart-1: #7aa2f7;
+  --chart-2: #bb9af7;
+  --chart-3: #9ece6a;
+  --chart-4: #ff9e64;
+  --chart-5: #e0af68;
+
+  /* 遮罩层 */
+  --drawer-overlay: rgba(26, 27, 38, 0.6);
+  --dialog-overlay: rgba(26, 27, 38, 0.7);
+
+  /* 其他 */
+  --radius: 0.5rem;
+  --muted: #565f89;
+  --tabs-list-bg: rgba(169, 177, 214, 0.05);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(122, 162, 247, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
+}
+
+[data-theme="catppuccin"] {
+  --bg: #1e1e2e;
+  --background: #1e1e2e;
+  --card: #313244;
+  --popover: #313244;
+  --sidebar: #313244;
+  --secondary: #45475a;
+  --input: #45475a;
+  --text: #cdd6f4;
+  --foreground: #cdd6f4;
+  --card-foreground: #cdd6f4;
+  --popover-foreground: #cdd6f4;
+  --primary-foreground: #1e1e2e;
+  --secondary-foreground: #cdd6f4;
+  --muted-foreground: #a6adc8;
+  --accent-foreground: #cdd6f4;
+  --sidebar-foreground: #cdd6f4;
+  --sidebar-primary-foreground: #1e1e2e;
+  --sidebar-accent-foreground: #cdd6f4;
+  --primary: #89b4fa;
+  --accent: #b4befe;
+  --ring: #89b4fa;
+  --sidebar-primary: #89b4fa;
+  --sidebar-ring: #89b4fa;
+  --sidebar-accent: #585b70;
+  --success: #a6e3a1;
+  --danger: #f38ba8;
+  --destructive: #f38ba8;
+  --border: #45475a;
+  --sidebar-border: #45475a;
+  --table-row-hover-bg: #45475a;
+  --table-row-alt-bg: #313244;
+  --chart-1: #89b4fa;
+  --chart-2: #b4befe;
+  --chart-3: #a6e3a1;
+  --chart-4: #f5c2e7;
+  --chart-5: #fab387;
+  --drawer-overlay: rgba(30, 30, 46, 0.6);
+  --dialog-overlay: rgba(30, 30, 46, 0.7);
+  --radius: 0.5rem;
+  --muted: #a6adc8;
+  --tabs-list-bg: rgba(205, 214, 244, 0.05);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(137, 180, 250, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
+}
+
+[data-theme="onedark"] {
+  --bg: #282c34;
+  --background: #282c34;
+  --card: #3e4451;
+  --popover: #3e4451;
+  --sidebar: #3e4451;
+  --secondary: #4b5263;
+  --input: #4b5263;
+  --text: #abb2bf;
+  --foreground: #abb2bf;
+  --card-foreground: #abb2bf;
+  --popover-foreground: #abb2bf;
+  --primary-foreground: #282c34;
+  --secondary-foreground: #abb2bf;
+  --muted-foreground: #828997;
+  --accent-foreground: #abb2bf;
+  --sidebar-foreground: #abb2bf;
+  --sidebar-primary-foreground: #282c34;
+  --sidebar-accent-foreground: #abb2bf;
+  --primary: #61afef;
+  --accent: #c678dd;
+  --ring: #61afef;
+  --sidebar-primary: #61afef;
+  --sidebar-ring: #61afef;
+  --sidebar-accent: #4b5263;
+  --success: #98c379;
+  --danger: #e06c75;
+  --destructive: #e06c75;
+  --border: #4b5263;
+  --sidebar-border: #4b5263;
+  --table-row-hover-bg: #3e4451;
+  --table-row-alt-bg: #2c313a;
+  --chart-1: #61afef;
+  --chart-2: #c678dd;
+  --chart-3: #98c379;
+  --chart-4: #e5c07b;
+  --chart-5: #d19a66;
+  --drawer-overlay: rgba(40, 44, 52, 0.6);
+  --dialog-overlay: rgba(40, 44, 52, 0.7);
+  --radius: 0.5rem;
+  --muted: #828997;
+  --tabs-list-bg: rgba(171, 178, 191, 0.05);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(97, 175, 239, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
+}
+
+[data-theme="materialocean"] {
+  --bg: #0f1419;
+  --background: #0f1419;
+  --card: #1e232b;
+  --popover: #1e232b;
+  --sidebar: #1e232b;
+  --secondary: #2d333b;
+  --input: #2d333b;
+  --text: #c9d1d9;
+  --foreground: #c9d1d9;
+  --card-foreground: #c9d1d9;
+  --popover-foreground: #c9d1d9;
+  --primary-foreground: #0f1419;
+  --secondary-foreground: #c9d1d9;
+  --muted-foreground: #8b949e;
+  --accent-foreground: #c9d1d9;
+  --sidebar-foreground: #c9d1d9;
+  --sidebar-primary-foreground: #0f1419;
+  --sidebar-accent-foreground: #c9d1d9;
+  --primary: #58a6ff;
+  --accent: #a371f7;
+  --ring: #58a6ff;
+  --sidebar-primary: #58a6ff;
+  --sidebar-ring: #58a6ff;
+  --sidebar-accent: #2d333b;
+  --success: #3fb950;
+  --danger: #f85149;
+  --destructive: #f85149;
+  --border: #2d333b;
+  --sidebar-border: #2d333b;
+  --table-row-hover-bg: #2d333b;
+  --table-row-alt-bg: #1e232b;
+  --chart-1: #58a6ff;
+  --chart-2: #a371f7;
+  --chart-3: #3fb950;
+  --chart-4: #d2a8ff;
+  --chart-5: #f0883e;
+  --drawer-overlay: rgba(15, 20, 25, 0.6);
+  --dialog-overlay: rgba(15, 20, 25, 0.7);
+  --radius: 0.5rem;
+  --muted: #8b949e;
+  --tabs-list-bg: rgba(201, 209, 217, 0.05);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(88, 166, 255, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
+}
+
+[data-theme="rosepine"] {
+  --bg: #191724;
+  --background: #191724;
+  --card: #1f1d2e;
+  --popover: #1f1d2e;
+  --sidebar: #1f1d2e;
+  --secondary: #26233a;
+  --input: #26233a;
+  --text: #e0def4;
+  --foreground: #e0def4;
+  --card-foreground: #e0def4;
+  --popover-foreground: #e0def4;
+  --primary-foreground: #191724;
+  --secondary-foreground: #e0def4;
+  --muted-foreground: #6e6a86;
+  --accent-foreground: #e0def4;
+  --sidebar-foreground: #e0def4;
+  --sidebar-primary-foreground: #191724;
+  --sidebar-accent-foreground: #e0def4;
+  --primary: #c4a7e7;
+  --accent: #ebbcba;
+  --ring: #c4a7e7;
+  --sidebar-primary: #c4a7e7;
+  --sidebar-ring: #c4a7e7;
+  --sidebar-accent: #26233a;
+  --success: #9ccfd8;
+  --danger: #eb6f92;
+  --destructive: #eb6f92;
+  --border: #26233a;
+  --sidebar-border: #26233a;
+  --table-row-hover-bg: #26233a;
+  --table-row-alt-bg: #1f1d2e;
+  --chart-1: #c4a7e7;
+  --chart-2: #ebbcba;
+  --chart-3: #9ccfd8;
+  --chart-4: #f6c177;
+  --chart-5: #31748f;
+  --drawer-overlay: rgba(25, 23, 36, 0.6);
+  --dialog-overlay: rgba(25, 23, 36, 0.7);
+  --radius: 0.5rem;
+  --muted: #6e6a86;
+  --tabs-list-bg: rgba(224, 222, 244, 0.05);
+  --tabs-list-border: transparent;
+  --tabs-trigger-active-bg: rgba(196, 167, 231, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--foreground);
+}
+
+[data-theme="light"] {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #475569;
+  --primary: #0891b2;
+  --accent: #2563eb;
+  --success: #059669;
+  --danger: #dc2626;
+  --border: #e2e8f0;
+  --table-pinned-header-bg: #e2e8f0;
+  --table-row-hover-bg: #e2e8f0;
+  --table-row-alt-bg: #f8fafc;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted-foreground: #475569;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --input: #f1f5f9;
+  --ring: #0891b2;
+  --chart-1: #0891b2;
+  --chart-2: #2563eb;
+  --chart-3: #059669;
+  --chart-4: #db2777;
+  --chart-5: #ca8a04;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #0891b2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #0891b2;
+  --drawer-overlay: rgba(15, 23, 42, 0.25);
+  --dialog-overlay: rgba(15, 23, 42, 0.35);
+  --tabs-list-bg: rgba(0, 0, 0, 0.04);
+  --tabs-list-border: var(--border);
+  --tabs-trigger-active-bg: rgba(8, 145, 178, 0.15);
+  --tabs-trigger-active-text: var(--primary);
+  --switch-thumb: var(--background);
+}

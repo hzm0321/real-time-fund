@@ -99,7 +99,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const visibleRows = table.getRowModel().rows.slice(0, 5);
+  const visibleRows = table.getRowModel().rows.slice(0, 10);
 
   if (!code) return null;
   if (loading) {

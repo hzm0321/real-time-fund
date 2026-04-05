@@ -1,106 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./themes.css";
 
 @custom-variant dark (&:is(.dark *));
-
-:root {
-  --bg: #0f172a;
-  --card: #111827;
-  --text: #e5e7eb;
-  --muted: #9ca3af;
-  --primary: #22d3ee;
-  --accent: #60a5fa;
-  --success: #34d399;
-  --danger: #f87171;
-  --border: #1f2937;
-  --table-pinned-header-bg: #2a394b;
-  --table-row-hover-bg: #2a394b;
-  --table-row-alt-bg: #1a2535;
-  --radius: 0.625rem;
-  --background: #0f172a;
-  --foreground: #e5e7eb;
-  --card-foreground: #e5e7eb;
-  --popover: #111827;
-  --popover-foreground: #e5e7eb;
-  --primary-foreground: #0f172a;
-  --secondary: #0b1220;
-  --secondary-foreground: #e5e7eb;
-  --muted-foreground: #9ca3af;
-  --accent-foreground: #e5e7eb;
-  --destructive: #f87171;
-  --input: #0b1220;
-  --ring: #22d3ee;
-  --chart-1: #22d3ee;
-  --chart-2: #60a5fa;
-  --chart-3: #34d399;
-  --chart-4: #f472b6;
-  --chart-5: #fbbf24;
-  --sidebar: #111827;
-  --sidebar-foreground: #e5e7eb;
-  --sidebar-primary: #22d3ee;
-  --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #1f2937;
-  --sidebar-accent-foreground: #e5e7eb;
-  --sidebar-border: #1f2937;
-  --sidebar-ring: #22d3ee;
-  --drawer-overlay: rgba(2, 6, 23, 0.5);
-  --dialog-overlay: rgba(2, 6, 23, 0.6);
-  --tabs-list-bg: rgba(255, 255, 255, 0.04);
-  --tabs-list-border: transparent;
-  --tabs-trigger-active-bg: rgba(34, 211, 238, 0.12);
-  --tabs-trigger-active-text: var(--primary);
-  --switch-thumb: var(--foreground);
-}
-
-/* 亮色主题：ui-ux-pro-max 规范 - 正文 #0F172A、弱化 #475569、玻璃 bg-white/80+、边框可见 */
-[data-theme="light"] {
-  --bg: #f1f5f9;
-  --card: #ffffff;
-  --text: #0f172a;
-  --muted: #475569;
-  --primary: #0891b2;
-  --accent: #2563eb;
-  --success: #059669;
-  --danger: #dc2626;
-  --border: #e2e8f0;
-  --table-pinned-header-bg: #e2e8f0;
-  --table-row-hover-bg: #e2e8f0;
-  --table-row-alt-bg: #f8fafc;
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted-foreground: #475569;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --input: #f1f5f9;
-  --ring: #0891b2;
-  --chart-1: #0891b2;
-  --chart-2: #2563eb;
-  --chart-3: #059669;
-  --chart-4: #db2777;
-  --chart-5: #ca8a04;
-  --sidebar: #f8fafc;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #0891b2;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #0891b2;
-  --drawer-overlay: rgba(15, 23, 42, 0.25);
-  --dialog-overlay: rgba(15, 23, 42, 0.35);
-  --tabs-list-bg: rgba(0, 0, 0, 0.04);
-  --tabs-list-border: var(--border);
-  --tabs-trigger-active-bg: rgba(8, 145, 178, 0.15);
-  --tabs-trigger-active-text: var(--primary);
-  --switch-thumb: var(--background);
-}
 
 * {
   box-sizing: border-box;
@@ -1534,6 +1437,7 @@ input[type="number"] {
 .title-text {
   display: flex;
   flex-direction: column;
+  outline: none 0;
   gap: 2px;
 }
 
@@ -3583,4 +3487,89 @@ input[type="number"] {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ===== 主题选择器样式 ===== */
+.theme-selector-container {
+  position: relative;
+  display: inline-block;
+}
+
+.theme-selector-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  min-width: 180px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  padding: 8px 0;
+  backdrop-filter: blur(12px);
+}
+
+.theme-selector-header {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.theme-option:hover {
+  background: var(--table-row-hover-bg);
+}
+
+.theme-option.active {
+  background: var(--tabs-trigger-active-bg);
+}
+
+.theme-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+}
+
+.theme-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+}
+
+.theme-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.theme-desc {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.theme-check {
+  color: var(--primary);
+  flex-shrink: 0;
 }
