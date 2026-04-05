@@ -598,6 +598,20 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
   const lastIndex = data.length > 0 ? data.length - 1 : null;
   const currentIndex = activeIndex != null && activeIndex < data.length ? activeIndex : lastIndex;
 
+  // 计算当前索引相比前一日的涨跌幅
+  const dailyChange = useMemo(() => {
+    if (!data.length || currentIndex <= 0) return { value: 0, isUp: true };
+    const current = data[currentIndex]?.value;
+    const previous = data[currentIndex - 1]?.value;
+    if (typeof current !== 'number' || typeof previous !== 'number' || previous === 0) {
+      return { value: 0, isUp: true };
+    }
+    const change = ((current - previous) / previous) * 100;
+    return { value: change, isUp: change >= 0 };
+  }, [data, currentIndex]);
+
+  const changeColor = dailyChange.isUp ? upColor : downColor;
+  
   const chartBlock = (
     <>
       {/* 顶部图示：说明不同颜色/标记代表的含义 */}
@@ -626,7 +640,10 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                 paddingLeft: 14,
               }}
             >
-              {percentageData[currentIndex].toFixed(2)}%
+              <a className="mr-2">{percentageData[currentIndex].toFixed(2)}%</a>
+              <a style={{ color: changeColor }}>
+                {currentIndex > 0 ? `${dailyChange.value >= 0 ? '+' : ''}${dailyChange.value.toFixed(2)}%` : '0.00%'}
+              </a>
             </span>
           )}
         </div>
@@ -647,7 +664,6 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
               // 与折线一致：对比线显示“相对当前区间首日”的累计收益率变化
               const pointsArray = Array.isArray(series.points) ? series.points : [];
               const pointsByDate = new Map(pointsArray.map(p => [p.date, p.value]));
-              console.log(pointsByDate)
               let baseValue = null;
               for (const d of data) {
                 const v = pointsByDate.get(d.date);
