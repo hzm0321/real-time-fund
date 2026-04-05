@@ -481,7 +481,6 @@
   --destructive: #f85149;
   --border: rgba(48, 54, 61, 0.5);
   --sidebar-border: rgba(48, 54, 61, 0.5);
-  --table-row-hover-bg: rgba(48, 54, 61, 0.4);
   --table-row-alt-bg: rgba(22, 27, 34, 0.5);
   --chart-1: #58a6ff;
   --chart-2: #3fb950;
@@ -530,7 +529,6 @@
   --destructive: #ff453a;
   --border: rgba(72, 72, 74, 0.5);
   --sidebar-border: rgba(72, 72, 74, 0.5);
-  --table-row-hover-bg: rgba(72, 72, 74, 0.45);
   --table-row-alt-bg: rgba(44, 44, 46, 0.55);
   --chart-1: #0a84ff;
   --chart-2: #bf5af2;
