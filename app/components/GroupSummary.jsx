@@ -272,7 +272,6 @@ export default function GroupSummary({
               style={{
                 fontSize: '24px',
                 fontWeight: 700,
-                fontFamily: 'var(--font-mono)',
               }}
             >
               <span style={{ fontSize: '16px', marginRight: 2 }}>¥</span>
@@ -317,7 +316,6 @@ export default function GroupSummary({
                 style={{
                   fontSize: '18px',
                   fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
                   cursor: summary.hasAnyTodayData ? 'pointer' : 'default',
                 }}
                 onClick={() => summary.hasAnyTodayData && setShowTodayPercent(!showTodayPercent)}
@@ -380,7 +378,6 @@ export default function GroupSummary({
                 style={{
                   fontSize: '18px',
                   fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
                 }}
                 onClick={() => setShowPercent(!showPercent)}

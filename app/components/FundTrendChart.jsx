@@ -75,7 +75,66 @@ const CHART_COLORS = {
   }
 };
 
+// 从 CSS 变量中获取当前主题的颜色
+function getThemeColorsFromCSS() {
+  if (typeof window === 'undefined') return null;
+  
+  const styles = getComputedStyle(document.documentElement);
+  const danger = styles.getPropertyValue('--danger').trim();
+  const success = styles.getPropertyValue('--success').trim();
+  const primary = styles.getPropertyValue('--primary').trim();
+  const muted = styles.getPropertyValue('--muted-foreground').trim();
+  const border = styles.getPropertyValue('--border').trim();
+  const text = styles.getPropertyValue('--text').trim();
+  
+  // 如果没有获取到 CSS 变量，返回 null
+  if (!danger || !success || !primary) return null;
+  
+  return { danger, success, primary, muted, border, text };
+}
+
+// 将十六进制颜色转换为 rgba
+function hexToRgba(hex, alpha = 1) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return hex;
+  
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function getChartThemeColors(theme) {
+  // 尝试从 CSS 变量获取当前主题色
+  const cssColors = getThemeColorsFromCSS();
+  
+  if (cssColors) {
+    // 使用 CSS 变量中的主题色
+    return {
+      danger: cssColors.danger,
+      success: cssColors.success,
+      primary: cssColors.primary,
+      muted: cssColors.muted,
+      border: cssColors.border,
+      text: cssColors.text,
+      crosshairText: theme === 'light' ? '#ffffff' : '#0f172a',
+      grandLine: [
+        hexToRgba(cssColors.primary, 0.55),
+        hexToRgba(cssColors.muted, 0.55),
+        hexToRgba('#fb923c', 0.55), // 橙色保持不变
+        hexToRgba(cssColors.text, 0.45),
+      ],
+      grandLegend: [
+        hexToRgba(cssColors.primary, 0.55),
+        hexToRgba(cssColors.muted, 0.55),
+        hexToRgba('#fb923c', 0.55),
+        hexToRgba(cssColors.text, 0.45),
+      ],
+    };
+  }
+  
+  // 回退到默认配置
   return CHART_COLORS[theme] || CHART_COLORS.dark;
 }
 
@@ -89,12 +148,18 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
   const clearActiveIndexRef = useRef(null);
   const [hiddenGrandSeries, setHiddenGrandSeries] = useState(() => new Set());
   const [activeIndex, setActiveIndex] = useState(null);
+  const [cssColorVersion, setCssColorVersion] = useState(0);
 
   useEffect(() => {
     clearActiveIndexRef.current = () => setActiveIndex(null);
   });
 
-  const chartColors = useMemo(() => getChartThemeColors(theme), [theme]);
+  // 监听主题切换，强制重新获取 CSS 变量
+  useEffect(() => {
+    setCssColorVersion(v => v + 1);
+  }, [theme]);
+
+  const chartColors = useMemo(() => getChartThemeColors(theme), [theme, cssColorVersion]);
 
   useEffect(() => {
     // If collapsed, don't fetch data unless we have no data yet
@@ -219,7 +284,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         pointRadius: 0,
         pointHoverRadius: 3,
         fill: false,
-        tension: 0.2,
+        tension: .1,
         order: 2,
       };
     });
@@ -239,11 +304,11 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             gradient.addColorStop(1, `${lineColor}00`); // 0% opacity
             return gradient;
           },
-          borderWidth: 2,
+          borderWidth: 1.5,
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: true,
-          tension: 0.2,
+          tension: .1,
           order: 2
         },
         ...(['1y', '3y', 'all'].includes(range) ? [] : grandDatasets),
@@ -598,6 +663,20 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
   const lastIndex = data.length > 0 ? data.length - 1 : null;
   const currentIndex = activeIndex != null && activeIndex < data.length ? activeIndex : lastIndex;
 
+  // 计算当前索引相比前一日的涨跌幅
+  const dailyChange = useMemo(() => {
+    if (!data.length || currentIndex <= 0) return { value: 0, isUp: true };
+    const current = data[currentIndex]?.value;
+    const previous = data[currentIndex - 1]?.value;
+    if (typeof current !== 'number' || typeof previous !== 'number' || previous === 0) {
+      return { value: 0, isUp: true };
+    }
+    const change = ((current - previous) / previous) * 100;
+    return { value: change, isUp: change >= 0 };
+  }, [data, currentIndex]);
+
+  const changeColor = dailyChange.isUp ? upColor : downColor;
+  
   const chartBlock = (
     <>
       {/* 顶部图示：说明不同颜色/标记代表的含义 */}
@@ -626,7 +705,10 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                 paddingLeft: 14,
               }}
             >
-              {percentageData[currentIndex].toFixed(2)}%
+              <a className="mr-2">{percentageData[currentIndex].toFixed(2)}%</a>
+              <a style={{ color: changeColor }}>
+                {currentIndex > 0 ? `${dailyChange.value >= 0 ? '+' : ''}${dailyChange.value.toFixed(2)}%` : '0.00%'}
+              </a>
             </span>
           )}
         </div>
@@ -647,7 +729,6 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
               // 与折线一致：对比线显示“相对当前区间首日”的累计收益率变化
               const pointsArray = Array.isArray(series.points) ? series.points : [];
               const pointsByDate = new Map(pointsArray.map(p => [p.date, p.value]));
-
               let baseValue = null;
               for (const d of data) {
                 const v = pointsByDate.get(d.date);
@@ -765,7 +846,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           })}
       </div>
 
-      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+      <div style={{ position: 'relative', height: 350, width: '100%', touchAction: 'pan-y' }}>
         {loading && (
           <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
             <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>
@@ -836,7 +917,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
       {hideHeader && data.length > 0 && (
         <div className="row" style={{ marginBottom: 8, justifyContent: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
+            <span className="muted text-sm">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
             <span style={{ color: lineColor, fontWeight: 600 }}>
               {change > 0 ? '+' : ''}{change.toFixed(2)}%
             </span>
