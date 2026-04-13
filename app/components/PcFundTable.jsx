@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon } from './Icons';
+import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon, LinkIcon } from './Icons';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 import MoveGroupModal from './MoveGroupModal';
 
@@ -776,6 +776,9 @@ export default function PcFundTable({
     const isFavorites = favorites?.has?.(code);
     const rowContext = useContext(SortableRowContext);
     const showFavoriteButton = !isGroupTab && (currentTab === 'all' || currentTab === 'fav' || !currentTab);
+    const holdingLocked =
+      (currentTab === 'all' || currentTab === 'fav') &&
+      !!original.isHoldingLinked;
 
     return (
       <div className="name-cell-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }}>
@@ -845,6 +848,23 @@ export default function PcFundTable({
             className={`name-text ${showFullFundName ? 'show-full' : ''}`}
             title={isUpdated ? '今日净值已更新' : ''}
           >
+            {holdingLocked ? (
+              <span
+                title="持仓来自自定义分组汇总"
+                aria-label="已关联持仓"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  marginRight: 6,
+                  color: 'var(--primary)',
+                  verticalAlign: 'middle',
+                  position: 'relative',
+                  bottom: 2,
+                }}
+              >
+                <LinkIcon width="14" height="14" />
+              </span>
+            ) : null}
             {info.getValue() ?? '—'}
           </span>
           {code ? <span className="muted code-text">
@@ -1230,21 +1250,33 @@ export default function PcFundTable({
         minSize: 100,
         cell: (info) => {
           const original = info.row.original || {};
+          const holdingLocked =
+            (currentTab === 'all' || currentTab === 'fav') &&
+            !!original.isHoldingLinked;
+          const holdingLockedTitle = '持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额';
           if (original.holdingAmountValue == null) {
             return (
               <div
-                role="button"
-                tabIndex={0}
+                role={holdingLocked ? undefined : 'button'}
+                tabIndex={holdingLocked ? -1 : 0}
                 className="muted"
-                title="设置持仓"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '12px', cursor: 'pointer' }}
+                title={holdingLocked ? holdingLockedTitle : '设置持仓'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: '12px',
+                  cursor: holdingLocked ? 'not-allowed' : 'pointer',
+                }}
                 onClick={(e) => {
                   e.stopPropagation?.();
+                  if (holdingLocked) return;
                   onHoldingAmountClickRef.current?.(original, { hasHolding: false });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
+                    if (holdingLocked) return;
                     onHoldingAmountClickRef.current?.(original, { hasHolding: false });
                   }
                 }}
@@ -1255,10 +1287,17 @@ export default function PcFundTable({
           }
           return (
             <div
-              title="点击设置持仓"
-              style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', width: '100%', minWidth: 0 }}
+              title={holdingLocked ? holdingLockedTitle : '点击设置持仓'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: holdingLocked ? 'not-allowed' : 'pointer',
+                width: '100%',
+                minWidth: 0,
+              }}
               onClick={(e) => {
                 e.stopPropagation?.();
+                if (holdingLocked) return;
                 onHoldingAmountClickRef.current?.(original, { hasHolding: true });
               }}
             >
@@ -1271,10 +1310,21 @@ export default function PcFundTable({
                 className="icon-button no-hover"
                 onClick={(e) => {
                   e.stopPropagation?.();
+                  if (holdingLocked) return;
                   onHoldingAmountClickRef.current?.(original, { hasHolding: true });
                 }}
-                title="编辑持仓"
-                style={{ border: 'none', width: '28px', height: '28px', marginLeft: 4, flexShrink: 0, backgroundColor: 'transparent' }}
+                title={holdingLocked ? holdingLockedTitle : '编辑持仓'}
+                disabled={holdingLocked}
+                style={{
+                  border: 'none',
+                  width: '28px',
+                  height: '28px',
+                  marginLeft: 4,
+                  flexShrink: 0,
+                  backgroundColor: 'transparent',
+                  color: holdingLocked ? 'var(--muted)' : undefined,
+                  cursor: holdingLocked ? 'not-allowed' : 'pointer',
+                }}
               >
                 <SettingsIcon width="14" height="14" />
               </button>

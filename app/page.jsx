@@ -1176,11 +1176,73 @@ export default function HomePage() {
     [fundDailyEarnings]
   );
 
-  const holdingsForTab = useMemo(() => {
+  /**
+   * 全部/自选：当全局 holdings 无该基金持仓，但自定义分组存在持仓时，
+   * 仅用于展示地将其它分组的持仓汇总到当前 tab（不写入 localStorage）。
+   */
+  const linkedHoldingsForAllFav = useMemo(() => {
+    const enabled = (currentTab === 'all' || currentTab === 'fav') && !activeGroupId;
+    if (!enabled) return { derived: {}, linked: new Set() };
+
+    const derived = {};
+    const linked = new Set();
+
+    const hasGlobalHolding = (h) =>
+      !!h && isNumber(h.share) && Number(h.share) > 0;
+
+    for (const fund of funds || []) {
+      const code = fund?.code;
+      if (!code) continue;
+      if (hasGlobalHolding(holdings?.[code])) continue;
+
+      let totalShare = 0;
+      let totalCostShare = 0;
+      let hasAnyCost = false;
+
+      for (const g of groups || []) {
+        const gid = g?.id;
+        if (!gid) continue;
+        const h = groupHoldings?.[gid]?.[code];
+        if (!h) continue;
+        const s = Number(h.share);
+        if (!Number.isFinite(s) || s <= 0) continue;
+        totalShare += s;
+
+        const c = h.cost == null || h.cost === '' ? null : Number(h.cost);
+        if (c != null && Number.isFinite(c) && c > 0) {
+          totalCostShare += c * s;
+          hasAnyCost = true;
+        }
+      }
+
+      if (totalShare > 0) {
+        derived[code] = {
+          share: totalShare,
+          cost: hasAnyCost ? totalCostShare / totalShare : null,
+        };
+        linked.add(code);
+      }
+    }
+
+    return { derived, linked };
+  }, [currentTab, activeGroupId, funds, holdings, groupHoldings, groups]);
+
+  const holdingsForTabWithLinked = useMemo(() => {
     if (currentTab === SUMMARY_TAB_ID) return summaryMergedHoldings;
-    if (!activeGroupId) return holdings;
-    return groupHoldings[activeGroupId] || {};
-  }, [currentTab, summaryMergedHoldings, holdings, groupHoldings, activeGroupId]);
+    if (activeGroupId) return groupHoldings[activeGroupId] || {};
+    if (currentTab !== 'all' && currentTab !== 'fav') return holdings;
+    const derived = linkedHoldingsForAllFav.derived || {};
+    const keys = Object.keys(derived);
+    if (keys.length === 0) return holdings;
+    return { ...(holdings || {}), ...derived };
+  }, [
+    currentTab,
+    activeGroupId,
+    summaryMergedHoldings,
+    holdings,
+    groupHoldings,
+    linkedHoldingsForAllFav,
+  ]);
 
   const dcaPlansForTab = useMemo(() => {
     const scoped = migrateDcaPlansToScoped(dcaPlans);
@@ -1268,7 +1330,7 @@ export default function HomePage() {
 
       const profitByCode =
         sortBy === 'holdingAmount' || sortBy === 'todayProfit' || sortBy === 'holding'
-          ? new Map(filtered.map((f) => [f.code, getHoldingProfitForTab(f, holdingsForTab[f.code])]))
+          ? new Map(filtered.map((f) => [f.code, getHoldingProfitForTab(f, holdingsForTabWithLinked[f.code])]))
           : null;
 
       return filtered.sort((a, b) => {
@@ -1351,7 +1413,7 @@ export default function HomePage() {
         return 0;
       });
     },
-    [scopedFunds, currentTab, groups, sortBy, sortOrder, holdingsForTab, getHoldingProfitForTab, groupFundSearchTerm, shouldShowGroupFundSearch],
+    [scopedFunds, currentTab, groups, sortBy, sortOrder, holdingsForTabWithLinked, getHoldingProfitForTab, groupFundSearchTerm, shouldShowGroupFundSearch],
   );
 
   const latestDailyByCode = useMemo(() => {
@@ -1410,7 +1472,10 @@ export default function HomePage() {
         const estimateTime = f.noValuation ? (f.jzrq || '-') : (f.gztime || f.time || '-');
         const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
 
-        const holding = holdingsForTab[f.code];
+        const holding = holdingsForTabWithLinked[f.code];
+        const isHoldingLinked =
+          (currentTab === 'all' || currentTab === 'fav') &&
+          linkedHoldingsForAllFav.linked?.has?.(f.code);
         const profit = getHoldingProfitForTab(f, holding);
         const amount = profit ? profit.amount : null;
         const holdingAmount =
@@ -1504,6 +1569,7 @@ export default function HomePage() {
           rawFund: f,
           code: f.code,
           fundName: f.name,
+          isHoldingLinked: !!isHoldingLinked,
           isUpdated: f.jzrq === todayStr,
           hasDca: dcaPlansForTab[f.code]?.enabled === true,
           latestNav,
@@ -1541,7 +1607,7 @@ export default function HomePage() {
       }),
     [
       displayFunds,
-      holdingsForTab,
+      holdingsForTabWithLinked,
       isTradingDay,
       todayStr,
       getHoldingProfitForTab,
@@ -1549,6 +1615,7 @@ export default function HomePage() {
       latestDailyByCode,
       currentTab,
       summaryHoldingSourceGroupByCode,
+      linkedHoldingsForAllFav,
     ],
   );
 
@@ -4025,7 +4092,7 @@ export default function HomePage() {
             const code = u?.code;
             if (!code) continue;
             if (!fundCodeStillInStorage(code)) continue;
-            const h = holdingsForTab?.[code];
+            const h = holdingsForTabWithLinked?.[code];
             const share = h?.share;
             const cost = h?.cost;
             // 规则 1：基金存在持仓数据（只要求份额有效）
@@ -6069,13 +6136,17 @@ export default function HomePage() {
 
   const handleHoldingAmountClickRow = useCallback((row, meta) => {
     if (!row || !row.code) return;
+    if ((currentTab === 'all' || currentTab === 'fav') && row.isHoldingLinked) {
+      showToast('该基金持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额', 'info');
+      return;
+    }
     const fund = row.rawFund || { code: row.code, name: row.fundName };
     if (meta?.hasHolding) {
       setActionModal({ open: true, fund });
     } else {
       setHoldingModal({ open: true, fund });
     }
-  }, []);
+  }, [currentTab, showToast]);
 
   const handleHoldingProfitClickRow = useCallback((row) => {
     if (!row || !row.code) return;
@@ -6083,7 +6154,14 @@ export default function HomePage() {
     setPercentModes((prev) => ({ ...prev, [row.code]: !prev[row.code] }));
   }, []);
 
-  const openHoldingModal = useCallback((fund) => setHoldingModal({ open: true, fund }), []);
+  const openHoldingModal = useCallback((fund) => {
+    const code = fund?.code;
+    if ((currentTab === 'all' || currentTab === 'fav') && code && linkedHoldingsForAllFav.linked?.has?.(code)) {
+      showToast('该基金持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额', 'info');
+      return;
+    }
+    setHoldingModal({ open: true, fund });
+  }, [currentTab, linkedHoldingsForAllFav, showToast]);
   const openActionModal = useCallback((fund) => setActionModal({ open: true, fund }), []);
   const togglePercentMode = useCallback((code) => {
     setPercentModes((prev) => ({ ...prev, [code]: !prev[code] }));
@@ -6101,7 +6179,7 @@ export default function HomePage() {
       currentTab,
       favorites,
       dcaPlans: dcaPlansForTab,
-      holdings: holdingsForTab,
+      holdings: holdingsForTabWithLinked,
       percentModes,
       todayPercentModes,
       fundDailyEarnings: currentFundDailyEarnings,
@@ -6124,13 +6202,14 @@ export default function HomePage() {
       onToggleEarningsCollapse: toggleEarningsCollapse,
       masked: maskAmounts,
       layoutMode: 'drawer',
+      isHoldingLinked: !!row?.isHoldingLinked,
     };
   }, [
     todayStr,
     currentTab,
     favorites,
     dcaPlansForTab,
-    holdingsForTab,
+    holdingsForTabWithLinked,
     percentModes,
     todayPercentModes,
     currentFundDailyEarnings,
@@ -6795,7 +6874,7 @@ export default function HomePage() {
             <>
               <GroupSummary
                   funds={displayFunds}
-                  holdings={holdingsForTab}
+                  holdings={holdingsForTabWithLinked}
                   groupName={getGroupName()}
                   getProfit={getHoldingProfitForTab}
                   summaryTotalsOverride={
@@ -6955,11 +7034,15 @@ export default function HomePage() {
                         >
                             <FundCard
                               fund={f}
+                              isHoldingLinked={
+                                (currentTab === 'all' || currentTab === 'fav') &&
+                                linkedHoldingsForAllFav.linked?.has?.(f?.code)
+                              }
                               todayStr={todayStr}
                               currentTab={currentTab}
                               favorites={favorites}
                               dcaPlans={dcaPlansForTab}
-                              holdings={holdingsForTab}
+                              holdings={holdingsForTabWithLinked}
                               percentModes={percentModes}
                               todayPercentModes={todayPercentModes}
                               fundDailyEarnings={currentFundDailyEarnings}
@@ -7260,7 +7343,7 @@ export default function HomePage() {
           <AddFundToGroupModal
             allFunds={funds}
             currentGroupCodes={groups.find(g => g.id === currentTab)?.codes || []}
-            holdings={holdingsForTab}
+            holdings={holdingsForTabWithLinked}
             onClose={() => setAddFundToGroupOpen(false)}
             onAdd={handleAddFundsToGroup}
           />
@@ -7289,7 +7372,7 @@ export default function HomePage() {
           <TradeModal
             type={tradeModal.type}
             fund={tradeModal.fund}
-            holding={holdingsForTab[tradeModal.fund?.code]}
+            holding={holdingsForTabWithLinked[tradeModal.fund?.code]}
             onClose={() => setTradeModal({ open: false, fund: null, type: 'buy' })}
             onConfirm={(data) => handleTrade(tradeModal.fund, data)}
             pendingTrades={pendingTrades}
@@ -7395,7 +7478,7 @@ export default function HomePage() {
         {holdingModal.open && (
           <HoldingEditModal
             fund={holdingModal.fund}
-            holding={holdingsForTab[holdingModal.fund?.code]}
+            holding={holdingsForTabWithLinked[holdingModal.fund?.code]}
             onClose={() => setHoldingModal({ open: false, fund: null })}
             onSave={(data) => handleSaveHolding(holdingModal.fund?.code, data)}
             onOpenTrade={() => {

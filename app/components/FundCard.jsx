@@ -18,6 +18,7 @@ import {
   StarIcon,
   SwitchIcon,
   TrashIcon,
+  LinkIcon,
 } from './Icons';
 
 dayjs.extend(utc);
@@ -48,6 +49,7 @@ const formatDisplayDate = (value) => {
 
 export default function FundCard({
   fund: f,
+  isHoldingLinked = false,
   todayStr,
   currentTab,
   favorites,
@@ -153,6 +155,23 @@ export default function FundCard({
               className="name-text"
               title={f.jzrq === todayStr ? '今日净值已更新' : ''}
             >
+              {isHoldingLinked ? (
+                <span
+                  title="持仓来自自定义分组汇总"
+                  aria-label="已关联持仓"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    marginRight: 6,
+                    color: 'var(--primary)',
+                    verticalAlign: 'middle',
+                    position: 'relative',
+                    bottom: 2,
+                  }}
+                >
+                  <LinkIcon width="14" height="14" />
+                </span>
+              ) : null}
               {f.name}
             </span>
             <span className="muted">

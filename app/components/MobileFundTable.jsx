@@ -28,7 +28,7 @@ import FitText from './FitText';
 import MobileFundCardDrawer from './MobileFundCardDrawer';
 import MobileSettingModal from './MobileSettingModal';
 import MoveGroupModal from './MoveGroupModal';
-import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, LinkIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 
 const EDIT_MOVE_TO_FRONT_COL = 'editMoveToFront';
@@ -978,6 +978,10 @@ export default function MobileFundTable({
     const isFavorites = favorites?.has?.(code);
     const isGroupTab = isCustomGroupTab;
     const editSelected = code ? editSelectedCodes.has(code) : false;
+    const holdingLocked =
+      (currentTab === 'all' || currentTab === 'fav') &&
+      !!original.isHoldingLinked;
+    const holdingLockedTitle = '持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额';
 
     if (isEditMode) {
       return (
@@ -1021,6 +1025,23 @@ export default function MobileFundTable({
               className={`name-text ${showFullFundName ? 'show-full' : ''}`}
               title={isUpdated ? '今日净值已更新' : undefined}
             >
+              {holdingLocked ? (
+                <span
+                  title="持仓来自自定义分组汇总"
+                  aria-label="已关联持仓"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    marginRight: 6,
+                    color: 'var(--primary)',
+                    verticalAlign: 'middle',
+                    marginBottom: 2,
+                    position: 'relative',
+                  }}
+                >
+                  <LinkIcon width="14" height="14" />
+                </span>
+              ) : null}
               {info.getValue() ?? '—'}
             </span>
             {holdingAmountDisplay ? (
@@ -1098,22 +1119,41 @@ export default function MobileFundTable({
               }
             }}
           >
+            {holdingLocked ? (
+              <span
+                title="持仓来自自定义分组汇总"
+                aria-label="已关联持仓"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  marginRight: 6,
+                  color: 'var(--primary)',
+                  verticalAlign: 'middle',
+                  bottom: 2,
+                  position: 'relative',
+                }}
+              >
+                <LinkIcon width="14" height="14" />
+              </span>
+            ) : null}
             {info.getValue() ?? '—'}
           </span>
           {holdingAmountDisplay ? (
             <span
               className="muted code-text"
-              role="button"
-              tabIndex={0}
-              title="点击设置持仓"
-              style={{ cursor: 'pointer' }}
+              role={holdingLocked ? undefined : 'button'}
+              tabIndex={holdingLocked ? -1 : 0}
+              title={holdingLocked ? holdingLockedTitle : '点击设置持仓'}
+              style={{ cursor: holdingLocked ? 'not-allowed' : 'pointer' }}
               onClick={(e) => {
                 e.stopPropagation?.();
+                if (holdingLocked) return;
                 onHoldingAmountClickRef.current?.(original, { hasHolding: true });
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  if (holdingLocked) return;
                   onHoldingAmountClickRef.current?.(original, { hasHolding: true });
                 }
               }}
@@ -1125,17 +1165,19 @@ export default function MobileFundTable({
           ) : code ? (
             <span
               className="muted code-text"
-              role="button"
-              tabIndex={0}
-              title="设置持仓"
-              style={{ cursor: 'pointer' }}
+              role={holdingLocked ? undefined : 'button'}
+              tabIndex={holdingLocked ? -1 : 0}
+              title={holdingLocked ? holdingLockedTitle : '设置持仓'}
+              style={{ cursor: holdingLocked ? 'not-allowed' : 'pointer' }}
               onClick={(e) => {
                 e.stopPropagation?.();
+                if (holdingLocked) return;
                 onHoldingAmountClickRef.current?.(original, { hasHolding: false });
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  if (holdingLocked) return;
                   onHoldingAmountClickRef.current?.(original, { hasHolding: false });
                 }
               }}
