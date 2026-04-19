@@ -2,7 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* 项目主题切换使用 data-theme="dark"，同时兼容 .dark（shadcn 默认） */
+@custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 :root {
   --bg: #0f172a;
