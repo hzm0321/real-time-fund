@@ -135,7 +135,7 @@ function normalizeFundTagTheme(t) {
 }
 
 /**
- * 单只基金已选标签（允许同名多枚），用于持久化 fundTagLists
+ * 单只基金已选标签实例（允许同名多枚）。
  * @returns {{ id: string, name: string, theme: string }[]}
  */
 function normalizeFundTagInstanceListFromInput(rows) {
@@ -156,25 +156,6 @@ function normalizeFundTagInstanceListFromInput(rows) {
     if (out.length >= 30) break;
   }
   return out;
-}
-
-function loadFundTagListsFromStorage() {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem('fundTagLists');
-    const p = raw ? JSON.parse(raw) : null;
-    if (!p || typeof p !== 'object' || Array.isArray(p)) return {};
-    const out = {};
-    for (const [code, list] of Object.entries(p)) {
-      const c = String(code).trim();
-      if (!c || !Array.isArray(list)) continue;
-      const n = normalizeFundTagInstanceListFromInput(list);
-      if (n.length) out[c] = n;
-    }
-    return out;
-  } catch {
-    return {};
-  }
 }
 
 /** 从基金对象中移除旧版内联字段 `tags`（已迁移到独立 `tags` 存储） */
@@ -403,8 +384,30 @@ export default function HomePage() {
   const [funds, setFunds] = useState([]);
   /** 基金标签（独立 localStorage 键 `tags`）：{ id, name, theme, fundCodes: string[] }[] */
   const [fundTagRecords, setFundTagRecords] = useState([]);
-  /** 每只基金已选标签实例（允许同名多枚），localStorage 键 `fundTagLists` */
-  const [fundTagListsByCode, setFundTagListsByCode] = useState(loadFundTagListsFromStorage);
+  /**
+   * 每只基金已选标签实例：仅由 `tags` 推导生成（不再持久化 fundTagLists）。
+   * 形状保持为 { [code]: {id,name,theme}[] }，便于复用现有组件接口。
+   */
+  const fundTagListsByCode = useMemo(() => {
+    const out = {};
+    const codeSet = new Set((funds || []).map((f) => String(f?.code ?? '').trim()).filter(Boolean));
+    for (const r of fundTagRecords || []) {
+      if (!r || typeof r !== 'object') continue;
+      const id = String(r.id ?? '').trim();
+      const name = String(r.name ?? '').trim();
+      if (!id || !name) continue;
+      const theme = normalizeFundTagTheme(r.theme);
+      for (const c of getFundCodesFromTagRecord(r)) {
+        if (!codeSet.has(c)) continue;
+        if (!out[c]) out[c] = [];
+        out[c].push({ id, name, theme });
+      }
+    }
+    Object.keys(out).forEach((c) => {
+      out[c] = out[c].filter((x) => x?.name).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    });
+    return out;
+  }, [fundTagRecords, funds]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const timerRef = useRef(null);
@@ -612,6 +615,7 @@ export default function HomePage() {
   // 用户认证状态（Supabase 会话仍由客户端持久化；用户信息由 zustand 全局管理）
   const user = useUserStore((s) => s.user);
   const [lastSyncTime, setLastSyncTime] = useState(null);
+  const deviceIdRef = useRef('');
 
   useEffect(() => {
     // 优先使用服务端返回的时间，如果没有则使用本地存储的时间
@@ -622,6 +626,20 @@ export default function HomePage() {
     } else {
       // 如果没有存储的时间，暂时设为 null，等待接口返回
       setLastSyncTime(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const key = 'rtfDeviceId';
+      let id = window.localStorage.getItem(key);
+      if (!id) {
+        id = uuidv4();
+        window.localStorage.setItem(key, id);
+      }
+      deviceIdRef.current = id;
+    } catch {
+      deviceIdRef.current = uuidv4();
     }
   }, []);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -1766,21 +1784,13 @@ export default function HomePage() {
             : `${estimateProfitPercentValue > 0 ? '+' : ''}${estimateProfitPercentValue.toFixed(2)}%`;
 
         const fc = String(f.code ?? '').trim();
-        const listFromStorage = fundTagListsByCode[fc];
-        const fundTags =
-          Array.isArray(listFromStorage) && listFromStorage.length > 0
-            ? listFromStorage.map(({ name, theme }) => ({
-                name: String(name ?? '').trim(),
-                theme: normalizeFundTagTheme(theme),
-              }))
-            : fundTagRecords
-                .filter((r) => getFundCodesFromTagRecord(r).includes(fc))
-                .map((r) => ({
-                  name: String(r.name ?? '').trim(),
-                  theme: String(r.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-                }))
-                .filter((x) => x.name)
-                .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+        const listFromDerived = fundTagListsByCode[fc];
+        const fundTags = Array.isArray(listFromDerived)
+          ? listFromDerived.map(({ name, theme }) => ({
+              name: String(name ?? '').trim(),
+              theme: normalizeFundTagTheme(theme),
+            }))
+          : [];
 
         return {
           rawFund: f,
@@ -2901,7 +2911,7 @@ export default function HomePage() {
 
   const storageHelper = useMemo(() => {
     // 仅以下 key 参与云端同步；fundValuationTimeseries 不同步到云端（测试中功能，暂不同步）
-    const keys = new Set(['funds', 'tags', 'fundTagLists', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
+    const keys = new Set(['funds', 'tags', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
     const triggerSync = (key, prevValue, nextValue) => {
       if (keys.has(key)) {
         // 标记为脏数据
@@ -2918,11 +2928,6 @@ export default function HomePage() {
           const prevSig = getTagsStoreSignature(prevValue);
           const nextSig = getTagsStoreSignature(nextValue);
           if (prevSig === nextSig) {
-            return;
-          }
-        }
-        if (key === 'fundTagLists') {
-          if (prevValue === nextValue) {
             return;
           }
         }
@@ -2962,7 +2967,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // 仅以下 key 的变更会触发云端同步；fundValuationTimeseries 不在其中
-    const keys = new Set(['funds', 'tags', 'fundTagLists', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings', 'pendingTrades', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
+    const keys = new Set(['funds', 'tags', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings', 'pendingTrades', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
     const onStorage = (e) => {
       if (!e.key) return;
       if (e.key === 'localUpdatedAt') {
@@ -2979,7 +2984,6 @@ export default function HomePage() {
         const nextSig = getTagsStoreSignature(e.newValue);
         if (prevSig === nextSig) return;
       }
-      if (e.key === 'fundTagLists' && e.oldValue === e.newValue) return;
       scheduleSync();
     };
     window.addEventListener('storage', onStorage);
@@ -3005,29 +3009,22 @@ export default function HomePage() {
     if (!row?.code) return;
     const raw = row.rawFund;
     const fc = String(row.code).trim();
-    const fromList = fundTagListsByCode[fc];
-    const tags = Array.isArray(fromList) && fromList.length > 0
-      ? fromList.map((x) => ({
-          id: String(x.id ?? '').trim() || uuidv4(),
-          name: String(x.name ?? '').trim(),
-          theme: normalizeFundTagTheme(x.theme),
-        }))
-      : fundTagRecords
-          .filter((r) => getFundCodesFromTagRecord(r).includes(fc))
-          .map((r) => ({
-            id: String(r.id ?? '').trim() || uuidv4(),
-            name: String(r.name ?? '').trim(),
-            theme: String(r.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-          }))
-          .filter((x) => x.name)
-          .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    const tags = (fundTagRecords || [])
+      .filter((r) => getFundCodesFromTagRecord(r).includes(fc))
+      .map((r) => ({
+        id: String(r.id ?? '').trim() || uuidv4(),
+        name: String(r.name ?? '').trim(),
+        theme: String(r.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
+      }))
+      .filter((x) => x.name)
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
     setFundTagsEdit({
       open: true,
       code: row.code,
       name: row.fundName || raw?.name || '',
       tags,
     });
-  }, [fundTagRecords, fundTagListsByCode]);
+  }, [fundTagRecords]);
 
   const handleSaveFundTags = useCallback(
     (code, tagRows) => {
@@ -3035,14 +3032,6 @@ export default function HomePage() {
       const fc = String(code).trim();
       const rows = Array.isArray(tagRows) ? tagRows : [];
       const normalized = normalizeFundTagInstanceListFromInput(rows);
-
-      setFundTagListsByCode((prev) => {
-        const next = { ...prev };
-        if (normalized.length === 0) delete next[fc];
-        else next[fc] = normalized;
-        storageHelper.setItem('fundTagLists', JSON.stringify(next));
-        return next;
-      });
 
       setFundTagRecords((prev) => {
         const selectedById = new Map(
@@ -3146,22 +3135,6 @@ export default function HomePage() {
       setFundTagRecords((prev) => {
         const next = prev.filter((r) => String(r.id).trim() !== id);
         storageHelper.setItem('tags', JSON.stringify(next));
-        return next;
-      });
-      setFundTagListsByCode((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        for (const [code, list] of Object.entries(next)) {
-          if (!Array.isArray(list)) continue;
-          const filtered = list.filter((t) => String(t?.id ?? '').trim() !== id);
-          if (filtered.length !== list.length) {
-            changed = true;
-            if (filtered.length === 0) delete next[code];
-            else next[code] = filtered;
-          }
-        }
-        if (!changed) return prev;
-        storageHelper.setItem('fundTagLists', JSON.stringify(next));
         return next;
       });
     },
@@ -4109,6 +4082,8 @@ export default function HomePage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_configs', filter: `user_id=eq.${user.id}` }, async (payload) => {
         const incoming = payload?.new?.data;
         if (!isPlainObject(incoming)) return;
+        const incomingDeviceId = incoming?._syncMeta?.deviceId ? String(incoming._syncMeta.deviceId) : '';
+        if (incomingDeviceId && deviceIdRef.current && incomingDeviceId === deviceIdRef.current) return;
         const incomingComparable = getComparablePayload(incoming);
         if (!incomingComparable || incomingComparable === lastSyncedRef.current) return;
         await applyCloudConfig(incoming, payload.new.updated_at);
@@ -4116,6 +4091,8 @@ export default function HomePage() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_configs', filter: `user_id=eq.${user.id}` }, async (payload) => {
         const incoming = payload?.new?.data;
         if (!isPlainObject(incoming)) return;
+        const incomingDeviceId = incoming?._syncMeta?.deviceId ? String(incoming._syncMeta.deviceId) : '';
+        if (incomingDeviceId && deviceIdRef.current && incomingDeviceId === deviceIdRef.current) return;
         const incomingComparable = getComparablePayload(incoming);
         if (!incomingComparable || incomingComparable === lastSyncedRef.current) return;
         await applyCloudConfig(incoming, payload.new.updated_at);
@@ -5215,14 +5192,6 @@ export default function HomePage() {
       return nextScoped;
     });
 
-    setFundTagListsByCode((prev) => {
-      if (!(removeCode in prev)) return prev;
-      const next = { ...prev };
-      delete next[removeCode];
-      storageHelper.setItem('fundTagLists', JSON.stringify(next));
-      return next;
-    });
-
     setFundTagRecords((prev) => {
       const next = prev
         .map((r) => {
@@ -5451,19 +5420,6 @@ export default function HomePage() {
       if (!changed) return prev;
       storageHelper.setItem('dcaPlans', JSON.stringify(nextScoped));
       return nextScoped;
-    });
-
-    setFundTagListsByCode((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const c of set) {
-        if (c in next) {
-          delete next[c];
-          changed = true;
-        }
-      }
-      if (changed) storageHelper.setItem('fundTagLists', JSON.stringify(next));
-      return changed ? next : prev;
     });
 
     setFundTagRecords((prev) => {
@@ -5800,23 +5756,9 @@ export default function HomePage() {
       .sort()
       .join('\n');
 
-    const fundTagListsRaw = isPlainObject(payload.fundTagLists) ? payload.fundTagLists : {};
-    const fundTagListsSig = Object.keys(fundTagListsRaw)
-      .sort()
-      .map((code) => {
-        const c = normalizeCode(code);
-        if (!c) return '';
-        const list = fundTagListsRaw[code];
-        const norm = Array.isArray(list) ? normalizeFundTagInstanceListFromInput(list) : [];
-        return `${c}:${JSON.stringify(norm)}`;
-      })
-      .filter(Boolean)
-      .join('\n');
-
     return JSON.stringify({
       funds: uniqueFundCodes,
       tagsSig,
-      fundTagListsSig,
       favorites,
       groups,
       collapsedCodes,
@@ -5891,14 +5833,7 @@ export default function HomePage() {
         }
         if (!Array.isArray(all.tags)) all.tags = [];
       }
-      if (!keys || keys.has('fundTagLists')) {
-        try {
-          all.fundTagLists = JSON.parse(localStorage.getItem('fundTagLists') || '{}');
-        } catch {
-          all.fundTagLists = {};
-        }
-        if (!isPlainObject(all.fundTagLists)) all.fundTagLists = {};
-      }
+      // fundTagLists 已废弃：基金-标签归属仅由 tags.fundCodes 推导
 
       // 如果是全量收集（keys 为 null），进行完整的数据清洗和验证逻辑
       if (!keys) {
@@ -6050,19 +5985,11 @@ export default function HomePage() {
             .filter(Boolean)
           : [];
 
-        const cleanedFundTagLists = isPlainObject(all.fundTagLists)
-          ? Object.entries(all.fundTagLists).reduce((acc, [code, list]) => {
-              const c = String(code).trim();
-              if (!fundCodes.has(c) || !Array.isArray(list)) return acc;
-              acc[c] = normalizeFundTagInstanceListFromInput(list);
-              return acc;
-            }, {})
-          : {};
+        // fundTagLists 已废弃：不再清洗/返回该字段
 
         return {
           funds: all.funds,
           tags: cleanedTags,
-          fundTagLists: cleanedFundTagLists,
           favorites: cleanedFavorites,
           groups: cleanedGroups,
           collapsedCodes: cleanedCollapsed,
@@ -6087,7 +6014,6 @@ export default function HomePage() {
       return {
         funds: [],
         tags: [],
-        fundTagLists: {},
         favorites: [],
         groups: [],
         collapsedCodes: [],
@@ -6158,16 +6084,7 @@ export default function HomePage() {
         }
       }
 
-      if (hasOwn(cloudData, 'fundTagLists') && isPlainObject(cloudData.fundTagLists)) {
-        const merged = {};
-        for (const [code, list] of Object.entries(cloudData.fundTagLists)) {
-          const c = String(code).trim();
-          if (!nextFundCodes.has(c) || !Array.isArray(list)) continue;
-          merged[c] = normalizeFundTagInstanceListFromInput(list);
-        }
-        setFundTagListsByCode(merged);
-        storageHelper.setItem('fundTagLists', JSON.stringify(merged));
-      }
+      // fundTagLists 已废弃：基金-标签归属仅由 tags.fundCodes 推导
 
       // favorites 必须是字符串 code，且必须存在于 funds 中
       const nextFavorites = cleanCodeArray(cloudData.favorites, nextFundCodes);
@@ -6383,8 +6300,33 @@ export default function HomePage() {
     }
     try {
       setIsSyncing(true);
-      const dataToSync = payload || collectLocalPayload(); // Fallback to full sync if no payload
+      const baseData = payload || collectLocalPayload(); // Fallback to full sync if no payload
       const now = nowInTz().toISOString();
+      let deviceId = deviceIdRef.current || '';
+      if (!deviceId) {
+        try {
+          const key = 'rtfDeviceId';
+          deviceId = window.localStorage.getItem(key) || '';
+          if (!deviceId) {
+            deviceId = uuidv4();
+            window.localStorage.setItem(key, deviceId);
+          }
+          deviceIdRef.current = deviceId;
+        } catch {
+          deviceId = uuidv4();
+          deviceIdRef.current = deviceId;
+        }
+      }
+      const dataToSync = isPlainObject(baseData)
+        ? {
+            ...baseData,
+            _syncMeta: {
+              ...(isPlainObject(baseData._syncMeta) ? baseData._syncMeta : {}),
+              deviceId,
+              at: now,
+            }
+          }
+        : { _syncMeta: { deviceId, at: now } };
 
       if (isPartial) {
         // 增量更新：使用 RPC 调用
@@ -6462,7 +6404,6 @@ export default function HomePage() {
         dcaPlans: JSON.parse(localStorage.getItem('dcaPlans') || '{}'),
         customSettings: JSON.parse(localStorage.getItem('customSettings') || '{}'),
         fundDailyEarnings: JSON.parse(localStorage.getItem('fundDailyEarnings') || '{}'),
-        fundTagLists: JSON.parse(localStorage.getItem('fundTagLists') || '{}'),
         exportedAt: nowInTz().toISOString()
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -6571,21 +6512,7 @@ export default function HomePage() {
           storageHelper.setItem('tags', JSON.stringify(mergedTags));
         }
 
-        if (isPlainObject(data.fundTagLists)) {
-          const fundCodeSet = new Set(mergedFunds.map((f) => f?.code).filter(Boolean));
-          let currentLists = {};
-          try {
-            currentLists = JSON.parse(localStorage.getItem('fundTagLists') || '{}');
-          } catch { /* empty */ }
-          const base = isPlainObject(currentLists) ? { ...currentLists } : {};
-          for (const [code, list] of Object.entries(data.fundTagLists)) {
-            const c = String(code).trim();
-            if (!fundCodeSet.has(c) || !Array.isArray(list)) continue;
-            base[c] = normalizeFundTagInstanceListFromInput(list);
-          }
-          setFundTagListsByCode(base);
-          storageHelper.setItem('fundTagLists', JSON.stringify(base));
-        }
+        // fundTagLists 已废弃：导入时无需处理该字段
 
         if (Array.isArray(data.groups)) {
           // 合并分组：如果 ID 相同则合并 codes，否则添加新分组
