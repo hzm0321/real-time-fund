@@ -3893,13 +3893,23 @@ export default function HomePage() {
 
   useEffect(() => {
     refreshCycleStartRef.current = Date.now();
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      const codes = refreshCodesRef.current || [];
-      if (codes.length) refreshAll(codes);
-    }, refreshMs);
+    
+    const tick = () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        const codes = refreshCodesRef.current || [];
+        if (codes.length) {
+          refreshAll(codes);
+        } else {
+          tick(); // 如果没基金，继续等下一周期
+        }
+      }, refreshMs);
+    };
+
+    tick();
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [refreshMs]);
 
@@ -4275,6 +4285,16 @@ export default function HomePage() {
       refreshingRef.current = false;
       setRefreshing(false);
       refreshCycleStartRef.current = Date.now();
+      
+      // 核心改进：递归式调度下一次刷新，确保上一次请求彻底完成后才开始计时
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        const codes = refreshCodesRef.current || [];
+        if (codes.length) {
+          refreshAll(codes);
+        }
+      }, refreshMs);
+
       try {
         await processPendingQueue();
       }catch (e) {
