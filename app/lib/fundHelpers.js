@@ -132,57 +132,6 @@ export function mergeTagRowsByName(rows) {
   return Array.from(byName.values());
 }
 
-/**
- * 合并独立标签记录与基金上旧版内联 tags 字符串数组；同名合并为一条并写入 fundCodes
- * @param {Array} fundsList
- * @param {Array} existingRecords
- * @param {() => string} newId
- */
-export function mergeLegacyInlineTagsIntoRecords(fundsList, existingRecords, newId) {
-  const normalizeRow = (r) => {
-    if (!r || typeof r !== 'object') return null;
-    const name = String(r.name ?? '').trim();
-    if (!name) return null;
-    const codes = getFundCodesFromTagRecord(r);
-    return {
-      id: String(r.id ?? '').trim() || newId(),
-      name,
-      theme: String(r.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-      fundCodes: codes.sort(),
-    };
-  };
-
-  const acc = [];
-  for (const r of existingRecords || []) {
-    const row = normalizeRow(r);
-    if (row) acc.push(row);
-  }
-  const byName = new Map(mergeTagRowsByName(acc).map((r) => [r.name, r]));
-
-  for (const f of fundsList || []) {
-    if (!f?.code || !Array.isArray(f.tags)) continue;
-    const fc = String(f.code).trim();
-    for (const t of f.tags) {
-      const name = String(t).trim();
-      if (!name) continue;
-      const ex = byName.get(name);
-      if (ex) {
-        if (!ex.fundCodes.includes(fc)) {
-          ex.fundCodes = [...ex.fundCodes, fc].sort();
-        }
-      } else {
-        byName.set(name, {
-          id: newId(),
-          name,
-          theme: DEFAULT_FUND_TAG_THEME,
-          fundCodes: [fc],
-        });
-      }
-    }
-  }
-  return Array.from(byName.values());
-}
-
 export function cloneHoldingDeep(src) {
   if (!isPlainObject(src)) return null;
   try {

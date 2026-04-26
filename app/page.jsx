@@ -84,6 +84,7 @@ import {
   aggregatePortfolioDailyEarnings,
 } from './lib/dailyEarnings';
 import { loadHolidaysForYears, isTradingDay as isDateTradingDay } from './lib/tradingCalendar';
+import { asyncPool } from './lib/asyncHelper';
 import { parseFundTextWithLLM, fetchFundData, fetchFundNetValueRange, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds } from './api/fund';
 import packageJson from '../package.json';
 import PcFundTable from './components/PcFundTable';
@@ -119,7 +120,6 @@ import {
   sanitizeTagRowForStorage,
   serializeTagRecordsForCompare,
   mergeTagRowsByName,
-  mergeLegacyInlineTagsIntoRecords,
   cloneHoldingDeep,
   normalizeHoldingEntryForSeed,
   seedGroupHoldingsFromGlobal,
@@ -359,7 +359,7 @@ export default function HomePage() {
   }, [sortRules, sortBy]);
 
   // 视图模式
-  const [viewMode, setViewMode] = useState('card'); // card, list
+  const [viewMode, setViewMode] = useState('list'); // card, list
   // 全局隐藏金额状态（影响分组汇总、列表和卡片）
   const [maskAmounts, setMaskAmounts] = useState(false);
 
@@ -2540,7 +2540,7 @@ export default function HomePage() {
   const [cloudConfigModal, setCloudConfigModal] = useState({ open: false, userId: null });
   const syncDebounceRef = useRef(null);
   const lastSyncedRef = useRef('');
-  const skipSyncRef = useRef(false);
+  const skipSyncRef = useRef(isSupabaseConfigured);
   const userIdRef = useRef(null);
   const dirtyKeysRef = useRef(new Set()); // 记录发生变化的字段
 
@@ -3457,7 +3457,8 @@ export default function HomePage() {
       initDcaPlans();
       initCustomSettings();
       initFundDailyEarnings();
-      try {        // 已登录用户：不在此处调用 refreshAll，等 fetchCloudConfig 完成后由 applyCloudConfig 统一刷新        let shouldRefreshFromLocal = true;
+      try {        // 已登录用户：不在此处调用 refreshAll，等 fetchCloudConfig 完成后由 applyCloudConfig 统一刷新
+        let shouldRefreshFromLocal = true;
         if (isSupabaseConfigured) {
           const { data, error } = await supabase.auth.getSession();
           if (!cancelled && !error && data?.session?.user) {
@@ -3475,8 +3476,7 @@ export default function HomePage() {
             storedTagRows = storageStore.getItem('tags', []);
           } catch { /* empty */ }
           if (!Array.isArray(storedTagRows)) storedTagRows = [];
-          const mergedTags = mergeLegacyInlineTagsIntoRecords(deduped, storedTagRows, () => uuidv4());
-          const normalizedTags = mergedTags
+          const normalizedTags = storedTagRows
             .map((r) => {
               const codes = getFundCodesFromTagRecord(r).filter((c) => fundCodeSet.has(c));
               return {
@@ -3489,7 +3489,6 @@ export default function HomePage() {
             .filter((r) => r.name);
           const cleanedFunds = deduped.map(stripLegacyTagsFromFundObject);
           setFundTagRecords(normalizedTags);
-          storageHelper.setItem('tags', JSON.stringify(normalizedTags));
           const codes = Array.from(new Set(cleanedFunds.map((f) => f.code)));
           if (codes.length && shouldRefreshFromLocal) refreshAll(codes);
         } else {
@@ -3554,10 +3553,6 @@ export default function HomePage() {
       if (JSON.stringify(migratedDca) !== JSON.stringify(dcaPlans)) {
         setDcaPlans(migratedDca);
       }
-      const savedViewMode = storageStore.getItem('viewMode');
-      if (savedViewMode === 'card' || savedViewMode === 'list') {
-        setViewMode(savedViewMode);
-      }
       const savedTheme = storageStore.getItem('theme');
       if (savedTheme === 'light' || savedTheme === 'dark') {
         setTheme(savedTheme);
@@ -3613,6 +3608,7 @@ export default function HomePage() {
     const clearAuthState = () => {
       clearAuthUser();
       setUserMenuOpen(false);
+      skipSyncRef.current = false;
     };
 
     const handleSession = async (session, event, isExplicitLogin = false) => {
@@ -3623,6 +3619,7 @@ export default function HomePage() {
         }
         isLoggingOutRef.current = false;
         clearAuthState();
+        skipSyncRef.current = false;
         return;
       }
       if (session.expires_at && session.expires_at * 1000 <= Date.now()) {
@@ -3938,7 +3935,7 @@ export default function HomePage() {
     setLoading(true);
     try {
       const added = [];
-      for (const code of toAdd) {
+      await asyncPool(5, toAdd, async (code) => {
         try {
           const data = await fetchFundData(code);
           if (data && data.code) {
@@ -3947,7 +3944,7 @@ export default function HomePage() {
         } catch (e) {
           console.error(`通过识别导入基金 ${code} 失败`, e);
         }
-      }
+      });
       if (added.length > 0) {
         setFunds(prev => {
           const merged = [...prev, ...added];
@@ -3977,15 +3974,15 @@ export default function HomePage() {
 
     try {
       const newFunds = [];
-      for (const f of selectedFunds) {
-        if (funds.some(existing => existing.code === f.CODE)) continue;
+      await asyncPool(5, selectedFunds, async (f) => {
+        if (funds.some(existing => existing.code === f.CODE)) return;
         try {
           const data = await fetchFundData(f.CODE);
           newFunds.push(data);
         } catch (e) {
           console.error(`添加基金 ${f.CODE} 失败`, e);
         }
-      }
+      });
 
       if (newFunds.length > 0) {
         const updated = dedupeByCode([...newFunds, ...funds]);
@@ -4032,8 +4029,8 @@ export default function HomePage() {
     };
     try {
       const updated = [];
-      for (const c of uniqueCodes) {
-        if (!fundCodeStillInStorage(c)) continue;
+      await asyncPool(5, uniqueCodes, async (c) => {
+        if (!fundCodeStillInStorage(c)) return;
         try {
           const data = await fetchFundData(c);
           // 请求完数据，检查数据是否存在，可能会有刷新前存在，刷新过程中被删除的情况
@@ -4054,7 +4051,7 @@ export default function HomePage() {
             }
           }
         }
-      }
+      });
 
       if (updated.length > 0) {
         setFunds(prev => {
@@ -4152,19 +4149,19 @@ export default function HomePage() {
             return null;
           };
 
-          for (const u of updated) {
+          await asyncPool(5, updated, async (u) => {
             const code = u?.code;
-            if (!code) continue;
-            if (!fundCodeStillInStorage(code)) continue;
+            if (!code) return;
+            if (!fundCodeStillInStorage(code)) return;
             const h = holdingsForTabWithLinked?.[code];
             const share = h?.share;
             const cost = h?.cost;
             // 规则 1：基金存在持仓数据（只要求份额有效）
-            if (!isNumber(share) || share <= 0) continue;
+            if (!isNumber(share) || share <= 0) return;
 
             const latestNavDate = u?.jzrq;
             // 只在“最新净值日期”明确存在时计算每日收益
-            if (!isValidDateStr(latestNavDate)) continue;
+            if (!isValidDateStr(latestNavDate)) return;
 
             const existing = Array.isArray(nextDailyMap[code]) ? nextDailyMap[code] : [];
             const lastRecordedDate = existing.length ? existing[existing.length - 1]?.date : null;
@@ -4173,7 +4170,7 @@ export default function HomePage() {
             if (!existing.length) {
               const v = calcLatestDayFromFund(u, share, cost);
               if (v && Number.isFinite(v.earnings) && fundCodeStillInStorage(code)) {
-                if (!fundCodeStillInStorage(code)) continue;
+                if (!fundCodeStillInStorage(code)) return;
                 const list = recordDailyEarnings(code, v.earnings, latestNavDate, v.rate, dailyEarningsScope);
                 nextDailyMap[code] = list;
                 changed = true;
@@ -4185,12 +4182,12 @@ export default function HomePage() {
                   if (Number.isFinite(nav) && nav > 0) {
                     const navCache = new Map([[latestNavDate, nav]]);
                     const prevNav = await findPrevTradingNav(code, latestNavDate, navCache, u);
-                    if (!fundCodeStillInStorage(code)) continue;
+                    if (!fundCodeStillInStorage(code)) return;
                     if (Number.isFinite(prevNav) && prevNav > 0) {
                       const earnings = calcEarningsFromNavs(nav, prevNav, share);
                       const rate = calcRateFromNavs(nav, prevNav, cost);
                       if (Number.isFinite(earnings) && fundCodeStillInStorage(code)) {
-                        if (!fundCodeStillInStorage(code)) continue;
+                        if (!fundCodeStillInStorage(code)) return;
                         const list = recordDailyEarnings(code, earnings, latestNavDate, rate, dailyEarningsScope);
                         nextDailyMap[code] = list;
                         changed = true;
@@ -4201,11 +4198,11 @@ export default function HomePage() {
                   // ignore
                 }
               }
-              continue;
+              return;
             }
 
             // 规则 2：如果每日收益最后一条日期数据小于基金最新净值，则需要遍历补齐
-            if (!isValidDateStr(lastRecordedDate) || lastRecordedDate >= latestNavDate) continue;
+            if (!isValidDateStr(lastRecordedDate) || lastRecordedDate >= latestNavDate) return;
 
             const navCache = new Map();
             const latestNav = Number(u?.dwjz);
@@ -4213,13 +4210,13 @@ export default function HomePage() {
 
             const start = addDays(lastRecordedDate, 1);
             const navRows = await fetchFundNetValueRange(code, lastRecordedDate, latestNavDate);
-            if (!fundCodeStillInStorage(code)) continue;
+            if (!fundCodeStillInStorage(code)) return;
             for (const r of navRows) {
               navCache.set(r.date, r.nav);
             }
 
             const firstIdx = navRows.findIndex((r) => r.date >= start);
-            if (firstIdx === -1) continue;
+            if (firstIdx === -1) return;
 
             for (let j = firstIdx; j < navRows.length; j++) {
               const prevNav = j > 0
@@ -4241,7 +4238,7 @@ export default function HomePage() {
                 changed = true;
               }
             }
-          }
+          });
           const storedForEarnings = readStoredFundCodes();
           if (storedForEarnings !== null) {
             for (const code of Object.keys(nextDailyMap)) {
@@ -5320,50 +5317,49 @@ export default function HomePage() {
       const all = {};
       // 不包含 fundValuationTimeseries，该数据暂不同步到云端
       if (!keys || keys.has('funds')) {
-        all.funds = funds;
+        all.funds = storageStore.getItem('funds', []);
       }
       if (!keys || keys.has('favorites')) {
-        all.favorites = Array.from(favorites);
+        all.favorites = storageStore.getItem('favorites', []);
       }
       if (!keys || keys.has('groups')) {
-        all.groups = groups;
+        all.groups = storageStore.getItem('groups', []);
       }
       if (!keys || keys.has('collapsedCodes')) {
-        all.collapsedCodes = Array.from(collapsedCodes);
+        all.collapsedCodes = storageStore.getItem('collapsedCodes', []);
       }
       if (!keys || keys.has('collapsedTrends')) {
-        all.collapsedTrends = Array.from(collapsedTrends);
+        all.collapsedTrends = storageStore.getItem('collapsedTrends', []);
       }
       if (!keys || keys.has('collapsedEarnings')) {
-        all.collapsedEarnings = Array.from(collapsedEarnings);
+        all.collapsedEarnings = storageStore.getItem('collapsedEarnings', []);
       }
       if (!keys || keys.has('refreshMs')) {
-        all.refreshMs = refreshMs;
+        all.refreshMs = storageStore.getItem('refreshMs', 30000);
       }
       if (!keys || keys.has('holdings')) {
-        all.holdings = holdings;
+        all.holdings = storageStore.getItem('holdings', {});
       }
       if (!keys || keys.has('groupHoldings')) {
-        all.groupHoldings = groupHoldings;
+        all.groupHoldings = storageStore.getItem('groupHoldings', {});
       }
       if (!keys || keys.has('pendingTrades')) {
-        all.pendingTrades = pendingTrades;
+        all.pendingTrades = storageStore.getItem('pendingTrades', []);
       }
       if (!keys || keys.has('transactions')) {
-        all.transactions = transactions;
+        all.transactions = storageStore.getItem('transactions', {});
       }
       if (!keys || keys.has('dcaPlans')) {
-        all.dcaPlans = dcaPlans;
+        all.dcaPlans = storageStore.getItem('dcaPlans', {});
       }
       if (!keys || keys.has('customSettings')) {
-        all.customSettings = customSettings || {};
+        all.customSettings = storageStore.getItem('customSettings', {});
       }
       if (!keys || keys.has('fundDailyEarnings')) {
-        all.fundDailyEarnings = fundDailyEarnings;
+        all.fundDailyEarnings = storageStore.getItem('fundDailyEarnings', {});
       }
       if (!keys || keys.has('tags')) {
         all.tags = storageStore.getItem('tags', []);
-        if (!Array.isArray(all.tags)) all.tags = [];
       }
       // fundTagLists 已废弃：基金-标签归属仅由 tags.fundCodes 推导
 
@@ -5852,6 +5848,7 @@ export default function HomePage() {
       setCloudConfigModal({ open: true, userId, type: 'empty' });
     } catch (e) {
       console.error('获取云端配置失败', e);
+      skipSyncRef.current = false;
     }
   };
 
@@ -5938,6 +5935,7 @@ export default function HomePage() {
       // showToast(`同步云端配置异常:${e}`, 'error');
     } finally {
       setIsSyncing(false);
+      skipSyncRef.current = false;
     }
   };
 
@@ -7913,6 +7911,8 @@ export default function HomePage() {
             onCancel={() => {
               if (cloudConfigModal.type === 'conflict' && cloudConfigModal.cloudData) {
                 applyCloudConfig(cloudConfigModal.cloudData);
+              } else {
+                skipSyncRef.current = false;
               }
               setCloudConfigModal({ open: false, userId: null });
             }}
