@@ -67,7 +67,7 @@ export const DEFAULT_SORT_RULES = [
   { id: 'yesterdayProfit', label: '昨日收益', enabled: false },
   { id: 'holdingDays', label: '持有天数', enabled: false },
   { id: 'holding', label: '持有收益', enabled: true },
-  { id: 'estimateProfit', label: '估算收益', enabled: true },
+  { id: 'estimateProfit', label: '估算收益', enabled: false },
   { id: 'holdingCost', label: '持仓成本', enabled: false },
   { id: 'last1Week', label: '近1周', enabled: false },
   { id: 'last1Month', label: '近1月', enabled: false },

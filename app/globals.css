@@ -1645,6 +1645,13 @@ input[type="number"] {
     /* min-width 由 MobileFundTable 根据 columns meta.width 动态设置 */
   }
 
+  /* 窗口级纵向虚拟滚动：表体自身不出现纵向滚动条，仅随页面滚动 */
+  .mobile-fund-table-body-virtual {
+    overflow-x: visible;
+    overflow-y: visible;
+    width: 100%;
+  }
+
   .mobile-fund-table-portal-header {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
