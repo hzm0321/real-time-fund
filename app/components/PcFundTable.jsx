@@ -1936,7 +1936,7 @@ export default function PcFundTable({
           const sortKey = sortMap[colId];
           const isSorted = sortBy && sortKey === sortBy;
           let isSortEnabled = sortKey && sortRules.find(r => r.id === sortKey)?.enabled;
-          
+
           // 选择默认排序的时候，隐藏基金名称表头的排序和箭头
           if (sortBy === 'default' && sortKey === 'name') {
             isSortEnabled = false;
@@ -2114,68 +2114,90 @@ export default function PcFundTable({
 
         {/* 表体 */}
         {enableVirtualization ? (
-          <div
-            ref={virtualScrollAnchorRef}
-            className="pc-fund-table-body-virtual"
-            style={{ position: 'relative', width: '100%' }}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
-            <div
-              style={{
-                height: rowVirtualizer.getTotalSize(),
-                position: 'relative',
-                width: '100%',
-              }}
+            <SortableContext
+              items={data.map((item) => item.code)}
+              strategy={verticalListSortingStrategy}
             >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const row = tableRows[virtualRow.index];
-              if (!row) return null;
-              return (
+              <div
+                ref={virtualScrollAnchorRef}
+                className="pc-fund-table-body-virtual"
+                style={{ position: 'relative', width: '100%' }}
+              >
                 <div
-                  key={row.original.code || row.id}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
+                    height: rowVirtualizer.getTotalSize(),
+                    position: 'relative',
                     width: '100%',
-                    transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
                   }}
                 >
-                  <div
-                    className={`table-row table-row-scroll ${virtualRow.index % 2 === 1 ? 'row-even' : ''}`}
-                  >
-                    {row.getVisibleCells().map((cell) => {
-                      const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
-                      const isNameColumn = columnId === 'fundName';
-                      const align = isNameColumn
-                        ? ''
-                        : NON_FROZEN_COLUMN_IDS.includes(columnId)
-                          ? 'text-right'
-                          : 'text-center';
-                      const cellClassName =
-                        (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
-                      const style = getCommonPinningStyles(cell.column, false);
-                      const isPinned = cell.column.getIsPinned();
-                      return (
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const row = tableRows[virtualRow.index];
+                  if (!row) return null;
+                  return (
+                    <div
+                      key={row.original.code || row.id}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
+                        zIndex: activeId === row.original.code ? 9999 : 1,
+                      }}
+                    >
+                      <SortableRow
+                        row={row}
+                        isTableDragging={!!activeId}
+                        disabled={sortBy !== 'default'}
+                        enableAnimation={false}
+                      >
                         <div
-                          key={cell.id}
-                          className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
-                          style={style}
+                          className={`table-row table-row-scroll ${virtualRow.index % 2 === 1 ? 'row-even' : ''}`}
                         >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
+                          {row.getVisibleCells().map((cell) => {
+                            const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
+                            const isNameColumn = columnId === 'fundName';
+                            const align = isNameColumn
+                              ? ''
+                              : NON_FROZEN_COLUMN_IDS.includes(columnId)
+                                ? 'text-right'
+                                : 'text-center';
+                            const cellClassName =
+                              (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
+                            const style = getCommonPinningStyles(cell.column, false);
+                            const isPinned = cell.column.getIsPinned();
+                            return (
+                              <div
+                                key={cell.id}
+                                className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
+                                style={style}
+                              >
+                                {flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext(),
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </SortableRow>
+                    </div>
+                  );
+                })}
                 </div>
-              );
-            })}
-            </div>
-          </div>
+              </div>
+            </SortableContext>
+          </DndContext>
         ) : (
           <DndContext
             sensors={sensors}
