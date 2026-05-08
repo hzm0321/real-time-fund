@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v1.3.1';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v1.3.5';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -69,7 +69,7 @@ export default function Announcement() {
               overflow: 'hidden',
             }}
           >
-            <div className="title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 500, fontSize: '18px', color: 'var(--accent)' }}>
+            <div className="title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 700, fontSize: '18px', color: 'var(--accent)' }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                 <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -78,12 +78,11 @@ export default function Announcement() {
               <span>公告</span>
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
-              <p>v1.3.1 更新内容如下：</p>
-              <p>1. 更换截图识别 ai 方案。</p>
-              <p>2. 修复分组新建、删除问题。</p>
-              <p>3. 修复移动端管理分组二次确认弹框层级问题。</p>
-              <p>4. 基金卡片、添加分组展示基金标签。</p>
-              <p>5. 定投弹框新增重置按钮。</p>
+              <p>v1.3.5 更新内容如下：</p>
+              <p>1. 新增单账号多设备同步乐观锁，避免因设备同步失败导致数据丢失。</p>
+              <p>2. 新增连续涨跌标识。</p>
+              <p>3. 截图识别允许覆盖已添加数据的持仓金额。</p>
+              <p>4. 移动端rem适配。</p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>

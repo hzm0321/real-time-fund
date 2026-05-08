@@ -5,6 +5,25 @@
 /* 项目主题切换使用 data-theme="dark"，同时兼容 .dark（shadcn 默认） */
 @custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
+/* =====================================================================
+ * 根字体大小（rem 基准）
+ * PC 端（> 640px）：16px 固定，与 postcss-pxtorem rootValue=16 一致
+ *   → 所有 px 转 rem 后在 PC 上视觉完全无变化（16px / 16 = 1rem = 16px）
+ * 移动端（≤ 640px）：clamp(13px, 3.84vw, 16px) 弹性缩放
+ *   → 375px 宽度约 14.4px，320px 约 13px，414px 约 15.9px
+ *   → 全局 rem 值在移动端自动随视口缩放，实现弹性适配
+ * 注意：这两条规则写在 @media 块内，postcss-pxtorem 不会转换其中的 px
+ * ===================================================================== */
+html {
+  font-size: 16px;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: clamp(13px, 3.84vw, 16px);
+  }
+}
+
 :root {
   --bg: #0f172a;
   --card: #111827;
@@ -1657,6 +1676,7 @@ input[type="number"] {
     align-items: center;
     min-width: 0;
     overflow: hidden;
+    font-size: 12px;
   }
 
   /* 移动端表格行：长按进批量/排序时尽量避免系统文字选择与 iOS 放大镜/呼出菜单（兼容 WebKit / Chromium） */
@@ -3539,6 +3559,9 @@ input[type="number"] {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+}
+.refresh-btn-wrap.is-refreshing::before {
+  display: none;
 }
 .refresh-btn-wrap .icon-button {
   position: relative;

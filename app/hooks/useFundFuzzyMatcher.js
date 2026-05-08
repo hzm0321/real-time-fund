@@ -44,7 +44,10 @@ export const useFundFuzzyMatcher = () => {
               script.src = `${FUND_CODE_SEARCH_URL}?_=${Date.now()}`;
               script.async = true;
 
+              let done = false;
               const cleanup = () => {
+                done = true;
+                if (timer) clearTimeout(timer);
                 if (document.body.contains(script)) {
                   document.body.removeChild(script);
                 }
@@ -59,7 +62,14 @@ export const useFundFuzzyMatcher = () => {
                 }
               };
 
+              const timer = setTimeout(() => {
+                if (done) return;
+                cleanup();
+                reject(new Error('LOAD_ALL_FUND_TIMEOUT'));
+              }, 10000);
+
               script.onload = () => {
+                if (done) return;
                 const snapshot = Array.isArray(window.r) ? JSON.parse(JSON.stringify(window.r)) : [];
                 cleanup();
                 const parsed = formatEastMoneyFundList(snapshot);
@@ -71,6 +81,7 @@ export const useFundFuzzyMatcher = () => {
               };
 
               script.onerror = () => {
+                if (done) return;
                 cleanup();
                 reject(new Error('LOAD_ALL_FUND_FAILED'));
               };

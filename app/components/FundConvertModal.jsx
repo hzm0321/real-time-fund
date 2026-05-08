@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { CloseIcon } from './Icons';
 import { DatePicker, NumericInput } from './Common';
+import { fetchSmartFundNetValueBackward } from '../api/fund';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,13 @@ export default function FundConvertModal({
   const [inAmount, setInAmount] = useState('');
   const [inFund, setInFund] = useState(null);
   const [confirmDate, setConfirmDate] = useState(() => dayjs().format('YYYY-MM-DD'));
+  const [outNetValue, setOutNetValue] = useState(null);
+  const [outNetValueDate, setOutNetValueDate] = useState(null);
+  const [inNetValue, setInNetValue] = useState(null);
+  const [inNetValueDate, setInNetValueDate] = useState(null);
+  const [loadingNetValue, setLoadingNetValue] = useState(false);
+  const [outNetValueError, setOutNetValueError] = useState(null);
+  const [inNetValueError, setInNetValueError] = useState(null);
   const ignoreDialogCloseUntilRef = useRef(0);
   const prevNestedModalOpenRef = useRef(false);
 
@@ -38,6 +46,13 @@ export default function FundConvertModal({
     setInAmount('');
     setInFund(null);
     setConfirmDate(dayjs().format('YYYY-MM-DD'));
+    setOutNetValue(null);
+    setOutNetValueDate(null);
+    setInNetValue(null);
+    setInNetValueDate(null);
+    setOutNetValueError(null);
+    setInNetValueError(null);
+    setLoadingNetValue(false);
   }, [fund?.code]);
 
   const maxOut = useMemo(() => {
@@ -50,8 +65,7 @@ export default function FundConvertModal({
 
   const outValid = Number.isFinite(outAmt) && outAmt > 0 && outAmt <= maxOut;
   const inValid = Number.isFinite(inAmt) && inAmt > 0;
-  const relationValid = outValid && inValid && outAmt >= inAmt;
-  const canSubmit = !!fund?.code && !!inFund?.code && relationValid && !!confirmDate;
+  const canSubmit = !!fund?.code && !!inFund?.code && outValid && inValid && !!confirmDate;
 
   useEffect(() => {
     if (nestedModalOpen) {
@@ -69,6 +83,55 @@ export default function FundConvertModal({
   };
 
   const hintMax = maxOut > 0 ? `最多可转出 ${format2(maxOut)}` : '暂无可转出金额';
+  const refStartDate = useMemo(() => {
+    const d = dayjs(confirmDate, 'YYYY-MM-DD', true);
+    if (!d.isValid()) return null;
+    return d.subtract(1, 'day').format('YYYY-MM-DD');
+  }, [confirmDate]);
+
+  useEffect(() => {
+    if (!fund?.code || !refStartDate) return;
+
+    const getNetValues = async () => {
+      setLoadingNetValue(true);
+      setOutNetValue(null);
+      setOutNetValueDate(null);
+      setInNetValue(null);
+      setInNetValueDate(null);
+      setOutNetValueError(null);
+      setInNetValueError(null);
+
+      try {
+        const tasks = [
+          fetchSmartFundNetValueBackward(fund.code, refStartDate),
+          inFund?.code ? fetchSmartFundNetValueBackward(inFund.code, refStartDate) : Promise.resolve(null),
+        ];
+        const [outRes, inRes] = await Promise.all(tasks);
+        if (outRes && outRes.value) {
+          setOutNetValue(outRes.value);
+          setOutNetValueDate(outRes.date);
+        } else {
+          setOutNetValueError('未找到该日期的净值数据');
+        }
+        if (inFund?.code) {
+          if (inRes && inRes.value) {
+            setInNetValue(inRes.value);
+            setInNetValueDate(inRes.date);
+          } else {
+            setInNetValueError('未找到该日期的净值数据');
+          }
+        }
+      } catch {
+        setOutNetValueError('获取净值失败');
+        if (inFund?.code) setInNetValueError('获取净值失败');
+      } finally {
+        setLoadingNetValue(false);
+      }
+    };
+
+    const timer = setTimeout(getNetValues, 500);
+    return () => clearTimeout(timer);
+  }, [fund?.code, inFund?.code, refStartDate]);
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
@@ -145,7 +208,7 @@ export default function FundConvertModal({
               />
             </div>
             <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              * {hintMax}，且需大于等于转入金额
+              * {hintMax}
             </div>
           </div>
 
@@ -180,7 +243,7 @@ export default function FundConvertModal({
             <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
               转入金额 <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
-            <div style={{ border: (!inAmount || !inValid || (outValid && inValid && !(inAmt <= outAmt))) ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius: 12 }}>
+            <div style={{ border: (!inAmount || !inValid) ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius: 12 }}>
               <NumericInput
                 value={inAmount}
                 onChange={setInAmount}
@@ -189,9 +252,6 @@ export default function FundConvertModal({
                 placeholder="请输入转入金额"
               />
             </div>
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              * 需小于等于转出金额
-            </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: 8 }}>
@@ -199,9 +259,27 @@ export default function FundConvertModal({
               确认转换日期
             </label>
             <DatePicker value={confirmDate} onChange={setConfirmDate} />
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              * 默认当前日期
-            </div>
+            {loadingNetValue && <div className="muted" style={{ fontSize: '12px', marginTop: 4 }}>正在获取净值...</div>}
+            {!loadingNetValue && outNetValueError && (
+              <div style={{ fontSize: '12px', color: 'var(--danger)', marginTop: 4 }}>
+                参考净值(转出): {outNetValueError}
+              </div>
+            )}
+            {!loadingNetValue && inFund?.code && inNetValueError && (
+              <div style={{ fontSize: '12px', color: 'var(--danger)', marginTop: 4 }}>
+                参考净值(转入): {inNetValueError}
+              </div>
+            )}
+            {outNetValue && !loadingNetValue && (
+              <div style={{ fontSize: '12px', color: 'var(--success)', marginTop: 4 }}>
+                参考净值(转出): {outNetValue} ({outNetValueDate})
+              </div>
+            )}
+            {inFund?.code && inNetValue && !loadingNetValue && (
+              <div style={{ fontSize: '12px', color: 'var(--success)', marginTop: 4 }}>
+                参考净值(转入): {inNetValue} ({inNetValueDate})
+              </div>
+            )}
           </div>
         </div>
 
@@ -241,4 +319,3 @@ export default function FundConvertModal({
     </Dialog>
   );
 }
-

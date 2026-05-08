@@ -1,8 +1,10 @@
 "use client";
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
 import { createPortal } from "react-dom";
+import { useStorageStore, DEFAULT_SORT_RULES } from "@/app/stores";
 import {
   Drawer,
   DrawerContent,
@@ -15,7 +17,6 @@ import { CloseIcon, DragIcon, ResetIcon, SettingsIcon } from "./Icons";
 import ConfirmModal from "./ConfirmModal";
 
 function SortSettingReorderItem({
-  isMobile,
   item,
   editingId,
   editingAlias,
@@ -26,6 +27,7 @@ function SortSettingReorderItem({
   handleToggle,
   setIsReordering,
 }) {
+  const isMobile = useIsMobile();
   const dragControls = useDragControls();
 
   return (
@@ -194,20 +196,23 @@ function SortSettingReorderItem({
  * @param {boolean} props.open - 是否打开
  * @param {() => void} props.onClose - 关闭回调
  * @param {boolean} props.isMobile - 是否为移动端（由上层传入）
- * @param {Array<{id: string, label: string, enabled: boolean}>} props.rules - 排序规则列表
- * @param {(nextRules: Array<{id: string, label: string, enabled: boolean}>) => void} props.onChangeRules - 规则变更回调
  */
-export default function SortSettingModal({
-  open,
-  onClose,
-  isMobile,
-  rules = [],
-  onChangeRules,
-  onResetRules,
-  sortDisplayMode = "buttons",
-  onChangeSortDisplayMode,
-}) {
-  const [localRules, setLocalRules] = useState(rules);
+export default function SortSettingModal({open,
+  onClose}) {
+  const isMobile = useIsMobile();
+  const {
+    sortRules,
+    setSortRules,
+    pcSortDisplayMode,
+    mobileSortDisplayMode,
+    setPcSortDisplayMode,
+    setMobileSortDisplayMode,
+  } = useStorageStore();
+
+  const sortDisplayMode = isMobile ? mobileSortDisplayMode : pcSortDisplayMode;
+  const onChangeSortDisplayMode = isMobile ? setMobileSortDisplayMode : setPcSortDisplayMode;
+
+  const [localRules, setLocalRules] = useState(sortRules);
   const [editingId, setEditingId] = useState(null);
   const [editingAlias, setEditingAlias] = useState("");
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -215,8 +220,8 @@ export default function SortSettingModal({
 
   useEffect(() => {
     if (open) {
-      const defaultRule = (rules || []).find((item) => item.id === "default");
-      const otherRules = (rules || []).filter((item) => item.id !== "default");
+      const defaultRule = (sortRules || []).find((item) => item.id === "default");
+      const otherRules = (sortRules || []).filter((item) => item.id !== "default");
       const ordered = defaultRule ? [defaultRule, ...otherRules] : otherRules;
       setLocalRules(ordered);
       const prev = document.body.style.overflow;
@@ -225,18 +230,16 @@ export default function SortSettingModal({
         document.body.style.overflow = prev;
       };
     }
-  }, [open, rules]);
+  }, [open, sortRules]);
 
   const handleReorder = (nextItems) => {
     // 基于当前 localRules 计算新顺序（默认规则固定在首位）
     const defaultRule = (localRules || []).find((item) => item.id === "default");
     const combined = defaultRule ? [defaultRule, ...nextItems] : nextItems;
     setLocalRules(combined);
-    if (onChangeRules) {
-      queueMicrotask(() => {
-        onChangeRules(combined);
-      });
-    }
+    queueMicrotask(() => {
+      setSortRules(combined);
+    });
   };
 
   const handleToggle = (id) => {
@@ -244,11 +247,9 @@ export default function SortSettingModal({
       item.id === id ? { ...item, enabled: !item.enabled } : item
     );
     setLocalRules(next);
-    if (onChangeRules) {
-      queueMicrotask(() => {
-        onChangeRules(next);
-      });
-    }
+    queueMicrotask(() => {
+      setSortRules(next);
+    });
   };
 
   const startEditAlias = (item) => {
@@ -270,9 +271,9 @@ export default function SortSettingModal({
       return next;
     });
     if (nextRules) {
-      // 将父组件状态更新放到微任务中，避免在 SortSettingModal 渲染过程中直接更新 HomePage
+      // 将 store 状态更新放到微任务中，避免在渲染过程中触发状态变更
       queueMicrotask(() => {
-        onChangeRules?.(nextRules);
+        setSortRules(nextRules);
       });
     }
     setEditingId(null);
@@ -369,8 +370,7 @@ export default function SortSettingModal({
           >
             排序规则
           </h3>
-          {onResetRules && (
-            <button
+          <button
               type="button"
               className="icon-button"
               onClick={() => setResetConfirmOpen(true)}
@@ -389,7 +389,6 @@ export default function SortSettingModal({
             >
               <ResetIcon width="16" height="16" />
             </button>
-          )}
         </div>
         <p
           className="muted"
@@ -465,7 +464,6 @@ export default function SortSettingModal({
               .map((item) => (
                 <SortSettingReorderItem
                   key={item.id}
-                  isMobile={isMobile}
                   item={item}
                   editingId={editingId}
                   editingAlias={editingAlias}
@@ -503,7 +501,7 @@ export default function SortSettingModal({
           onConfirm={() => {
             setResetConfirmOpen(false);
             queueMicrotask(() => {
-              onResetRules?.();
+              setSortRules(DEFAULT_SORT_RULES);
             });
           }}
           onCancel={() => setResetConfirmOpen(false)}

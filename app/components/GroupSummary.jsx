@@ -1,13 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
+import {useIsMobile} from "@/app/hooks/useIsMobile";
 import { PinIcon, PinOffIcon, EyeIcon, EyeOffIcon, SwitchIcon } from './Icons';
+import FitText from './FitText';
 
 /** 与 app/page.jsx、EmptyStateCard 中虚拟「汇总」Tab id 保持一致 */
 const SUMMARY_TAB_ID = '__portfolio_groups_summary__';
 
 // 数字滚动组件（初始化时无动画，后续变更再动画）
-function CountUp({ value, prefix = '', suffix = '', decimals = 2, className = '', style = {} }) {
+function CountUp({
+  value,
+  prefix = '',
+  suffix = '',
+  decimals = 2,
+  className = '',
+  style = {},
+  maxFontSize,
+  minFontSize,
+  as = 'span',
+}) {
   const [displayValue, setDisplayValue] = useState(value);
   const previousValue = useRef(value);
   const isFirstChange = useRef(true);
@@ -56,12 +68,20 @@ function CountUp({ value, prefix = '', suffix = '', decimals = 2, className = ''
     };
   }, [value]);
 
+  const text = `${prefix}${Math.abs(displayValue).toLocaleString('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`;
+  const styleFontSize = typeof style.fontSize === 'number' ? style.fontSize : parseFloat(style.fontSize);
+  const resolvedMaxFontSize = maxFontSize ?? (Number.isFinite(styleFontSize) ? styleFontSize : undefined);
+
   return (
-    <span className={className} style={style}>
-      {prefix}
-      {Math.abs(displayValue).toLocaleString('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
-      {suffix}
-    </span>
+    <FitText
+      as={as}
+      className={className}
+      style={style}
+      maxFontSize={resolvedMaxFontSize}
+      minFontSize={minFontSize}
+    >
+      {text}
+    </FitText>
   );
 }
 
@@ -82,41 +102,13 @@ export default function GroupSummary({
   marketIndexAccordionHeight,
   navbarHeight,
 }) {
+  const isMobile = useIsMobile();
   const [showPercent, setShowPercent] = useState(true);
   const [showTodayPercent, setShowTodayPercent] = useState(false);
   const [isMasked, setIsMasked] = useState(masked ?? false);
   const rowRef = useRef(null);
-  const [assetSize, setAssetSize] = useState(24);
-  const [metricSize, setMetricSize] = useState(18);
-  const [winW, setWinW] = useState(0);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setWinW(window.innerWidth);
-      const onR = () => setWinW(window.innerWidth);
-      window.addEventListener('resize', onR);
-      return () => window.removeEventListener('resize', onR);
-    }
-  }, []);
-
-  // 根据窗口宽度设置基础字号，保证小屏数字不会撑破布局
-  useEffect(() => {
-    if (!winW) return;
-
-    if (winW <= 360) {
-      setAssetSize(18);
-      setMetricSize(14);
-    } else if (winW <= 414) {
-      setAssetSize(22);
-      setMetricSize(16);
-    } else if (winW <= 768) {
-      setAssetSize(24);
-      setMetricSize(18);
-    } else {
-      setAssetSize(26);
-      setMetricSize(20);
-    }
-  }, [winW]);
+  const [assetSize, setAssetSize] = useState(26);
+  const [metricSize, setMetricSize] = useState(20);
 
   useEffect(() => {
     if (typeof masked === 'boolean') {
@@ -202,7 +194,6 @@ export default function GroupSummary({
       setMetricSize((s) => Math.max(12, s - 1));
     }
   }, [
-    winW,
     summary.totalAsset,
     summary.totalProfitToday,
     summary.totalHoldingReturn,
@@ -223,6 +214,9 @@ export default function GroupSummary({
   },[isSticky, stickyTop, marketIndexAccordionHeight, navbarHeight])
 
   if (!summary.hasHolding) return null;
+
+  const todayProfitPrefix = summary.totalProfitToday > 0 ? '+' : summary.totalProfitToday < 0 ? '-' : '';
+  const holdingReturnPrefix = summary.totalHoldingReturn > 0 ? '+' : summary.totalHoldingReturn < 0 ? '-' : '';
 
   return (
     <div
@@ -264,9 +258,9 @@ export default function GroupSummary({
         <div
           ref={rowRef}
           className="row"
-          style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}
+          style={{ alignItems: 'flex-end', justifyContent: 'space-between', minWidth: 0 }}
         >
-          <div>
+          <div style={{flex: 4, minWidth: 0}}>
             <div
               style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}
             >
@@ -302,9 +296,9 @@ export default function GroupSummary({
                 fontSize: '24px',
                 fontWeight: 500,
                 fontFamily: 'var(--font-mono)',
+                minWidth: 0,
               }}
             >
-              <span style={{ fontSize: '16px', marginRight: 2 }}></span>
               {isMasked ? (
                 <span
                   className="mask-text"
@@ -313,12 +307,17 @@ export default function GroupSummary({
                   ******
                 </span>
               ) : (
-                <CountUp value={summary.totalAsset} style={{ fontSize: assetSize }} />
+                <CountUp
+                  value={summary.totalAsset}
+                  maxFontSize={assetSize}
+                  minFontSize={16}
+                  as="div"
+                />
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 24 }}>
-            <div style={{ textAlign: 'right' }}>
+          <div style={{ display: 'flex', gap: 12, flex: 5, minWidth: 0 }}>
+            <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
               <div
                 className="muted"
                 style={{
@@ -358,23 +357,21 @@ export default function GroupSummary({
                   </span>
                 ) : summary.hasAnyTodayData ? (
                   <>
-                    <span style={{ marginRight: 1 }}>
-                      {summary.totalProfitToday > 0
-                        ? '+'
-                        : summary.totalProfitToday < 0
-                          ? '-'
-                          : ''}
-                    </span>
                     {showTodayPercent ? (
                       <CountUp
                         value={Math.abs(summary.todayReturnRate)}
+                        prefix={todayProfitPrefix}
                         suffix="%"
                         style={{ fontSize: metricSize }}
                       />
                     ) : (
                       <CountUp
                         value={Math.abs(summary.totalProfitToday)}
-                        style={{ fontSize: metricSize }}
+                        prefix={todayProfitPrefix}
+                        maxFontSize={metricSize}
+                        minFontSize={12}
+                        as="div"
+                        style={{ textAlign: 'right' }}
                       />
                     )}
                   </>
@@ -383,7 +380,7 @@ export default function GroupSummary({
                 )}
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', flex: isMobile ? 1 : null, minWidth: 0 }}>
               <div
                 className="muted"
                 style={{
@@ -421,23 +418,20 @@ export default function GroupSummary({
                   </span>
                 ) : (
                   <>
-                    <span style={{ marginRight: 1 }}>
-                      {summary.totalHoldingReturn > 0
-                        ? '+'
-                        : summary.totalHoldingReturn < 0
-                          ? '-'
-                          : ''}
-                    </span>
                     {showPercent ? (
                       <CountUp
                         value={Math.abs(summary.returnRate)}
+                        prefix={holdingReturnPrefix}
                         suffix="%"
                         style={{ fontSize: metricSize }}
                       />
                     ) : (
                       <CountUp
                         value={Math.abs(summary.totalHoldingReturn)}
-                        style={{ fontSize: metricSize }}
+                        maxFontSize={metricSize}
+                        minFontSize={12}
+                        as="div"
+                        style={{ textAlign: 'right' }}
                       />
                     )}
                   </>

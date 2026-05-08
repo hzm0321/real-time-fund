@@ -5,7 +5,8 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import {CloseIcon} from "@/app/components/Icons";
-import { useBodyScrollLock } from "../../app/hooks/useBodyScrollLock";
+
+const DialogContext = React.createContext({ open: false });
 
 function Dialog({
   open: openProp,
@@ -17,9 +18,6 @@ function Dialog({
   const isControlled = openProp !== undefined;
   const currentOpen = isControlled ? openProp : uncontrolledOpen;
 
-  // 使用全局 hook 统一处理 body 滚动锁定 & 恢复，避免弹窗打开时页面跳到顶部
-  useBodyScrollLock(currentOpen);
-
   const handleOpenChange = React.useCallback(
     (next) => {
       if (!isControlled) setUncontrolledOpen(next);
@@ -29,13 +27,16 @@ function Dialog({
   );
 
   return (
-    <DialogPrimitive.Root
-      data-slot="dialog"
-      open={isControlled ? openProp : undefined}
-      defaultOpen={defaultOpen}
-      onOpenChange={handleOpenChange}
-      {...props}
-    />
+    <DialogContext.Provider value={{ open: currentOpen }}>
+      <DialogPrimitive.Root
+        modal={false}
+        data-slot="dialog"
+        open={isControlled ? openProp : undefined}
+        defaultOpen={defaultOpen}
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+    </DialogContext.Provider>
   );
 }
 
@@ -61,14 +62,44 @@ function DialogOverlay({
   className,
   ...props
 }) {
+  const { open } = React.useContext(DialogContext);
+  const overlayRef = React.useRef(null);
+  
+  React.useEffect(() => {
+    const el = overlayRef.current;
+    if (!el || !open) return;
+    
+    const preventScroll = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    
+    el.addEventListener("touchmove", preventScroll, { passive: false });
+    el.addEventListener("wheel", preventScroll, { passive: false });
+    
+    return () => {
+      el.removeEventListener("touchmove", preventScroll);
+      el.removeEventListener("wheel", preventScroll);
+    };
+  }, [open]);
+
   return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-[var(--dialog-overlay)] backdrop-blur-[4px]",
-        className
-      )}
-      {...props} />
+    <DialogPrimitive.Close asChild>
+      <div
+        ref={overlayRef}
+        data-slot="dialog-overlay"
+        data-state={open ? "open" : "closed"}
+        role="button"
+        tabIndex={-1}
+        aria-label="关闭"
+        className={cn(
+          "fixed inset-0 z-50 cursor-default bg-[var(--dialog-overlay)] backdrop-blur-[4px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+          className
+        )}
+        style={{ touchAction: "none" }}
+        {...props} 
+      />
+    </DialogPrimitive.Close>
   );
 }
 
@@ -87,8 +118,10 @@ function DialogContent({
         data-slot="dialog-content"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[16px] border border-[var(--border)] text-[var(--foreground)] p-6 dialog-content-shadow outline-none sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-50 w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[16px] border border-[var(--border)] text-[var(--foreground)] p-6 dialog-content-shadow outline-none duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           "mobile-dialog-glass",
           className
         )}

@@ -1,4 +1,5 @@
 'use client';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -51,10 +52,8 @@ function normalizeTagDraft(raw) {
  * @param {(tagId: string) => void} [props.onDeleteGlobalTag]
  * @param {(tagId: string) => string[]} [props.getTagUsageLabels]
  */
-export default function FundTagsEditDialog({
-  open,
+export default function FundTagsEditDialog({open,
   onOpenChange,
-  isMobile = false,
   fundCode,
   fundName = '',
   tags = [],
@@ -62,8 +61,8 @@ export default function FundTagsEditDialog({
   recommendedTagItems = [],
   onAddPoolTag,
   onDeleteGlobalTag,
-  getTagUsageLabels,
-}) {
+  getTagUsageLabels}) {
+  const isMobile = useIsMobile();
   const [draft, setDraft] = useState(() => normalizeTagDraft(tags));
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   /** 'fund'：加到当前基金已选；'pool'：仅写入全局可选池 */

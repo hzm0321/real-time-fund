@@ -8,7 +8,8 @@ import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString } from 'lodash';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Stat } from './Common';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { Stat, ConsecutiveTrendBadge } from './Common';
 import FundTrendChart from './FundTrendChart';
 import FundIntradayChart from './FundIntradayChart';
 import FundDailyEarnings from './FundDailyEarnings';
@@ -82,6 +83,7 @@ export default function FundCard({
   masked = false,
   fundTags = [],
   onFundTagsClick,
+  fundExtraData,
 }) {
   const holding = holdings[f?.code];
   const profit = getHoldingProfit?.(f, holding) ?? null;
@@ -180,6 +182,7 @@ export default function FundCard({
                   <LinkIcon width="14" height="14" />
                 </span>
               ) : null}
+              <ConsecutiveTrendBadge trend={fundExtraData?.consecutiveTrend} />
               {f.name}
             </span>
             <span className="muted">
@@ -606,7 +609,16 @@ export default function FundCard({
           )}
           {hasHoldingAmount && (
             <TabsContent value="earnings" className="mt-3 outline-none">
-              <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
+              {displayDailyEarningsSeries.length > 0 ? (
+                <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
+              ) : (
+                <Empty className="py-8 border-none bg-transparent">
+                  <EmptyHeader>
+                    <EmptyTitle>暂无收益数据</EmptyTitle>
+                    <EmptyDescription>该基金暂无历史收益记录</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
             </TabsContent>
           )}
           <TabsContent value="trend" className="mt-3 outline-none">
@@ -725,7 +737,16 @@ export default function FundCard({
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
                     style={{ overflow: 'hidden' }}
                   >
-                    <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
+                    {displayDailyEarningsSeries.length > 0 ? (
+                      <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
+                    ) : (
+                      <Empty className="py-6 border-none bg-transparent">
+                        <EmptyHeader>
+                          <EmptyTitle className="text-sm">暂无收益数据</EmptyTitle>
+                          <EmptyDescription className="text-xs">该基金暂无历史收益记录</EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

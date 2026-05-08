@@ -89,21 +89,21 @@ export default function ScanImportConfirmModal({
                 const inGroup = targetGroup && targetGroup !== 'all' && targetGroup !== 'fav'
                   ? groupCodes.includes(item.code)
                   : false;
+                const holdAmounts = formatAmount(item.holdAmounts);
+                const holdGains = formatAmount(item.holdGains);
+                const hasHoldingData = holdAmounts !== null && holdGains !== null;
                 const isAlreadyInTarget =
                   targetGroup === 'all'
                     ? inAll
                     : targetGroup === 'fav'
                       ? inFav
                       : inGroup;
-                const isDisabled = isAlreadyInTarget || isInvalid;
+                const isDisabled = (isAlreadyInTarget && !hasHoldingData) || isInvalid;
                 const displayName = item.name || (isInvalid ? '未找到基金' : '未知基金');
-                const holdAmounts = formatAmount(item.holdAmounts);
-                const holdGains = formatAmount(item.holdGains);
-                const hasHoldingData = holdAmounts !== null && holdGains !== null;
                 return (
                   <div
                     key={item.code}
-                    className={`search-item ${isSelected ? 'selected' : ''} ${isAlreadyInTarget ? 'added' : ''}`}
+                    className={`search-item ${isSelected ? 'selected' : ''} ${isAlreadyInTarget && !hasHoldingData ? 'added' : ''}`}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       if (isDisabled) return;
@@ -116,7 +116,7 @@ export default function ScanImportConfirmModal({
                         <span className="fund-name">{displayName}</span>
                         <span className="fund-code muted">#{item.code}</span>
                       </div>
-                      {isAlreadyInTarget ? (
+                      {isAlreadyInTarget && !hasHoldingData ? (
                         <span className="added-label">已添加</span>
                       ) : isInvalid ? (
                         <span className="added-label">未找到</span>
@@ -127,7 +127,7 @@ export default function ScanImportConfirmModal({
                       )}
                     </div>
                     {hasHoldingData && !isDisabled && (
-                      <div style={{ display: 'flex', gap: 16, marginTop: 6, paddingLeft: 0 }}>
+                      <div style={{ display: 'flex', gap: 16, marginTop: 6, paddingLeft: 0, alignItems: 'center' }}>
                         {holdAmounts !== null && (
                           <span className="muted" style={{ fontSize: 12 }}>
                             持有金额：<span style={{ color: 'var(--text)', fontWeight: 500 }}>{holdAmounts.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -139,6 +139,9 @@ export default function ScanImportConfirmModal({
                               {holdGains >= 0 ? '+' : '-'}{Math.abs(holdGains).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </span>
+                        )}
+                        {isAlreadyInTarget && (
+                          <span className="added-label" style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 15%, transparent)', marginLeft: 'auto' }}>已存在</span>
                         )}
                       </div>
                     )}

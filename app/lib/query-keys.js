@@ -19,4 +19,7 @@ export const pingzhongdata = (fundCode) => ['pingzhongdata', String(fundCode).tr
 /** @param {string} code @param {string} range */
 export const fundHistory = (code, range) => ['fundHistory', String(code).trim(), range];
 
+/** @param {string} val */
+export const fundSearch = (val) => ['fundSearch', String(val).trim()];
+
 export const eastmoneyFundcodeSearchList = () => ['eastmoneyFundcodeSearchList'];

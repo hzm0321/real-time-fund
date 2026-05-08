@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo, useLayoutEffect, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useLayoutEffect, useCallback, useTransition, useDeferredValue } from 'react';
+import dynamic from 'next/dynamic';
 import ScanButton from './components/ScanButton';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
@@ -14,6 +15,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString, isPlainObject, isNil } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
+import { RefreshCw } from 'lucide-react';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import {
   Select,
@@ -43,44 +45,45 @@ import {
   SettingsIcon,
   SortIcon,
   SunIcon,
-  UpdateIcon,
   UserIcon,
   CameraIcon,
   FolderPlusIcon,
 } from "./components/Icons";
 import AddFundToGroupModal from "./components/AddFundToGroupModal";
-import AddResultModal from "./components/AddResultModal";
-import CloudConfigModal from "./components/CloudConfigModal";
+// 高频组件：同步加载
 import ConfirmModal from "./components/ConfirmModal";
-import DonateModal from "./components/DonateModal";
-import FeedbackModal from "./components/FeedbackModal";
 import GroupManageModal from "./components/GroupManageModal";
 import GroupModal from "./components/GroupModal";
 import HoldingEditModal from "./components/HoldingEditModal";
 import HoldingActionModal from "./components/HoldingActionModal";
 import LoginModal from "./components/LoginModal";
-import ScanImportConfirmModal from "./components/ScanImportConfirmModal";
-import ScanImportProgressModal from "./components/ScanImportProgressModal";
-import ScanPickModal from "./components/ScanPickModal";
-import ScanProgressModal from "./components/ScanProgressModal";
 import SettingsModal from "./components/SettingsModal";
 import SuccessModal from "./components/SuccessModal";
 import TradeModal from "./components/TradeModal";
 import TransactionHistoryModal from "./components/TransactionHistoryModal";
-import AddHistoryModal from "./components/AddHistoryModal";
-import UpdatePromptModal from "./components/UpdatePromptModal";
+import UserMenu from "./components/UserMenu";
 import RefreshButton from "./components/RefreshButton";
-import WeChatModal from "./components/WeChatModal";
-import DcaModal from "./components/DcaModal";
-import FundConvertModal from "./components/FundConvertModal";
-import SelectFundSingleModal from "./components/SelectFundSingleModal";
+// 低频弹窗：懒加载，减少首屏 JS 解析体积
+const CloudConfigModal = dynamic(() => import('./components/CloudConfigModal'), { ssr: false });
+const DonateModal = dynamic(() => import('./components/DonateModal'), { ssr: false });
+const FeedbackModal = dynamic(() => import('./components/FeedbackModal'), { ssr: false });
+const WeChatModal = dynamic(() => import('./components/WeChatModal'), { ssr: false });
+const DcaModal = dynamic(() => import('./components/DcaModal'), { ssr: false });
+const FundConvertModal = dynamic(() => import('./components/FundConvertModal'), { ssr: false });
+const SelectFundSingleModal = dynamic(() => import('./components/SelectFundSingleModal'), { ssr: false });
+const SelectHoldingGroupModal = dynamic(() => import('./components/SelectHoldingGroupModal'), { ssr: false });
+const ScanImportConfirmModal = dynamic(() => import('./components/ScanImportConfirmModal'), { ssr: false });
+const ScanImportProgressModal = dynamic(() => import('./components/ScanImportProgressModal'), { ssr: false });
+const ScanPickModal = dynamic(() => import('./components/ScanPickModal'), { ssr: false });
+const ScanProgressModal = dynamic(() => import('./components/ScanProgressModal'), { ssr: false });
+const AddHistoryModal = dynamic(() => import('./components/AddHistoryModal'), { ssr: false });
+const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
 import MarketIndexAccordion from "./components/MarketIndexAccordion";
 import SortSettingModal from "./components/SortSettingModal";
-import SelectHoldingGroupModal from "./components/SelectHoldingGroupModal";
 import githubImg from "./assets/github.svg";
 import SectorFlowModal from './components/SectorFlowModal';
 import SectorFlowDetailModal from './components/SectorFlowDetailModal';
-import { fetchSectorDetail, fetchFundSecidByRelatedSector, fetchRelatedSectors } from './api/fund';
+import { fetchSectorDetail, fetchRelatedSectors } from './api/fund';
 import { Wallet } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { recordValuation, getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
@@ -92,8 +95,7 @@ import {
 } from './lib/dailyEarnings';
 import { loadHolidaysForYears, isTradingDay as isDateTradingDay } from './lib/tradingCalendar';
 import { asyncPool } from './lib/asyncHelper';
-import { parseFundTextWithLLM, fetchFundData, fetchFundNetValueRange, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds } from './api/fund';
-import packageJson from '../package.json';
+import { parseFundTextWithLLM, fetchFundData, fetchFundNetValueRange, fetchShanghaiIndexDate, fetchSmartFundNetValue, fetchSmartFundNetValueBackward, searchFunds, fetchFundPeriodReturns } from './api/fund';
 import PcFundTable from './components/PcFundTable';
 import MobileFundTable from './components/MobileFundTable';
 import FundTagsEditDialog from './components/FundTagsEditDialog';
@@ -103,7 +105,12 @@ import MineTab from './components/MineTab';
 import SearchFund from './components/SearchFund';
 import MyEarningsCalendarPage from './components/MyEarningsCalendarPage';
 import { useFundFuzzyMatcher } from './hooks/useFundFuzzyMatcher';
-import {useUserStore, clearAuthUser, setAuthUser, useStorageStore, storageStore, getFundCodesSignature} from './stores';
+import { useTheme } from './hooks/useTheme';
+import { useTradingDay } from './hooks/useTradingDay';
+import { useNavHeights } from './hooks/useNavHeights';
+import { useScanImport } from './hooks/useScanImport';
+import { useIsMobile } from './hooks/useIsMobile';
+import {useUserStore, clearAuthUser, setAuthUser, useStorageStore, storageStore, getFundCodesSignature, DEFAULT_SORT_RULES, SORT_DISPLAY_MODES} from './stores';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -126,6 +133,7 @@ import {
   getFundCodesFromTagRecord,
   sanitizeTagRowForStorage,
   serializeTagRecordsForCompare,
+  mergeTagRowsByName,
   cloneHoldingDeep,
   normalizeHoldingEntryForSeed,
   seedGroupHoldingsFromGlobal,
@@ -133,6 +141,42 @@ import {
 } from './lib/fundHelpers';
 
 import GlobalToast from './components/GlobalToast';
+
+// --- Utility Functions ---
+const dedupeByCode = (list) => {
+  const seen = new Set();
+  return list.filter((f) => {
+    const c = f?.code;
+    if (!c || seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+};
+
+function normalizeCode(value) {
+  return String(value ?? '').trim();
+}
+
+function cleanCodeArray(input, allowedSet = null) {
+  const arr = Array.isArray(input) ? input : [];
+  const next = [];
+  const seen = new Set();
+  for (const v of arr) {
+    const code = normalizeCode(v);
+    if (!code) continue;
+    if (allowedSet && !allowedSet.has(code)) continue;
+    if (seen.has(code)) continue;
+    seen.add(code);
+    next.push(code);
+  }
+  return next;
+}
+
+const normalizeNumber = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
 
 export default function HomePage() {
   const {
@@ -154,7 +198,13 @@ export default function HomePage() {
     initHoldings, initGroupHoldings,
     initPendingTrades, initTransactions,
     initDcaPlans, initCustomSettings,
-    initFundDailyEarnings
+    initFundDailyEarnings,
+    sortBy, setSortBy,
+    sortOrder, setSortOrder,
+    pcSortDisplayMode, setPcSortDisplayMode,
+    mobileSortDisplayMode, setMobileSortDisplayMode,
+    sortRules, setSortRules,
+    initSort,
   } = useStorageStore();
   /** 基金标签（独立 localStorage 键 `tags`）：{ id, name, theme, fundCodes: string[] }[] */
   const [fundTagRecords, setFundTagRecords] = useState([]);
@@ -224,130 +274,20 @@ export default function HomePage() {
   const [valuationSeries, setValuationSeries] = useState(() => (typeof window !== 'undefined' ? getAllValuationSeries() : {}));
   // 自选状态
   const [currentTab, setCurrentTab] = useState('all');
+  const [isPending, startTransition] = useTransition();
   const hasLocalTabInitRef = useRef(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [groupManageOpen, setGroupManageOpen] = useState(false);
   const [addFundToGroupOpen, setAddFundToGroupOpen] = useState(false);
-
-  const DEFAULT_SORT_RULES = [
-    { id: 'default', label: '默认', enabled: true },
-    // 估值涨幅为原始名称，"涨跌幅"为别名
-    { id: 'yield', label: '估算涨幅', alias: '涨跌幅', enabled: true },
-    // 最新涨幅排序：默认隐藏
-    { id: 'yesterdayIncrease', label: '最新涨幅', enabled: false },
-    // 持仓金额排序：默认隐藏
-    { id: 'holdingAmount', label: '持仓金额', enabled: false },
-    { id: 'todayProfit', label: '当日收益', enabled: false },
-    { id: 'holding', label: '持有收益', enabled: true },
-    { id: 'name', label: '基金名称', alias: '名称', enabled: true },
-  ];
-  const SORT_DISPLAY_MODES = new Set(['buttons', 'dropdown']);
-
-  // 排序状态
-  const [sortBy, setSortBy] = useState('default'); // default, name, yield, yesterdayIncrease, holding, holdingAmount, todayProfit
-  const [sortOrder, setSortOrder] = useState('desc'); // asc | desc
-  const [sortDisplayMode, setSortDisplayMode] = useState('buttons'); // buttons | dropdown
-  const [isSortLoaded, setIsSortLoaded] = useState(false);
-  const [sortRules, setSortRules] = useState(DEFAULT_SORT_RULES);
   const [sortSettingOpen, setSortSettingOpen] = useState(false);
 
+  // 调用 store 的 initSort，在 mount 时恢复持久化的排序偏好
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedSortBy = storageStore.getItem('localSortBy');
-      const savedSortOrder = storageStore.getItem('localSortOrder');
-      if (savedSortBy) setSortBy(savedSortBy);
-      if (savedSortOrder) setSortOrder(savedSortOrder);
-
-      // 1）优先从 customSettings.localSortRules 读取
-      // 2）兼容旧版独立 localSortRules 字段
-      let rulesFromSettings = null;
-      try {
-        const parsed = storageStore.getItem('customSettings', customSettings || {});
-        if (parsed) {
-          if (Array.isArray(parsed.localSortRules)) {
-            rulesFromSettings = parsed.localSortRules;
-          }
-          if (
-            parsed &&
-            typeof parsed.localSortDisplayMode === 'string' &&
-            SORT_DISPLAY_MODES.has(parsed.localSortDisplayMode)
-          ) {
-            setSortDisplayMode(parsed.localSortDisplayMode);
-          }
-        }
-      } catch {
-        // ignore
-      }
-
-      if (!rulesFromSettings) {
-        const parsed = storageStore.getItem('localSortRules');
-        if (parsed) {
-          try {
-            if (Array.isArray(parsed)) {
-              rulesFromSettings = parsed;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      if (rulesFromSettings && rulesFromSettings.length) {
-        // 1）先按本地存储的顺序还原（包含 alias、enabled 等字段）
-        const defaultMap = new Map(
-          DEFAULT_SORT_RULES.map((rule) => [rule.id, rule])
-        );
-        const merged = [];
-
-        // 先遍历本地配置，保持用户自定义的顺序和别名/开关
-        for (const stored of rulesFromSettings) {
-          const base = defaultMap.get(stored.id);
-          if (!base) continue;
-          merged.push({
-            ...base,
-            // 只用本地的 enabled / alias 等个性化字段，基础 label 仍以内置为准
-            enabled:
-              typeof stored.enabled === "boolean"
-                ? stored.enabled
-                : base.enabled,
-            alias:
-              typeof stored.alias === "string" && stored.alias.trim()
-                ? stored.alias.trim()
-                : base.alias,
-          });
-        }
-
-        // 再把本次版本新增、但本地还没记录过的规则追加到末尾
-        DEFAULT_SORT_RULES.forEach((rule) => {
-          if (!merged.some((r) => r.id === rule.id)) {
-            merged.push(rule);
-          }
-        });
-
-        setSortRules(merged);
-      }
-
-      setIsSortLoaded(true);
+      initSort();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isSortLoaded) {
-      storageStore.setItem('localSortBy', sortBy);
-      storageStore.setItem('localSortOrder', sortOrder);
-      try {
-        const parsed = customSettings || {};
-        const next = {
-          ...(parsed && typeof parsed === 'object' ? parsed : {}),
-          localSortRules: sortRules,
-          localSortDisplayMode: sortDisplayMode,
-        };
-        setCustomSettings(next);
-      } catch {
-        // ignore
-      }
-    }
-  }, [sortBy, sortOrder, sortRules, sortDisplayMode, isSortLoaded]);
 
   // 当用户关闭某个排序规则时，如果当前 sortBy 不再可用，则自动切换到第一个启用的规则
   useEffect(() => {
@@ -399,13 +339,8 @@ export default function HomePage() {
       deviceIdRef.current = uuidv4();
     }
   }, []);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const [loginSuccess, setLoginSuccess] = useState('');
-  const [loginOtp, setLoginOtp] = useState('');
+  const [loginInitialError, setLoginInitialError] = useState('');
 
   const userAvatar = useMemo(() => {
     if (!user?.id) return '';
@@ -422,6 +357,7 @@ export default function HomePage() {
 
   // 搜索相关状态
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [selectedFunds, setSelectedFunds] = useState([]);
@@ -430,62 +366,25 @@ export default function HomePage() {
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [addResultOpen, setAddResultOpen] = useState(false);
-  const [addFailures, setAddFailures] = useState([]);
 
   // 分组内基金列表搜索（点击按钮后才应用）
   const [groupFundSearchTerm, setGroupFundSearchTerm] = useState('');
+  const deferredGroupFundSearchTerm = useDeferredValue(groupFundSearchTerm);
 
-  // 动态计算 Navbar 和 FilterBar 高度
-  const navbarRef = useRef(null);
-  const filterBarRef = useRef(null);
+  // --- 主题管理（抽离到 useTheme）---
+  const { theme, showThemeTransition, setShowThemeTransition, handleThemeToggle } = useTheme();
+
+  // 动态计算 Navbar 和 FilterBar 高度（抽离到 useNavHeights）
+  // 注意：isMobile 在此处尚未声明，shouldShowMarketIndex 由 page.jsx 内独立 useEffect 处理
   const containerRef = useRef(null);
-  const [navbarHeight, setNavbarHeight] = useState(0);
-  const [filterBarHeight, setFilterBarHeight] = useState(0);
-  const [marketIndexAccordionHeight, setMarketIndexAccordionHeight] = useState(0);
-  // 主题初始固定为 light（白色），避免 SSR 与客户端首屏不一致导致 hydration 报错；真实偏好由 useLayoutEffect 在首帧前恢复
-  const [theme, setTheme] = useState('light');
-  const [showThemeTransition, setShowThemeTransition] = useState(false);
-
-  const handleThemeToggle = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-    setShowThemeTransition(true);
-  }, []);
-
-  // 首帧前同步主题（与 layout 中脚本设置的 data-theme 一致），减少图标闪烁
-  useLayoutEffect(() => {
-    try {
-      const fromDom = document.documentElement.getAttribute('data-theme');
-      if (fromDom === 'light' || fromDom === 'dark') {
-        setTheme(fromDom);
-        return;
-      }
-      const fromStorage = storageStore.getItem('theme');
-      if (fromStorage === 'light' || fromStorage === 'dark') {
-        setTheme(fromStorage);
-        document.documentElement.setAttribute('data-theme', fromStorage);
-      }
-    } catch { }
-  }, []);
-
-  useEffect(() => {
-    const updateHeights = () => {
-      if (navbarRef.current) {
-        setNavbarHeight(navbarRef.current.offsetHeight);
-      }
-      if (filterBarRef.current) {
-        setFilterBarHeight(filterBarRef.current.offsetHeight);
-      }
-    };
-
-    // 初始延迟一下，确保渲染完成
-    const timer = setTimeout(updateHeights, 100);
-    window.addEventListener('resize', updateHeights);
-    return () => {
-      window.removeEventListener('resize', updateHeights);
-      clearTimeout(timer);
-    };
-  }, [groups, currentTab]); // groups 或 tab 变化可能导致 filterBar 高度变化
+  const {
+    navbarRef,
+    filterBarRef,
+    navbarHeight,
+    filterBarHeight,
+    marketIndexAccordionHeight,
+    setMarketIndexAccordionHeight,
+  } = useNavHeights({ groups, currentTab });
 
   const handleMobileSearchClick = (e) => {
     e?.preventDefault();
@@ -529,7 +428,6 @@ export default function HomePage() {
     transactionsRef.current = transactions;
   }, [holdings, groupHoldings, pendingTrades, transactions]);
 
-  const [isTradingDay, setIsTradingDay] = useState(true); // 默认为交易日，通过接口校正
   const tabsRef = useRef(null);
   const [fundDeleteConfirm, setFundDeleteConfirm] = useState(null); // { code, name }
   const [fundDeleteBulkConfirm, setFundDeleteBulkConfirm] = useState(null); // { codes: string[], count: number, groupId?: string, scope?: 'group' | 'global' }
@@ -540,17 +438,8 @@ export default function HomePage() {
 
   const todayStr = formatDate();
 
-  const [isMobile, setIsMobile] = useState(false);
-  const [hoveredPcRowCode, setHoveredPcRowCode] = useState(null); // PC 列表行悬浮高亮
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const checkMobile = () => setIsMobile(window.innerWidth <= 640);
-      checkMobile();
-      window.addEventListener('resize', checkMobile);
-      return () => window.removeEventListener('resize', checkMobile);
-    }
-  }, []);
+  const isMobile = useIsMobile();
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const [mobileMainTab, setMobileMainTab] = useState('home');
   const [mobileBottomNavHidden, setMobileBottomNavHidden] = useState(false);
@@ -586,48 +475,18 @@ export default function HomePage() {
   // 当关闭大盘指数时，重置它的高度，避免 top/stickyTop 仍沿用旧值
   useEffect(() => {
     if (!shouldShowMarketIndex) setMarketIndexAccordionHeight(0);
-  }, [shouldShowMarketIndex]);
+  }, [shouldShowMarketIndex, setMarketIndexAccordionHeight]);
 
-  // 检查更新
-  const [hasUpdate, setHasUpdate] = useState(false);
-  const [latestVersion, setLatestVersion] = useState('');
-  const [updateContent, setUpdateContent] = useState('');
-  // 用户忽略的更新版本，关闭弹窗后不再显示（从 localStorage 读取）
-  const [ignoredVersion, setIgnoredVersion] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    return localStorage.getItem('ignoredUpdateVersion') || '';
-  });
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // 交易日检测（抽离到 useTradingDay）
+  const { isTradingDay } = useTradingDay();
   // 板块资金流向
   const [sectors, setSectors] = useState([]);
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
   const [sectorDetailModalOpen, setSectorDetailModalOpen] = useState(false);
   const [selectedSector, setSelectedSector] = useState(null);
 
-  useEffect(() => {
-    // 未配置 GitHub 最新版本接口地址时，不进行更新检查
-    if (!process.env.NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL) return;
-
-    const checkUpdate = async () => {
-      try {
-        const data = await fetchLatestRelease();
-        if (!data?.tagName) return;
-        const remoteVersion = data.tagName.replace(/^v/, '');
-        if (remoteVersion !== packageJson.version && remoteVersion !== ignoredVersion) {
-          setHasUpdate(true);
-          setLatestVersion(remoteVersion);
-          setUpdateContent(data.body || '');
-        }
-      } catch (e) {
-        console.error('Check update failed:', e);
-      }
-    };
-
-    checkUpdate();
-    const interval = setInterval(checkUpdate, 30 * 60 * 1000); // 30 minutes
-    return () => clearInterval(interval);
-  }, []);
 
   // 从 localStorage 加载板块列表
   useEffect(() => {
@@ -711,78 +570,21 @@ export default function HomePage() {
     initSectors();
   }, [funds.length]);
 
-  // 存储当前被划开的基金代码
-  const [swipedFundCode, setSwipedFundCode] = useState(null);
 
-  // 点击页面其他区域时收起删除按钮
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      // 检查点击事件是否来自删除按钮
-      // 如果点击的是 .swipe-action-bg 或其子元素，不执行收起逻辑
-      if (e.target.closest('.swipe-action-bg')) {
-        return;
-      }
 
-      if (swipedFundCode) {
-        setSwipedFundCode(null);
-      }
+    // 板块操作函数
+    const handleAddSector = async (sector) => {
+        if (sectors.some(s => s.name === sector.name)) return;
+        // 直接使用传入的 sector 数据（已包含 fundFlow 等字段）
+        setSectors(prev => [...prev, sector]);
     };
 
-    if (swipedFundCode) {
-      document.addEventListener('click', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+    const handleRemoveSector = (name) => {
+        setSectors(prev => prev.filter(s => s.name !== name));
     };
-  }, [swipedFundCode]);
 
-  // 检查交易日状态
-  const checkTradingDay = async () => {
-    const now = nowInTz();
-    const isWeekend = now.day() === 0 || now.day() === 6;
 
-    // 周末直接判定为非交易日
-    if (isWeekend) {
-      setIsTradingDay(false);
-      return;
-    }
-
-    // 工作日通过上证指数判断是否为节假日
-    // 接口返回示例: v_sh000001="1~上证指数~...~20260205150000~..."
-    // 第30位是时间字段
-    try {
-      const dateStr = await fetchShanghaiIndexDate();
-      if (!dateStr) {
-        setIsTradingDay(!isWeekend);
-        return;
-      }
-      const currentStr = todayStr.replace(/-/g, '');
-      if (dateStr === currentStr) {
-        setIsTradingDay(true);
-      } else {
-        const minutes = now.hour() * 60 + now.minute();
-        if (minutes >= 9 * 60 + 30) {
-          setIsTradingDay(false);
-        } else {
-          setIsTradingDay(true);
-        }
-      }
-    } catch (e) {
-      setIsTradingDay(!isWeekend);
-    }
-  };
-
-  useEffect(() => {
-    checkTradingDay();
-    // 每30分钟检查一次
-    const timer = setInterval(checkTradingDay, 60000 * 30);
-    return () => clearInterval(timer);
-  }, []);
-
-  const activeGroupId =
+    const activeGroupId =
     currentTab !== 'all' &&
     currentTab !== 'fav' &&
     currentTab !== SUMMARY_TAB_ID &&
@@ -892,7 +694,8 @@ export default function HomePage() {
     return {
       amount,
       profitToday,
-      profitTotal
+      profitTotal,
+      principalToday: isNumber(holding.cost) ? holding.cost * shareForTodayProfit : 0
     };
   }, [isTradingDay, todayStr, transactions, activeGroupId]);
 
@@ -918,6 +721,7 @@ export default function HomePage() {
     let totalProfitToday = 0;
     let totalHoldingReturn = 0;
     let totalCost = 0;
+    let totalPrincipalToday = 0;
     let hasHolding = false;
     let hasAnyTodayData = false;
 
@@ -929,6 +733,7 @@ export default function HomePage() {
       totalAsset += Math.round(p.amount * 100) / 100;
       if (p.profitToday != null) {
         totalProfitToday += p.profitToday;
+        totalPrincipalToday += (p.principalToday || 0);
         hasAnyTodayData = true;
       }
       if (p.profitTotal != null) {
@@ -952,7 +757,7 @@ export default function HomePage() {
 
     const roundedTotalProfitToday = Math.round(totalProfitToday * 100) / 100;
     const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
-    const todayReturnRate = totalCost > 0 ? (roundedTotalProfitToday / totalCost) * 100 : 0;
+    const todayReturnRate = totalPrincipalToday > 0 ? (roundedTotalProfitToday / totalPrincipalToday) * 100 : 0;
 
     return {
       totalAsset,
@@ -1043,6 +848,7 @@ export default function HomePage() {
       let totalHoldingReturn = 0;
       let totalCost = 0;
       let totalProfitToday = 0;
+      let totalPrincipalToday = 0;
       let hasAnyTodayData = false;
       let upCount = 0;
       let downCount = 0;
@@ -1055,6 +861,7 @@ export default function HomePage() {
         totalAsset += Math.round(profit.amount * 100) / 100;
         if (profit.profitToday != null) {
           totalProfitToday += profit.profitToday;
+          totalPrincipalToday += (profit.principalToday || 0);
           hasAnyTodayData = true;
         }
         if (profit.profitTotal !== null) {
@@ -1076,7 +883,7 @@ export default function HomePage() {
 
       const roundedToday = Math.round(totalProfitToday * 100) / 100;
       const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
-      const todayReturnRate = totalCost > 0 ? (roundedToday / totalCost) * 100 : 0;
+      const todayReturnRate = totalPrincipalToday > 0 ? (roundedToday / totalPrincipalToday) * 100 : 0;
       const scopeDaily = isPlainObject(fundDailyEarnings?.[DAILY_EARNINGS_SCOPE_ALL])
         ? fundDailyEarnings[DAILY_EARNINGS_SCOPE_ALL]
         : {};
@@ -1110,6 +917,7 @@ export default function HomePage() {
       let totalHoldingReturn = 0;
       let totalCost = 0;
       let totalProfitToday = 0;
+      let totalPrincipalToday = 0;
       let hasAnyTodayData = false;
       let upCount = 0;
       let downCount = 0;
@@ -1121,6 +929,7 @@ export default function HomePage() {
           totalAsset += Math.round(profit.amount * 100) / 100;
           if (profit.profitToday != null) {
             totalProfitToday += profit.profitToday;
+            totalPrincipalToday += (profit.principalToday || 0);
             hasAnyTodayData = true;
           }
           if (profit.profitTotal !== null) {
@@ -1143,7 +952,7 @@ export default function HomePage() {
 
       const roundedToday = Math.round(totalProfitToday * 100) / 100;
       const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
-      const todayReturnRate = totalCost > 0 ? (roundedToday / totalCost) * 100 : 0;
+      const todayReturnRate = totalPrincipalToday > 0 ? (roundedToday / totalPrincipalToday) * 100 : 0;
 
       const scopeDaily = isPlainObject(fundDailyEarnings?.[g.id]) ? fundDailyEarnings[g.id] : {};
       const dailySeries = aggregatePortfolioDailyEarnings(scopeDaily);
@@ -1191,44 +1000,6 @@ export default function HomePage() {
       return getHoldingProfit(fund, holding);
     },
     [currentTab, summaryHoldingSourceGroupByCode, getHoldingProfit]
-  );
-
-  const dailyEarningsScope = activeGroupId || DAILY_EARNINGS_SCOPE_ALL;
-  const currentFundDailyEarnings = useMemo(() => {
-    if (!isPlainObject(fundDailyEarnings)) return {};
-    const scoped = fundDailyEarnings[dailyEarningsScope];
-    return isPlainObject(scoped) ? scoped : {};
-  }, [fundDailyEarnings, dailyEarningsScope]);
-  const portfolioDailySeries = useMemo(
-    () => {
-      if (!isPlainObject(fundDailyEarnings)) return [];
-      const mergedByCode = {};
-      Object.values(fundDailyEarnings).forEach((bucket) => {
-        if (!isPlainObject(bucket)) return;
-        Object.entries(bucket).forEach(([code, list]) => {
-          if (!Array.isArray(list) || list.length === 0) return;
-          const prev = Array.isArray(mergedByCode[code]) ? mergedByCode[code] : [];
-          // 按 scope 合并后按日期去重，避免同一基金同一天重复累计
-          const byDate = new Map();
-          [...prev, ...list].forEach((item) => {
-            const date = item?.date ? String(item.date) : '';
-            const earnings = Number(item?.earnings);
-            const rateRaw = item?.rate;
-            const rate = rateRaw == null || rateRaw === '' ? null : Number(rateRaw);
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-            if (!Number.isFinite(earnings)) return;
-            byDate.set(date, {
-              date,
-              earnings,
-              rate: Number.isFinite(rate) ? rate : null,
-            });
-          });
-          mergedByCode[code] = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-        });
-      });
-      return aggregatePortfolioDailyEarnings(mergedByCode);
-    },
-    [fundDailyEarnings]
   );
 
   /**
@@ -1285,6 +1056,159 @@ export default function HomePage() {
 
     return { derived, linked, groupIdsByCode };
   }, [currentTab, activeGroupId, funds, holdings, groupHoldings, groups]);
+
+  useEffect(() => {
+    const linkedCodes = linkedHoldingsForAllFav?.linked;
+    if (!(linkedCodes instanceof Set) || linkedCodes.size === 0) return;
+    setFundDailyEarnings((prev) => {
+      if (!isPlainObject(prev)) return prev;
+      const globalBucket = prev[DAILY_EARNINGS_SCOPE_ALL];
+      if (!isPlainObject(globalBucket)) return prev;
+      const nextGlobalBucket = { ...globalBucket };
+      let changed = false;
+      for (const code of linkedCodes) {
+        if (code in nextGlobalBucket) {
+          delete nextGlobalBucket[code];
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
+      return { ...prev, [DAILY_EARNINGS_SCOPE_ALL]: nextGlobalBucket };
+    });
+  }, [linkedHoldingsForAllFav, setFundDailyEarnings]);
+
+  const currentFundDailyEarnings = useMemo(() => {
+    if (!isPlainObject(fundDailyEarnings)) return {};
+
+    const getScopeBucket = (scopeKey) => {
+      const scoped = fundDailyEarnings[scopeKey];
+      return isPlainObject(scoped) ? scoped : {};
+    };
+
+    if (activeGroupId) {
+      return getScopeBucket(activeGroupId);
+    }
+
+    if (currentTab === SUMMARY_TAB_ID) {
+      const out = {};
+      Object.entries(summaryHoldingSourceGroupByCode || {}).forEach(([code, source]) => {
+        const scopeKey = source === SUMMARY_SOURCE_GLOBAL ? DAILY_EARNINGS_SCOPE_ALL : source;
+        const bucket = getScopeBucket(scopeKey);
+        const list = bucket[code];
+        if (Array.isArray(list) && list.length > 0) out[code] = list;
+      });
+      return out;
+    }
+
+    const globalBucket = getScopeBucket(DAILY_EARNINGS_SCOPE_ALL);
+
+    if (currentTab !== 'all' && currentTab !== 'fav') {
+      return globalBucket;
+    }
+
+    const linkedCodes = linkedHoldingsForAllFav?.linked;
+    if (!(linkedCodes instanceof Set) || linkedCodes.size === 0) {
+      return globalBucket;
+    }
+
+    const out = { ...globalBucket };
+    const groupIdsByCode = linkedHoldingsForAllFav?.groupIdsByCode || {};
+
+    for (const code of linkedCodes) {
+      const groupIds = Array.isArray(groupIdsByCode[code]) ? groupIdsByCode[code] : [];
+      if (groupIds.length === 0) continue;
+
+      let fallbackPrincipalCurrent = 0;
+      for (const gid of groupIds) {
+        const h = groupHoldings?.[gid]?.[code];
+        if (!h) continue;
+        const share = Number(h.share);
+        const cost = Number(h.cost);
+        if (!Number.isFinite(share) || share <= 0) continue;
+        if (!Number.isFinite(cost) || cost <= 0) continue;
+        fallbackPrincipalCurrent += cost * share;
+      }
+
+      const byDate = new Map();
+      for (const gid of groupIds) {
+        const bucket = getScopeBucket(gid);
+        const list = bucket[code];
+        if (!Array.isArray(list) || list.length === 0) continue;
+
+        for (const item of list) {
+          const date = item?.date ? String(item.date) : '';
+          const earnings = Number(item?.earnings);
+          const rate = Number(item?.rate);
+          const baseCostAmount = Number(item?.baseCostAmount);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+          if (!Number.isFinite(earnings)) continue;
+          const prev = byDate.get(date) || { earnings: 0, rowCount: 0, singleRate: null, rateCount: 0, baseCostAmount: 0 };
+          prev.earnings += earnings;
+          prev.rowCount += 1;
+          if (Number.isFinite(rate)) {
+            prev.rateCount += 1;
+            if (prev.singleRate == null) prev.singleRate = rate;
+          }
+          if (Number.isFinite(baseCostAmount) && baseCostAmount > 0) {
+            prev.baseCostAmount += baseCostAmount;
+          }
+          byDate.set(date, prev);
+        }
+      }
+
+      if (byDate.size > 0) {
+        out[code] = [...byDate.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([date, row]) => {
+            const earnings = row.earnings;
+            const baseCostAmount = Number.isFinite(row.baseCostAmount) && row.baseCostAmount > 0
+              ? row.baseCostAmount
+              : null;
+            let rate = null;
+            if (baseCostAmount != null) {
+              rate = (earnings / baseCostAmount) * 100;
+            } else if (row.rowCount === 1 && row.rateCount === 1 && Number.isFinite(row.singleRate)) {
+              rate = row.singleRate;
+            } else if (Number.isFinite(fallbackPrincipalCurrent) && fallbackPrincipalCurrent > 0) {
+              // 兼容旧数据：历史记录缺少快照且无 rate 时，用当前关联持仓成本兜底展示
+              rate = (earnings / fallbackPrincipalCurrent) * 100;
+            }
+            return { date, earnings, rate, baseCostAmount };
+          });
+      }
+    }
+
+    return out;
+  }, [
+    fundDailyEarnings,
+    activeGroupId,
+    currentTab,
+    summaryHoldingSourceGroupByCode,
+    linkedHoldingsForAllFav,
+  ]);
+  const portfolioDailySeries = useMemo(
+    () => {
+      if (!isPlainObject(fundDailyEarnings)) return [];
+      const byDate = new Map();
+      Object.values(fundDailyEarnings).forEach((bucket) => {
+        if (!isPlainObject(bucket)) return;
+        Object.values(bucket).forEach((list) => {
+          if (!Array.isArray(list) || list.length === 0) return;
+          list.forEach((item) => {
+            const date = item?.date ? String(item.date) : '';
+            const earnings = Number(item?.earnings);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+            if (!Number.isFinite(earnings)) return;
+            byDate.set(date, (byDate.get(date) ?? 0) + earnings);
+          });
+        });
+      });
+      return [...byDate.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, earnings]) => ({ date, earnings, rate: null }));
+    },
+    [fundDailyEarnings]
+  );
 
   const holdingsForTabWithLinked = useMemo(() => {
     if (currentTab === SUMMARY_TAB_ID) return summaryMergedHoldings;
@@ -1380,12 +1304,67 @@ export default function HomePage() {
     });
   }, [funds, currentTab, favorites, activeGroupCodeSet]);
 
+  const [fundExtraDataByCode, setFundExtraDataByCode] = useState({});
+  const fundExtraDataCacheRef = useRef(new Map());
+  const needsSortPeriodReturns = ['last1Week', 'last1Month', 'last3Months', 'last6Months', 'last1Year'].includes(sortBy);
+
+  useEffect(() => {
+    // 始终尝试为当前列表基金获取额外数据（阶段涨跌幅、连涨连跌），用于展示图标或排序
+    const codes = scopedFunds.map(f => f.code);
+    if (codes.length === 0) return;
+
+    let cancelled = false;
+    const missing = [];
+    const cachedBatch = {};
+
+    for (const code of codes) {
+      if (!fundExtraDataCacheRef.current.has(code)) {
+        missing.push(code);
+      } else {
+        cachedBatch[code] = fundExtraDataCacheRef.current.get(code);
+      }
+    }
+
+    if (Object.keys(cachedBatch).length > 0) {
+      setFundExtraDataByCode((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [code, value] of Object.entries(cachedBatch)) {
+          if (next[code] !== value) {
+            next[code] = value;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    if (missing.length === 0) return;
+
+    (async () => {
+      // 这里的 fetchFundPeriodReturns 已包含阶段涨跌幅和连涨连跌数据
+      await asyncPool(4, missing, async (code) => {
+        const value = await fetchFundPeriodReturns(code);
+        fundExtraDataCacheRef.current.set(code, value);
+        if (cancelled) return;
+        setFundExtraDataByCode((prev) => {
+          if (prev[code] === value) return prev;
+          return { ...prev, [code]: value };
+        });
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scopedFunds]);
+
   // 过滤和排序后的基金列表（包含“列表搜索”过滤）
-  const displayFunds = useMemo(
+  const displayFundsRaw = useMemo(
     () => {
       let filtered = [...scopedFunds];
 
-      const q = (shouldShowGroupFundSearch ? (groupFundSearchTerm || '') : '').trim();
+      const q = (shouldShowGroupFundSearch ? (deferredGroupFundSearchTerm || '') : '').trim();
       if (q) {
         const qLower = q.toLowerCase();
         filtered = filtered.filter((f) => {
@@ -1482,9 +1461,122 @@ export default function HomePage() {
         if (sortBy === 'holding') {
           const pa = profitByCode?.get(a.code);
           const pb = profitByCode?.get(b.code);
-          const valA = pa?.profitTotal ?? Number.NEGATIVE_INFINITY;
-          const valB = pb?.profitTotal ?? Number.NEGATIVE_INFINITY;
+          const valA = pa?.profitTotal;
+          const valB = pb?.profitTotal;
+          const hasA = valA != null && Number.isFinite(valA);
+          const hasB = valB != null && Number.isFinite(valB);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
           return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'estimateProfit') {
+          const getEstimateProfitValue = (f) => {
+            const hasTodayData = f.jzrq === todayStr;
+            const holding = holdingsForTabWithLinked[f.code];
+            const profit = getHoldingProfitForTab(f, holding);
+            const total = profit ? profit.profitTotal : null;
+            if (hasTodayData) return total;
+
+            const principal = holding && isNumber(holding.cost) && isNumber(holding.share) ? holding.cost * holding.share : 0;
+            const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
+            const estimateChangeValue = f.noValuation ? null : (f.estPricedCoverage > 0.05 ? (isNumber(f.estGszzl) ? Number(f.estGszzl) : null) : (isNumber(f.gszzl) ? Number(f.gszzl) : null));
+            const holdingProfitPercentValue = total != null && principal > 0 ? (total / principal) * 100 : null;
+            const hasEstimatePercent = hasTodayEstimate && estimateChangeValue != null;
+            const hasHoldingPercent = holdingProfitPercentValue != null;
+            const fallbackEstimateProfitPercentValue = hasEstimatePercent || hasHoldingPercent ? (hasEstimatePercent ? estimateChangeValue : 0) + (hasHoldingPercent ? holdingProfitPercentValue : 0) : null;
+
+            return fallbackEstimateProfitPercentValue != null && principal > 0 ? principal * (fallbackEstimateProfitPercentValue / 100) : null;
+          };
+          const valA = getEstimateProfitValue(a);
+          const valB = getEstimateProfitValue(b);
+          const hasA = valA != null && Number.isFinite(valA);
+          const hasB = valB != null && Number.isFinite(valB);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'yesterdayProfit') {
+          const getYesterdayProfit = (code, jzrq) => {
+            const list = currentFundDailyEarnings?.[code];
+            if (!Array.isArray(list) || list.length === 0) return null;
+            let matchedDaily = null;
+            if (typeof jzrq === 'string') {
+              for (const item of list) {
+                if (item?.date === jzrq) {
+                  matchedDaily = item;
+                  break;
+                }
+              }
+            }
+            if (!matchedDaily) matchedDaily = list[list.length - 1];
+            return matchedDaily && Number.isFinite(Number(matchedDaily.earnings)) ? Number(matchedDaily.earnings) : null;
+          };
+          const valA = getYesterdayProfit(a.code, a.jzrq);
+          const valB = getYesterdayProfit(b.code, b.jzrq);
+          const hasA = valA != null && Number.isFinite(valA);
+          const hasB = valB != null && Number.isFinite(valB);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'holdingDays') {
+          const ha = holdingsForTabWithLinked[a.code];
+          const hb = holdingsForTabWithLinked[b.code];
+          const valA = ha?.firstPurchaseDate ? dayjs(todayStr).diff(dayjs(ha.firstPurchaseDate), 'day') : null;
+          const valB = hb?.firstPurchaseDate ? dayjs(todayStr).diff(dayjs(hb.firstPurchaseDate), 'day') : null;
+          const hasA = valA != null && Number.isFinite(valA);
+          const hasB = valB != null && Number.isFinite(valB);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'holdingCost') {
+          const getCost = (h) => h?.cost != null && h?.share != null && Number.isFinite(Number(h.cost)) && Number.isFinite(Number(h.share)) ? Number(h.cost) * Number(h.share) : null;
+          const valA = getCost(holdingsForTabWithLinked[a.code]);
+          const valB = getCost(holdingsForTabWithLinked[b.code]);
+          const hasA = valA != null && Number.isFinite(valA);
+          const hasB = valB != null && Number.isFinite(valB);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (['last1Week', 'last1Month', 'last3Months', 'last6Months', 'last1Year'].includes(sortBy)) {
+          const keyMap = { last1Week: 'week', last1Month: 'month', last3Months: 'month3', last6Months: 'month6', last1Year: 'year1' };
+          const key = keyMap[sortBy];
+          const valA = fundExtraDataByCode[a.code]?.[key];
+          const valB = fundExtraDataByCode[b.code]?.[key];
+          const hasA = valA != null && Number.isFinite(valA);
+          const hasB = valB != null && Number.isFinite(valB);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+        }
+        if (sortBy === 'tags') {
+          const getTagKey = (fund) => {
+            const code = String(fund?.code ?? '').trim();
+            const list = code ? fundTagListsByCode?.[code] : null;
+            if (!Array.isArray(list) || list.length === 0) return '';
+            return list
+              .map((t) => (t?.name != null ? String(t.name).trim() : ''))
+              .filter(Boolean)
+              .join('、');
+          };
+          const keyA = getTagKey(a);
+          const keyB = getTagKey(b);
+          const hasA = !!keyA;
+          const hasB = !!keyB;
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return sortOrder === 'asc'
+            ? keyA.localeCompare(keyB, 'zh-CN')
+            : keyB.localeCompare(keyA, 'zh-CN');
         }
         if (sortBy === 'name') {
           return sortOrder === 'asc' ? a.name.localeCompare(b.name, 'zh-CN') : b.name.localeCompare(a.name, 'zh-CN');
@@ -1492,8 +1584,10 @@ export default function HomePage() {
         return 0;
       });
     },
-    [scopedFunds, currentTab, groups, sortBy, sortOrder, holdingsForTabWithLinked, getHoldingProfitForTab, groupFundSearchTerm, shouldShowGroupFundSearch],
+    [scopedFunds, currentTab, groups, sortBy, sortOrder, holdingsForTabWithLinked, getHoldingProfitForTab, deferredGroupFundSearchTerm, shouldShowGroupFundSearch, currentFundDailyEarnings, fundExtraDataByCode, todayStr, fundTagListsByCode],
   );
+
+  const displayFunds = useDeferredValue(displayFundsRaw);
 
   const latestDailyByCode = useMemo(() => {
     const out = {};
@@ -1589,8 +1683,8 @@ export default function HomePage() {
         const costNav =
           costNavValue == null ? '—' : Number(costNavValue).toFixed(4);
         const todayProfitPercent =
-          profitToday != null && principal > 0
-            ? `${profitToday > 0 ? '+' : profitToday < 0 ? '-' : ''}${Math.abs((profitToday / principal) * 100).toFixed(2)}%`
+          profitToday != null && profit?.principalToday > 0
+            ? `${profitToday > 0 ? '+' : profitToday < 0 ? '-' : ''}${Math.abs((profitToday / profit.principalToday) * 100).toFixed(2)}%`
             : '';
 
         const latestNavDateStr = isString(f.jzrq) ? f.jzrq : '';
@@ -1607,20 +1701,30 @@ export default function HomePage() {
           yesterdayProfitVal == null
             ? ''
             : `${yesterdayProfitVal > 0 ? '+' : yesterdayProfitVal < 0 ? '-' : ''}${Math.abs(yesterdayProfitVal).toFixed(2)}`;
+        const dailyBaseCostAmount =
+          matchedDaily && matchedDaily.baseCostAmount != null && matchedDaily.baseCostAmount !== '' && Number.isFinite(Number(matchedDaily.baseCostAmount))
+            ? Number(matchedDaily.baseCostAmount)
+            : null;
+        const derivedRateFromSnapshot =
+          yesterdayProfitVal != null && dailyBaseCostAmount != null && dailyBaseCostAmount > 0
+            ? (yesterdayProfitVal / dailyBaseCostAmount) * 100
+            : null;
         const dailyRate =
           matchedDaily && matchedDaily.rate != null && matchedDaily.rate !== '' && Number.isFinite(Number(matchedDaily.rate))
             ? Number(matchedDaily.rate)
-            : null;
+            : derivedRateFromSnapshot;
         const yesterdayProfitPercentLine =
-          yesterdayProfitVal != null && principal > 0
-            ? `${yesterdayProfitVal > 0 ? '+' : yesterdayProfitVal < 0 ? '-' : ''}${Math.abs((yesterdayProfitVal / principal) * 100).toFixed(2)}%`
-            : (dailyRate != null
-              ? `${dailyRate > 0 ? '+' : ''}${dailyRate.toFixed(2)}%`
+          dailyRate != null
+            ? `${dailyRate > 0 ? '+' : dailyRate < 0 ? '-' : ''}${Math.abs(dailyRate).toFixed(2)}%`
+            : (yesterdayProfitVal != null && principal > 0
+              ? `${yesterdayProfitVal > 0 ? '+' : yesterdayProfitVal < 0 ? '-' : ''}${Math.abs((yesterdayProfitVal / principal) * 100).toFixed(2)}%`
               : '');
         const yesterdaySecondLinePctValue =
-          yesterdayProfitVal != null && principal > 0
-            ? (yesterdayProfitVal / principal) * 100
-            : dailyRate;
+          dailyRate != null
+            ? dailyRate
+            : (yesterdayProfitVal != null && principal > 0
+              ? (yesterdayProfitVal / principal) * 100
+              : null);
 
         const holdingProfit =
           total == null
@@ -1656,6 +1760,44 @@ export default function HomePage() {
             ? ''
             : `${estimateProfitPercentValue > 0 ? '+' : ''}${estimateProfitPercentValue.toFixed(2)}%`;
 
+        const addBaseNavRaw = f.addBaseNav != null && f.addBaseNav !== '' ? Number(f.addBaseNav) : null;
+        const addBaseNav = addBaseNavRaw != null && Number.isFinite(addBaseNavRaw) && addBaseNavRaw > 0 ? addBaseNavRaw : null;
+        const sinceAddedCurrentNav = (() => {
+          if (f.noValuation) {
+            const v = Number(f.dwjz);
+            return Number.isFinite(v) && v > 0 ? v : null;
+          }
+          if (f.estPricedCoverage > 0.05) {
+            const v = Number(f.estGsz);
+            return Number.isFinite(v) && v > 0 ? v : null;
+          }
+          const v = Number(f.gsz);
+          return Number.isFinite(v) && v > 0 ? v : null;
+        })();
+        const sinceAddedChangeValue =
+          addBaseNav != null && sinceAddedCurrentNav != null
+            ? ((sinceAddedCurrentNav / addBaseNav) - 1) * 100
+            : null;
+        const sinceAddedChangePercent =
+          sinceAddedChangeValue == null
+            ? '—'
+            : `${sinceAddedChangeValue > 0 ? '+' : ''}${sinceAddedChangeValue.toFixed(2)}%`;
+        const sinceAddedDateRaw = (() => {
+          const raw = f.addBaseDate;
+          const rawStr = raw != null ? String(raw) : '';
+          if (/^\d{4}-\d{2}-\d{2}/.test(rawStr)) return rawStr.slice(0, 10);
+          const ts = Number(f.addedAt);
+          if (Number.isFinite(ts) && ts > 0) return dayjs.tz(ts, TZ).format('YYYY-MM-DD');
+          return '';
+        })();
+        const sinceAddedDate = (() => {
+          const raw = sinceAddedDateRaw || '';
+          if (!raw) return '';
+          const currentYear = typeof todayStr === 'string' && todayStr.length >= 4 ? todayStr.slice(0, 4) : '';
+          if (currentYear && raw.startsWith(`${currentYear}-`) && raw.length >= 10) return raw.slice(5);
+          return raw;
+        })();
+
         const fc = String(f.code ?? '').trim();
         const listFromDerived = fundTagListsByCode[fc];
         const fundTags = Array.isArray(listFromDerived)
@@ -1689,6 +1831,10 @@ export default function HomePage() {
           estimateProfit,
           estimateProfitValue,
           estimateProfitPercent,
+          sinceAddedChangePercent,
+          sinceAddedChangeValue,
+          sinceAddedDate,
+          sinceAddedDateRaw: sinceAddedDateRaw || undefined,
           holdingAmount,
           holdingAmountValue,
           holdingCost,
@@ -1721,7 +1867,7 @@ export default function HomePage() {
       currentTab,
       summaryHoldingSourceGroupByCode,
       linkedHoldingsForAllFav,
-      fundTagRecords,
+      // fundTagRecords 已移除：fundTagListsByCode 是其派生值，两者同时存在会导致标签变化时双重触发
       fundTagListsByCode,
     ],
   );
@@ -1857,6 +2003,17 @@ export default function HomePage() {
         }
         return next;
       });
+
+      try {
+        const earningsScope = gid || DAILY_EARNINGS_SCOPE_ALL;
+        clearDailyEarnings(code, earningsScope);
+        setFundDailyEarnings((prev) => {
+          if (!isPlainObject(prev) || !isPlainObject(prev[earningsScope]) || !(code in prev[earningsScope])) return prev;
+          const next = { ...prev, [earningsScope]: { ...prev[earningsScope] } };
+          delete next[earningsScope][code];
+          return next;
+        });
+      } catch { }
     }
     setClearConfirm(null);
   };
@@ -1901,7 +2058,13 @@ export default function HomePage() {
       }
 
       // 尝试获取智能净值
-      const result = await fetchSmartFundNetValue(trade.fundCode, queryDate);
+      const navOffsetDays = Number(trade.navOffsetDays);
+      if (Number.isFinite(navOffsetDays) && navOffsetDays) {
+        queryDate = toTz(queryDate).add(navOffsetDays, 'day').format('YYYY-MM-DD');
+      }
+      const result = (trade.netValueSearch === 'backward')
+        ? await fetchSmartFundNetValueBackward(trade.fundCode, queryDate)
+        : await fetchSmartFundNetValue(trade.fundCode, queryDate);
 
       if (result && result.value > 0) {
         // 成功获取，执行交易
@@ -2229,9 +2392,19 @@ export default function HomePage() {
 
   useEffect(() => {
     updateTabOverflow();
-    const onResize = () => updateTabOverflow();
+    let rafId = null;
+    const onResize = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateTabOverflow();
+      });
+    };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [groups, funds.length, favorites.size]);
 
   // 成功提示弹窗
@@ -2251,7 +2424,6 @@ export default function HomePage() {
   // 定投计划自动生成买入队列的逻辑会在 storageHelper 定义之后实现
 
   const handleOpenLogin = () => {
-    setUserMenuOpen(false);
     if (!isSupabaseConfigured) {
       showToast('未配置 Supabase，无法登录', 'error');
       return;
@@ -2259,427 +2431,44 @@ export default function HomePage() {
     setLoginModalOpen(true);
   };
 
-  const [updateModalOpen, setUpdateModalOpen] = useState(false);
-  const [scanModalOpen, setScanModalOpen] = useState(false); // 扫描弹窗
-  const [scanConfirmModalOpen, setScanConfirmModalOpen] = useState(false); // 扫描确认弹窗
-  const [scannedFunds, setScannedFunds] = useState([]); // 扫描到的基金
-  const [selectedScannedCodes, setSelectedScannedCodes] = useState(new Set()); // 选中的扫描代码
-  const [isScanning, setIsScanning] = useState(false);
-  const [isScanImporting, setIsScanImporting] = useState(false);
-  const [scanImportProgress, setScanImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
-  const [scanProgress, setScanProgress] = useState({ stage: 'ocr', current: 0, total: 0 }); // stage: ocr | verify
-  const [isOcrScan, setIsOcrScan] = useState(false); // 是否为拍照/图片识别触发的弹框
-  const abortScanRef = useRef(false); // 终止扫描标记
-  const fileInputRef = useRef(null);
-  const ocrWorkerRef = useRef(null);
-  const { resolveFundCodeByFuzzy } = useFundFuzzyMatcher();
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
-  const handleScanClick = () => {
-    if (!user?.id) {
-      sonnerToast.error('该功能需登录后使用');
-      return;
-    }
-    setScanModalOpen(true);
-  };
-
-  const handleScanPick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const cancelScan = () => {
-    abortScanRef.current = true;
-    setIsScanning(false);
-    setScanProgress({ stage: 'ocr', current: 0, total: 0 });
-    if (ocrWorkerRef.current) {
-      try {
-        ocrWorkerRef.current.terminate();
-      } catch (e) {}
-      ocrWorkerRef.current = null;
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const processFiles = async (files) => {
-    if (!files?.length) return;
-
-    setIsScanning(true);
-    setScanModalOpen(false); // 关闭选择弹窗
-    abortScanRef.current = false;
-    setScanProgress({ stage: 'ocr', current: 0, total: files.length });
-
-    try {
-      let worker = ocrWorkerRef.current;
-      if (!worker) {
-        const cdnBases = [
-          'https://01kjzb6fhx9f8rjstc8c21qadx.esa.staticdn.net/npm',
-          'https://fastly.jsdelivr.net/npm',
-          'https://cdn.jsdelivr.net/npm',
-        ];
-        const coreCandidates = [
-          'tesseract-core-simd-lstm.wasm.js',
-          'tesseract-core-lstm.wasm.js',
-        ];
-        let lastErr = null;
-        for (const base of cdnBases) {
-          for (const coreFile of coreCandidates) {
-            try {
-              worker = await createWorker('chi_sim+eng', 1, {
-                workerPath: `${base}/tesseract.js@v5.1.1/dist/worker.min.js`,
-                corePath: `${base}/tesseract.js-core@v5.1.1/${coreFile}`,
-              });
-              lastErr = null;
-              break;
-            } catch (e) {
-              lastErr = e;
-            }
-          }
-          if (!lastErr) break;
-        }
-        if (lastErr) throw lastErr;
-        ocrWorkerRef.current = worker;
-      }
-
-      const recognizeWithTimeout = async (file, ms) => {
-        let timer = null;
-        const timeout = new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error('OCR_TIMEOUT')), ms);
-        });
-        try {
-          return await Promise.race([worker.recognize(file), timeout]);
-        } finally {
-          if (timer) clearTimeout(timer);
-        }
-      };
-
-      const searchFundsWithTimeout = async (val, ms) => {
-        let timer = null;
-        const timeout = new Promise((resolve) => {
-          timer = setTimeout(() => resolve([]), ms);
-        });
-        try {
-          return await Promise.race([searchFunds(val), timeout]);
-        } catch (e) {
-          return [];
-        } finally {
-          if (timer) clearTimeout(timer);
-        }
-      };
-
-      const allFundsData = []; // 存储所有解析出的基金信息，格式为 [{fundCode, fundName, holdAmounts, holdGains}]
-      const addedFundCodes = new Set(); // 用于去重
-
-      for (let i = 0; i < files.length; i++) {
-        if (abortScanRef.current) break;
-
-        const f = files[i];
-        // 更新进度：正在处理第 i+1 张
-        setScanProgress(prev => ({ ...prev, current: i + 1 }));
-
-        let text = '';
-        try {
-          const res = await recognizeWithTimeout(f, 30000);
-          text = res?.data?.text || '';
-        } catch (e) {
-          if (String(e?.message || '').includes('OCR_TIMEOUT')) {
-            if (worker) {
-              try {
-                await worker.terminate();
-              } catch (err) {}
-              ocrWorkerRef.current = null;
-            }
-            throw e;
-          }
-          text = '';
-        }
-        // 提取到 text 内容，调用大模型 api 进行解析，获取基金数据(fundCode 可能为空)
-        const fundsResString = await parseFundTextWithLLM(text);
-        let fundsRes = null; // 格式为 [{"fundCode": "000001", "fundName": "浙商债券","holdAmounts": "99.99", "holdGains": "99.99"}]
-        try {
-          fundsRes = JSON.parse(fundsResString);
-        } catch (e) {
-          console.error(e);
-        }
-
-        // 处理大模型解析结果，根据 fundCode 去重
-        if (Array.isArray(fundsRes) && fundsRes.length > 0) {
-          fundsRes.forEach((fund) => {
-            const code = fund.fundCode || '';
-            const name = (fund.fundName || '').trim();
-            if (code && !addedFundCodes.has(code)) {
-              addedFundCodes.add(code);
-              allFundsData.push({
-                fundCode: code,
-                fundName: name,
-                holdAmounts: fund.holdAmounts || '',
-                holdGains: fund.holdGains || ''
-              });
-            } else if (!code && name) {
-              // fundCode 为空但有名称，后续需要通过名称搜索基金代码
-              allFundsData.push({
-                fundCode: '',
-                fundName: name,
-                holdAmounts: fund.holdAmounts || '',
-                holdGains: fund.holdGains || ''
-              });
-            }
-          });
-        }
-      }
-
-      if (abortScanRef.current) {
-        return;
-      }
-
-      // 处理没有基金代码但有名称的情况，通过名称搜索基金代码
-      const fundsWithoutCode = allFundsData.filter(f => !f.fundCode && f.fundName);
-      if (fundsWithoutCode.length > 0) {
-        setScanProgress({ stage: 'verify', current: 0, total: fundsWithoutCode.length });
-        for (let i = 0; i < fundsWithoutCode.length; i++) {
-          if (abortScanRef.current) break;
-          const fundItem = fundsWithoutCode[i];
-          setScanProgress(prev => ({ ...prev, current: i + 1 }));
-          try {
-            const list = await searchFundsWithTimeout(fundItem.fundName, 8000);
-            // 只有当搜索结果「有且仅有一条」时，才认为名称匹配是唯一且有效的
-            if (Array.isArray(list) && list.length === 1) {
-              const found = list[0];
-              if (found && found.CODE && !addedFundCodes.has(found.CODE)) {
-                addedFundCodes.add(found.CODE);
-                fundItem.fundCode = found.CODE;
-              }
-            } else {
-              // 使用 fuse.js 读取 Public 中的 allFunds 数据进行模糊匹配，补充搜索接口的不足
-              try {
-                const fuzzyCode = await resolveFundCodeByFuzzy(fundItem.fundName);
-                if (fuzzyCode && !addedFundCodes.has(fuzzyCode)) {
-                  addedFundCodes.add(fuzzyCode);
-                  fundItem.fundCode = fuzzyCode;
-                }
-              } catch (e) {
-              }
-            }
-          } catch (e) {
-          }
-        }
-      }
-
-      // 过滤出有基金代码的记录
-      const validFunds = allFundsData.filter(f => f.fundCode);
-      const codes = validFunds.map(f => f.fundCode).sort();
-      setScanProgress({ stage: 'verify', current: 0, total: codes.length });
-
-      const existingCodes = new Set(funds.map(f => f.code));
-      const results = [];
-      for (let i = 0; i < codes.length; i++) {
-        if (abortScanRef.current) break;
-        const code = codes[i];
-        const fundInfo = validFunds.find(f => f.fundCode === code);
-        setScanProgress(prev => ({ ...prev, current: i + 1 }));
-
-        let found = null;
-        try {
-          const list = await searchFundsWithTimeout(code, 8000);
-          found = Array.isArray(list) ? list.find(d => d.CODE === code) : null;
-        } catch (e) {
-          found = null;
-        }
-
-        const alreadyAdded = existingCodes.has(code);
-        const ok = !!found && !alreadyAdded;
-        results.push({
-          code,
-          name: found ? (found.NAME || found.SHORTNAME || '') : (fundInfo?.fundName || ''),
-          status: alreadyAdded ? 'added' : (ok ? 'ok' : 'invalid'),
-          holdAmounts: fundInfo?.holdAmounts || '',
-          holdGains: fundInfo?.holdGains || ''
-        });
-      }
-
-      if (abortScanRef.current) {
-        return;
-      }
-
-      setScannedFunds(results);
-      setSelectedScannedCodes(new Set(results.filter(r => r.status === 'ok').map(r => r.code)));
-      setIsOcrScan(true);
-      setScanConfirmModalOpen(true);
-    } catch (err) {
-      if (!abortScanRef.current) {
-        console.error('OCR Error:', err);
-        showToast('图片识别失败，请重试或更换更清晰的截图', 'error');
-      }
-    } finally {
-      setIsScanning(false);
-      setScanProgress({ stage: 'ocr', current: 0, total: 0 });
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleFilesUpload = (event) => {
-    processFiles(Array.from(event.target.files || []));
-  };
-
-  const handleFilesDrop = (files) => {
-    processFiles(files);
-  };
-
-  const toggleScannedCode = (code) => {
-    setSelectedScannedCodes(prev => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-  };
-
-  const confirmScanImport = async (targetGroupId = 'all', expandAfterAdd = true) => {
-    const rawCodes = Array.from(selectedScannedCodes);
-    const targetExists = (code) => {
-      if (!code) return false;
-      if (targetGroupId === 'all') return funds.some((f) => f.code === code);
-      if (targetGroupId === 'fav') return favorites?.has?.(code);
-      const g = groups.find((x) => x.id === targetGroupId);
-      return !!(g && Array.isArray(g.codes) && g.codes.includes(code));
-    };
-    const codes = rawCodes.filter((c) => !targetExists(c));
-    if (codes.length === 0) {
-      showToast('所选基金已在目标分组中', 'info');
-      return;
-    }
-    setScanConfirmModalOpen(false);
-    setIsScanImporting(true);
-    setScanImportProgress({ current: 0, total: codes.length, success: 0, failed: 0 });
-
-    const parseAmount = (val) => {
-      if (!val) return null;
-      const num = parseFloat(String(val).replace(/,/g, ''));
-      return isNaN(num) ? null : num;
-    };
-
-    try {
-      const newFunds = [];
-      const newHoldings = {};
-      let successCount = 0;
-      let failedCount = 0;
-
-      for (let i = 0; i < codes.length; i++) {
-        const code = codes[i];
-        setScanImportProgress(prev => ({ ...prev, current: i + 1 }));
-
-        const existed = funds.some(existing => existing.code === code);
-        try {
-          const data = existed ? (funds.find((f) => f.code === code) || null) : await fetchFundData(code);
-          if (!existed && data) newFunds.push(data);
-
-          const scannedFund = scannedFunds.find(f => f.code === code);
-          const holdAmounts = parseAmount(scannedFund?.holdAmounts);
-          const holdGains = parseAmount(scannedFund?.holdGains);
-          const dwjz = data?.dwjz || data?.gsz || 0;
-
-          if (!existed && holdAmounts !== null && dwjz > 0) {
-            const share = holdAmounts / dwjz;
-            const profit = holdGains !== null ? holdGains : 0;
-            const principal = holdAmounts - profit;
-            const cost = share > 0 ? principal / share : 0;
-            newHoldings[code] = {
-              share: Number(share.toFixed(2)),
-              cost: Number(cost.toFixed(4))
-            };
-          }
-
-          successCount++;
-          setScanImportProgress(prev => ({ ...prev, success: prev.success + 1 }));
-        } catch (e) {
-          failedCount++;
-          setScanImportProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
-        }
-      }
-
-      const newCodesSet = new Set(newFunds.map((f) => f.code));
-      const allSelectedSet = new Set(codes);
-
-      if (newFunds.length > 0) {
-        setFunds(prev => dedupeByCode([...newFunds, ...prev]));
-
-        if (Object.keys(newHoldings).length > 0) {
-          setHoldings(prev => {
-            const next = { ...prev, ...newHoldings };
-            return next;
-          });
-        }
-
-        const nextSeries = {};
-        newFunds.forEach(u => {
-          if (u?.code != null && !u.noValuation && Number.isFinite(Number(u.gsz))) {
-            nextSeries[u.code] = recordValuation(u.code, { gsz: u.gsz, gztime: u.gztime });
-          }
-        });
-        if (Object.keys(nextSeries).length > 0) setValuationSeries(prev => ({ ...prev, ...nextSeries }));
-
-        if (!expandAfterAdd) {
-          // 用户关闭“添加后展开详情”：将新添加基金的卡片和业绩走势都标记为收起
-          setCollapsedCodes(prev => {
-            const next = new Set(prev);
-            newCodesSet.forEach((code) => next.add(code));
-            return next;
-          });
-          setCollapsedTrends(prev => {
-            const next = new Set(prev);
-            newCodesSet.forEach((code) => next.add(code));
-            return next;
-          });
-        }
-      }
-
-      // 无论是否新增 funds，都允许把已存在基金加入到目标分组/自选
-      if (targetGroupId === 'fav') {
-        setFavorites(prev => {
-          const next = new Set(prev);
-          codes.map(normalizeCode).filter(Boolean).forEach(code => next.add(code));
-          return next;
-        });
-        setCurrentTab('fav');
-      } else if (targetGroupId && targetGroupId !== 'all') {
-        setGroups(prev => {
-          return prev.map(g => {
-            if (g.id === targetGroupId) {
-              return {
-                ...g,
-                codes: Array.from(new Set([...(g.codes || []), ...codes]))
-              };
-            }
-            return g;
-          });
-        });
-        setCurrentTab(targetGroupId);
-      } else {
-        setCurrentTab('all');
-      }
-
-      if (successCount > 0) {
-        setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
-      } else if (allSelectedSet.size > 0 && failedCount === 0) {
-        setSuccessModal({ open: true, message: '所选基金已在目标分组中' });
-      } else {
-        showToast('未能导入任何基金', 'info');
-      }
-    } catch (e) {
-      showToast('导入失败', 'error');
-    } finally {
-      setIsScanImporting(false);
-      setScanImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
-      setScannedFunds([]);
-      setSelectedScannedCodes(new Set());
-    }
-  };
+  // OCR 扫描导入（抽离到 useScanImport）
+  const {
+    scanModalOpen, setScanModalOpen,
+    scanConfirmModalOpen, setScanConfirmModalOpen,
+    scannedFunds, setScannedFunds,
+    selectedScannedCodes, setSelectedScannedCodes,
+    isScanning,
+    isScanImporting,
+    scanImportProgress,
+    scanProgress,
+    isOcrScan, setIsOcrScan,
+    fileInputRef,
+    handleScanClick,
+    handleScanPick,
+    cancelScan,
+    handleFilesUpload,
+    handleFilesDrop,
+    toggleScannedCode,
+    confirmScanImport,
+  } = useScanImport({
+    setCurrentTab,
+    setValuationSeries,
+    setSuccessModal,
+    showToast,
+    normalizeCode,
+    dedupeByCode,
+  });
 
   const [cloudConfigModal, setCloudConfigModal] = useState({ open: false, userId: null });
+  const [deviceConflictModal, setDeviceConflictModal] = useState({ open: false, message: '', userId: null, payload: null, isPartial: false });
   const syncDebounceRef = useRef(null);
+
   const lastSyncedRef = useRef('');
   const skipSyncRef = useRef(isSupabaseConfigured);
   const userIdRef = useRef(null);
+  const deviceConflictModalOpenRef = useRef(false);
   const dirtyKeysRef = useRef(new Set()); // 记录发生变化的字段
 
   useEffect(() => {
@@ -2695,6 +2484,10 @@ export default function HomePage() {
   useEffect(() => {
     userIdRef.current = user?.id || null;
   }, [user]);
+
+  useEffect(() => {
+    deviceConflictModalOpenRef.current = deviceConflictModal.open;
+  }, [deviceConflictModal.open]);
 
 
   const scheduleSync = useCallback(() => {
@@ -2766,7 +2559,7 @@ export default function HomePage() {
         setLastSyncTime(e.newValue);
       }
       if (!keys.has(e.key)) return;
-      
+
       // 使用 storageStore 提供的签名函数进行精细判断
       import('./stores/storageStore').then(({ getFundCodesSignature, getTagsStoreSignature }) => {
         if (e.key === 'funds') {
@@ -3569,16 +3362,7 @@ export default function HomePage() {
     }
   };
 
-  // 按 code 去重，保留第一次出现的项，避免列表重复
-  const dedupeByCode = (list) => {
-    const seen = new Set();
-    return list.filter((f) => {
-      const c = f?.code;
-      if (!c || seen.has(c)) return false;
-      seen.add(c);
-      return true;
-    });
-  };
+
 
   useEffect(() => {
     let cancelled = false;
@@ -3728,31 +3512,23 @@ export default function HomePage() {
     } catch { }
   }, [currentTab]);
 
-  // 主题同步到 document 并持久化
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    try {
-      storageStore.setItem('theme', theme);
-    } catch { }
-  }, [theme]);
+  // 主题同步：已由 useTheme hook 内部的 useEffect 处理，此处无需重复
 
   // 初始化认证状态监听
   useEffect(() => {
     if (!isSupabaseConfigured) {
       clearAuthUser();
-      setUserMenuOpen(false);
       return;
     }
     const clearAuthState = () => {
       clearAuthUser();
-      setUserMenuOpen(false);
       skipSyncRef.current = false;
     };
 
     const handleSession = async (session, event, isExplicitLogin = false) => {
       if (!session?.user) {
         if (event === 'SIGNED_OUT' && !isLoggingOutRef.current) {
-          setLoginError('会话已过期，请重新登录');
+          setLoginInitialError('会话已过期，请重新登录');
           setLoginModalOpen(true);
         }
         isLoggingOutRef.current = false;
@@ -3780,7 +3556,7 @@ export default function HomePage() {
           });
         } catch { }
         clearAuthState();
-        setLoginError('会话已过期，请重新登录');
+        setLoginInitialError('会话已过期，请重新登录');
         showToast('会话已过期，请重新登录', 'error');
         setLoginModalOpen(true);
         return;
@@ -3788,9 +3564,7 @@ export default function HomePage() {
       setAuthUser(session.user);
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         setLoginModalOpen(false);
-        setLoginEmail('');
-        setLoginSuccess('');
-        setLoginError('');
+        setLoginInitialError('');
       }
       // 仅在明确的登录动作（SIGNED_IN）时检查冲突；INITIAL_SESSION（刷新页面等）不检查，直接以云端为准
       fetchCloudConfig(session.user.id, isExplicitLogin);
@@ -3820,18 +3594,14 @@ export default function HomePage() {
   // 实时同步
   useEffect(() => {
     if (!isSupabaseConfigured || !user?.id) return;
+    const deviceId = deviceIdRef.current;
+    if (!deviceId) return; // 确保设备ID已初始化
+
     const channel = supabase
       .channel(`user-configs-${user.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_configs', filter: `user_id=eq.${user.id}` }, async (payload) => {
-        const incoming = payload?.new?.data;
-        if (!isPlainObject(incoming)) return;
-        const incomingDeviceId = incoming?._syncMeta?.deviceId ? String(incoming._syncMeta.deviceId) : '';
-        if (incomingDeviceId && deviceIdRef.current && incomingDeviceId === deviceIdRef.current) return;
-        const incomingComparable = getComparablePayload(incoming);
-        if (!incomingComparable || incomingComparable === lastSyncedRef.current) return;
-        await applyCloudConfig(incoming, payload.new.updated_at);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_configs', filter: `user_id=eq.${user.id}` }, async (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_configs', filter: `last_device_id=neq.${deviceId}` }, async (payload) => {
+        if (deviceConflictModalOpenRef.current) return; // 如果有拦截弹窗，忽略实时推送，防止覆盖本地数据
+        if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
         const incoming = payload?.new?.data;
         if (!isPlainObject(incoming)) return;
         const incomingDeviceId = incoming?._syncMeta?.deviceId ? String(incoming._syncMeta.deviceId) : '';
@@ -3846,114 +3616,14 @@ export default function HomePage() {
     };
   }, [user?.id]);
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    setLoginSuccess('');
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!loginEmail.trim()) {
-      setLoginError('请输入邮箱地址');
-      return;
-    }
-    if (!emailRegex.test(loginEmail.trim())) {
-      setLoginError('请输入有效的邮箱地址');
-      return;
-    }
-
-    setLoginLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: loginEmail.trim(),
-        options: {
-          shouldCreateUser: true
-        }
-      });
-      if (error) throw error;
-      setLoginSuccess('验证码已发送，请查收邮箱输入验证码完成注册/登录');
-    } catch (err) {
-      if (err.message?.includes('rate limit')) {
-        setLoginError('请求过于频繁，请稍后再试');
-      } else if (err.message?.includes('network')) {
-        setLoginError('网络错误，请检查网络连接');
-      } else {
-        setLoginError(err.message || '发送验证码失败，请稍后再试');
-      }
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleVerifyEmailOtp = async () => {
-    setLoginError('');
-    if (!loginOtp || loginOtp.length < 4) {
-      setLoginError('请输入邮箱中的验证码');
-      return;
-    }
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
-    try {
-      isExplicitLoginRef.current = true;
-      setLoginLoading(true);
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: loginEmail.trim(),
-        token: loginOtp.trim(),
-        type: 'email'
-      });
-      if (error) throw error;
-      if (data?.user) {
-        setLoginModalOpen(false);
-        setLoginEmail('');
-        setLoginOtp('');
-        setLoginSuccess('');
-        setLoginError('');
-      }
-    } catch (err) {
-      setLoginError(err.message || '验证失败，请检查验证码或稍后再试');
-      isExplicitLoginRef.current = false;
-    }
-    setLoginLoading(false);
-  };
-
-  const handleGithubLogin = async () => {
-    setLoginError('');
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
-    try {
-      isExplicitLoginRef.current = true;
-      setLoginLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
-    } catch (err) {
-      setLoginError(err.message || 'GitHub 登录失败，请稍后再试');
-      isExplicitLoginRef.current = false;
-      setLoginLoading(false);
-    }
-  };
 
   // 登出
   const handleLogout = async () => {
     isLoggingOutRef.current = true;
     if (!isSupabaseConfigured) {
       setLoginModalOpen(false);
-      setLoginError('');
-      setLoginSuccess('');
-      setLoginEmail('');
-      setLoginOtp('');
-      setUserMenuOpen(false);
+      setLoginInitialError('');
       clearAuthUser();
       return;
     }
@@ -3989,28 +3659,10 @@ export default function HomePage() {
         });
       } catch { }
       setLoginModalOpen(false);
-      setLoginError('');
-      setLoginSuccess('');
-      setLoginEmail('');
-      setLoginOtp('');
-      setUserMenuOpen(false);
+      setLoginInitialError('');
       clearAuthUser();
     }
   };
-
-  // 关闭用户菜单（点击外部时）
-  const userMenuRef = useRef(null);
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setUserMenuOpen(false);
-      }
-    };
-    if (userMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userMenuOpen]);
 
   const refreshCodesRef = useRef([]);
   useEffect(() => {
@@ -4019,7 +3671,7 @@ export default function HomePage() {
 
   useEffect(() => {
     refreshCycleStartRef.current = Date.now();
-    
+
     const tick = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
@@ -4072,6 +3724,30 @@ export default function HomePage() {
     });
   };
 
+  const getAddBaseSnapshotFromFund = (fund) => {
+    const dwjz = Number(fund?.dwjz);
+    if (Number.isFinite(dwjz) && dwjz > 0) {
+      return { nav: dwjz, date: fund?.jzrq || null };
+    }
+    const gsz = Number(fund?.gsz);
+    if (Number.isFinite(gsz) && gsz > 0) {
+      return { nav: gsz, date: fund?.gztime || fund?.time || null };
+    }
+    return { nav: null, date: null };
+  };
+
+  const withAddBaseline = (fund) => {
+    const next = { ...(fund || {}) };
+    const now = Date.now();
+    if (next.addedAt == null) next.addedAt = now;
+    if (next.addBaseNav == null || next.addBaseDate == null) {
+      const snap = getAddBaseSnapshotFromFund(next);
+      if (next.addBaseNav == null && snap.nav != null) next.addBaseNav = snap.nav;
+      if (next.addBaseDate == null && snap.date) next.addBaseDate = snap.date;
+    }
+    return next;
+  };
+
   const handleScanImportConfirm = async (codes) => {
     if (!Array.isArray(codes) || codes.length === 0) return;
     const uniqueCodes = Array.from(new Set(codes));
@@ -4087,7 +3763,7 @@ export default function HomePage() {
         try {
           const data = await fetchFundData(code);
           if (data && data.code) {
-            added.push(data);
+            added.push(withAddBaseline(data));
           }
         } catch (e) {
           console.error(`通过识别导入基金 ${code} 失败`, e);
@@ -4126,7 +3802,7 @@ export default function HomePage() {
         if (funds.some(existing => existing.code === f.CODE)) return;
         try {
           const data = await fetchFundData(f.CODE);
-          newFunds.push(data);
+          newFunds.push(withAddBaseline(data));
         } catch (e) {
           console.error(`添加基金 ${f.CODE} 失败`, e);
         }
@@ -4155,18 +3831,30 @@ export default function HomePage() {
   };
 
   const refreshAll = async (codes) => {
-    console.log('refreshAll called', codes, refreshingRef.current);  // 加这行
+    // 如果弹窗拦截同步中，则不允许执行数据刷新，但保持心跳循环
+    if (deviceConflictModalOpenRef.current) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        const nextCodes = refreshCodesRef.current || [];
+        if (nextCodes.length) refreshAll(nextCodes);
+      }, refreshMs);
+      return;
+    }
+
+    // 【步骤 1】重入锁检查：防止多个刷新任务同时运行导致状态混乱
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     setRefreshing(true);
-    const uniqueCodes = Array.from(new Set(codes));
 
-    // 1. 缓存当前存储中的基金代码，避免在循环中重复读取 localStorage
+    // 【步骤 2】参数归一化：去重并缓存当前本地存储中的基金代码，用于判断基金是否已被用户删除
+    const uniqueCodes = Array.from(new Set(codes));
     let cachedStoredFundCodes = new Set();
+    let cachedStoredFundsByCode = new Map();
     try {
       const arr = storageStore.getItem('funds', []);
       if (Array.isArray(arr)) {
         cachedStoredFundCodes = new Set(arr.map((x) => x?.code).filter(Boolean));
+        cachedStoredFundsByCode = new Map(arr.filter((x) => x?.code).map((x) => [x.code, x]));
       }
     } catch (e) {
       console.warn('读取缓存基金列表失败', e);
@@ -4176,38 +3864,45 @@ export default function HomePage() {
       if (!code) return false;
       return cachedStoredFundCodes.has(code);
     };
+    const getStoredFundSnapshot = (code) => {
+      if (!code) return null;
+      return cachedStoredFundsByCode.get(code) || null;
+    };
 
     try {
       const updated = [];
-      const dailyChanges = {}; // { [scope]: { [code]: nextList } }
+      const dailyChanges = {}; // 存储待更新的每日收益 { [scope]: { [code]: nextList } }
       let earningsChanged = false;
 
+      // ... 辅助函数定义 (isValidDateStr, addDays, calcEarningsFromNavs 等) ...
       const isValidDateStr = (s) => isString(s) && /^\d{4}-\d{2}-\d{2}$/.test(s);
       const addDays = (dateStr, days) => dayjs.tz(dateStr, TZ).add(days, 'day').format('YYYY-MM-DD');
       const subDays = (dateStr, days) => dayjs.tz(dateStr, TZ).subtract(days, 'day').format('YYYY-MM-DD');
       const calcEarningsFromNavs = (nav, prevNav, share) => (nav - prevNav) * share;
-      const calcRateFromNavs = (nav, prevNav, cost) => {
-        if (!Number.isFinite(nav) || !Number.isFinite(prevNav) || !Number.isFinite(cost) || cost <= 0) return null;
-        return ((nav - prevNav) / cost) * 100;
+      const calcRateFromEarnings = (earnings, baseCostAmount) => {
+        if (!Number.isFinite(earnings) || !Number.isFinite(baseCostAmount) || baseCostAmount <= 0) return null;
+        return (earnings / baseCostAmount) * 100;
       };
 
-      const calcLatestDayFromFund = (u, share, cost) => {
+      const calcLatestDayFromFund = (u, share, baseCostAmount) => {
         const nav = Number(u?.dwjz);
         if (!Number.isFinite(nav) || nav <= 0) return null;
         const lastNav = u?.lastNav != null && u.lastNav !== '' ? Number(u.lastNav) : null;
         if (lastNav != null && Number.isFinite(lastNav) && lastNav > 0) {
+          const earnings = calcEarningsFromNavs(nav, lastNav, share);
           return {
-            earnings: calcEarningsFromNavs(nav, lastNav, share),
-            rate: calcRateFromNavs(nav, lastNav, cost),
+            earnings,
+            rate: calcRateFromEarnings(earnings, baseCostAmount),
           };
         }
         const zzl = u?.zzl != null && u.zzl !== '' ? Number(u.zzl) : Number.NaN;
         if (Number.isFinite(zzl)) {
           const prev = nav / (1 + zzl / 100);
           if (Number.isFinite(prev) && prev > 0) {
+            const earnings = calcEarningsFromNavs(nav, prev, share);
             return {
-              earnings: calcEarningsFromNavs(nav, prev, share),
-              rate: calcRateFromNavs(nav, prev, cost),
+              earnings,
+              rate: calcRateFromEarnings(earnings, baseCostAmount),
             };
           }
         }
@@ -4248,32 +3943,45 @@ export default function HomePage() {
         return null;
       };
 
-      const localRecordToChanges = (scope, code, earnings, dateStr, rate) => {
+      const localRecordToChanges = (scope, code, earnings, dateStr, rate, baseCostAmount, force = false) => {
         if (!dailyChanges[scope]) dailyChanges[scope] = {};
-
-        // 优先从已有的变化中取，否则从当前 state (captured) 中取
         const list = dailyChanges[scope][code] ||
                      (fundDailyEarnings[scope] && Array.isArray(fundDailyEarnings[scope][code]) ? fundDailyEarnings[scope][code] : []);
-
         const existingIndex = list.findIndex(item => item.date === dateStr);
         const normalizedRate = isNumber(rate) && Number.isFinite(rate) ? rate : null;
+        const normalizedBaseCostAmount = Number.isFinite(Number(baseCostAmount)) && Number(baseCostAmount) > 0
+          ? Number(baseCostAmount)
+          : null;
         const nextList = existingIndex >= 0
-          ? list.map((item, i) => i === existingIndex ? { date: dateStr, earnings, rate: normalizedRate } : item)
-          : [...list, { date: dateStr, earnings, rate: normalizedRate }];
+          ? list.map((item, i) => {
+            if (i !== existingIndex) return item;
+            const prevRate = Number(item?.rate);
+            const prevBaseCostAmount = Number(item?.baseCostAmount);
+            // 如果是强制更新（确权阶段），或者原本数据缺失，则更新 rate 和 baseCostAmount
+            const shouldUpdateRate = force || !Number.isFinite(prevRate);
+            const shouldUpdateBase = force || !(Number.isFinite(prevBaseCostAmount) && prevBaseCostAmount > 0);
+            return {
+              date: dateStr,
+              earnings,
+              rate: shouldUpdateRate ? normalizedRate : prevRate,
+              baseCostAmount: shouldUpdateBase ? normalizedBaseCostAmount : prevBaseCostAmount,
+            };
+          })
+          : [...list, { date: dateStr, earnings, rate: normalizedRate, baseCostAmount: normalizedBaseCostAmount }];
         nextList.sort((a, b) => a.date.localeCompare(b.date));
-
         dailyChanges[scope][code] = nextList;
         earningsChanged = true;
       };
 
-      // 核心流水线优化：将抓取与收益计算合并到同一个异步池中
       const nextValuationSeries = { ...valuationSeries };
       let valuationChanged = false;
 
-      await asyncPool(5, uniqueCodes, async (c) => {
+      // 【步骤 3】核心流水线：使用 asyncPool 控制并发（同时抓取 3 个基金），降低接口并发压力
+      await asyncPool(3, uniqueCodes, async (c) => {
         if (!fundCodeStillInStorage(c)) return;
         let data = null;
         try {
+          // 【步骤 3.1】数据获取：调用 api 获取实时估值、净值和持仓数据
           data = await fetchFundData(c);
         } catch (e) {
           console.error(`刷新基金 ${c} 失败`, e);
@@ -4286,9 +3994,13 @@ export default function HomePage() {
         }
 
         if (!data || !fundCodeStillInStorage(c)) return;
+
+        // 如果估值接口本轮失败（回退到 fallback），且本地已有旧数据，则保留旧数据不覆盖。
+        if (data.valuationSource === 'fallback' && getStoredFundSnapshot(c)) return;
+
         updated.push(data);
 
-        // 记录估值分时
+        // 【步骤 3.2】估值时序记录：提取实时估值点（gsz），用于绘制分时图
         if (data.code != null && !data.noValuation && Number.isFinite(Number(data.gsz))) {
           const value = Number(data.gsz);
           const gztime = data.gztime ?? null;
@@ -4313,7 +4025,7 @@ export default function HomePage() {
           }
         }
 
-        // 补齐每日收益：遍历所有相关作用域（全局 + 所有包含此基金的分组）
+        // 【步骤 3.3】收益补齐逻辑：检查本地历史收益记录，如有缺失则根据持仓和历史净值进行追溯计算
         try {
           const targetScopes = [];
           if (holdings[data.code] && isNumber(holdings[data.code].share) && holdings[data.code].share > 0) {
@@ -4330,7 +4042,7 @@ export default function HomePage() {
           const latestNavDate = data.jzrq;
           if (!isValidDateStr(latestNavDate)) return;
 
-          const navCache = new Map(); // 同一基金的不同 scope 共享净值缓存
+          const navCache = new Map();
 
           for (const scope of targetScopes) {
             const h = scope === DAILY_EARNINGS_SCOPE_ALL ? holdings[data.code] : groupHoldings[scope][data.code];
@@ -4355,13 +4067,14 @@ export default function HomePage() {
 
             if (!existing.length) {
               const share = getEffectiveShare(latestNavDate);
+              const unitCost = Number(h?.cost);
+              const baseCostAmount = Number.isFinite(unitCost) && unitCost > 0 ? unitCost * share : null;
               if (share > 0) {
-                const v = calcLatestDayFromFund(data, share, h.cost);
+                const v = calcLatestDayFromFund(data, share, baseCostAmount);
                 if (v && Number.isFinite(v.earnings) && fundCodeStillInStorage(data.code)) {
-                  localRecordToChanges(scope, data.code, v.earnings, latestNavDate, v.rate);
+                  localRecordToChanges(scope, data.code, v.earnings, latestNavDate, v.rate, baseCostAmount, true);
                 }
               }
-              // 兜底补齐
               if (!(dailyChanges[scope] && dailyChanges[scope][data.code])) {
                 try {
                   const nav = Number(data.dwjz);
@@ -4371,9 +4084,11 @@ export default function HomePage() {
                     const share = getEffectiveShare(latestNavDate);
                     if (fundCodeStillInStorage(data.code) && Number.isFinite(prevNav) && prevNav > 0 && share > 0) {
                       const earnings = calcEarningsFromNavs(nav, prevNav, share);
-                      const rate = calcRateFromNavs(nav, prevNav, h.cost);
+                      const unitCost = Number(h?.cost);
+                      const baseCostAmount = Number.isFinite(unitCost) && unitCost > 0 ? unitCost * share : null;
+                      const rate = calcRateFromEarnings(earnings, baseCostAmount);
                       if (Number.isFinite(earnings)) {
-                        localRecordToChanges(scope, data.code, earnings, latestNavDate, rate);
+                        localRecordToChanges(scope, data.code, earnings, latestNavDate, rate, baseCostAmount, true);
                       }
                     }
                   }
@@ -4399,9 +4114,11 @@ export default function HomePage() {
                     const share = getEffectiveShare(cursor);
                     if (share <= 0) continue;
                     const earnings = calcEarningsFromNavs(nav, prevNav, share);
-                    const rate = calcRateFromNavs(nav, prevNav, h.cost);
+                    const unitCost = Number(h?.cost);
+                    const baseCostAmount = Number.isFinite(unitCost) && unitCost > 0 ? unitCost * share : null;
+                    const rate = calcRateFromEarnings(earnings, baseCostAmount);
                     if (Number.isFinite(earnings)) {
-                      localRecordToChanges(scope, data.code, earnings, cursor, rate);
+                      localRecordToChanges(scope, data.code, earnings, cursor, rate, baseCostAmount, true);
                     }
                   }
                 }
@@ -4413,9 +4130,31 @@ export default function HomePage() {
         }
       });
 
-      // 统一状态更新，减少渲染次数
+      // 【步骤 4】UI 与存储同步：统一更新 React 状态和本地 localStorage，减少页面重绘
       if (updated.length > 0) {
-        setFunds(prev => prev.map(f => updated.find(x => x.code === f.code) || f));
+        setFunds(prev => {
+          // 优化：先建 Map 做 O(n) 查找，避免 prev.map + updated.find 的 O(n²)
+          const updatedMap = new Map(updated.map(x => [x.code, x]));
+          let changed = false;
+          const next = prev.map((f) => {
+            const u = updatedMap.get(f.code);
+            if (!u) return f;
+            changed = true;
+            const merged = { ...u };
+            if (f.addedAt != null) merged.addedAt = f.addedAt;
+            if (f.addBaseNav != null) merged.addBaseNav = f.addBaseNav;
+            if (f.addBaseDate != null) merged.addBaseDate = f.addBaseDate;
+            if (merged.addedAt == null || merged.addBaseNav == null || merged.addBaseDate == null) {
+              const snap = getAddBaseSnapshotFromFund(merged);
+              if (merged.addedAt == null) merged.addedAt = Date.now();
+              if (merged.addBaseNav == null && snap.nav != null) merged.addBaseNav = snap.nav;
+              if (merged.addBaseDate == null && snap.date) merged.addBaseDate = snap.date;
+            }
+            return merged;
+          });
+          // 引用相等时直接返回 prev，不触发下游重渲
+          return changed ? next : prev;
+        });
         if (valuationChanged) {
           setValuationSeries(prev => {
             const next = { ...prev };
@@ -4424,19 +4163,16 @@ export default function HomePage() {
             });
             return next;
           });
-          // 虽然 setValuationSeries 是异步的，但 nextValuationSeries 包含全量更新，直接写入即可
           storageStore.setItem('fundValuationTimeseries', JSON.stringify(nextValuationSeries));
         }
       }
 
-      // 统一持久化收益数据 (使用函数式更新防止覆盖)
       if (earningsChanged) {
         setFundDailyEarnings(prev => {
           const next = { ...prev };
           for (const [scope, bucket] of Object.entries(dailyChanges)) {
             next[scope] = { ...next[scope], ...bucket };
           }
-          // 清理已删除的基金
           for (const code of uniqueCodes) {
             if (!cachedStoredFundCodes.has(code)) {
               Object.keys(next).forEach(s => {
@@ -4454,6 +4190,7 @@ export default function HomePage() {
     } catch (e) {
       console.error('刷新过程出错', e);
     } finally {
+      // 【步骤 5】后期调度：重置锁定状态，并根据用户设置的时间间隔启动下一次定时刷新
       refreshingRef.current = false;
       setRefreshing(false);
       refreshCycleStartRef.current = Date.now();
@@ -4462,6 +4199,8 @@ export default function HomePage() {
         const codes = refreshCodesRef.current || [];
         if (codes.length) refreshAll(codes);
       }, refreshMs);
+
+      // 【步骤 6】队列处理：执行可能积压的待处理交易（如到达触发价格的自动交易）
       try {
         await processPendingQueue();
       } catch (e) {
@@ -5184,17 +4923,6 @@ export default function HomePage() {
     await refreshAll(codes);
   };
 
-  // 板块操作函数
-  const handleAddSector = async (sector) => {
-    if (sectors.some(s => s.name === sector.name)) return;
-    // 直接使用传入的 sector 数据（已包含 fundFlow 等字段）
-    setSectors(prev => [...prev, sector]);
-  };
-
-  const handleRemoveSector = (name) => {
-    setSectors(prev => prev.filter(s => s.name !== name));
-  };
-
   const saveSettings = (e, secondsOverride, showMarketIndexOverride, showGroupFundSearchOverride, isMobileOverride) => {
     e?.preventDefault?.();
     const seconds = secondsOverride ?? tempSeconds;
@@ -5254,29 +4982,7 @@ export default function HomePage() {
   const importFileRef = useRef(null);
   const [importMsg, setImportMsg] = useState('');
 
-  function normalizeCode(value) {
-    return String(value ?? '').trim();
-  }
 
-  function cleanCodeArray(input, allowedSet = null) {
-    const arr = Array.isArray(input) ? input : [];
-    const next = [];
-    const seen = new Set();
-    for (const v of arr) {
-      const code = normalizeCode(v);
-      if (!code) continue;
-      if (allowedSet && !allowedSet.has(code)) continue;
-      if (seen.has(code)) continue;
-      seen.add(code);
-      next.push(code);
-    }
-    return next;
-  }
-  const normalizeNumber = (value) => {
-    if (value === null || value === undefined || value === '') return null;
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-  };
   const normalizeFundDailyEarningsScoped = (source) => {
     if (!isPlainObject(source)) return {};
     const values = Object.values(source);
@@ -5687,12 +5393,17 @@ export default function HomePage() {
                 const rate = rateRaw === null || rateRaw === undefined || rateRaw === ''
                   ? null
                   : Number(rateRaw);
+                const baseCostAmountRaw = item?.baseCostAmount;
+                const baseCostAmount = baseCostAmountRaw === null || baseCostAmountRaw === undefined || baseCostAmountRaw === ''
+                  ? null
+                  : Number(baseCostAmountRaw);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
                 if (!Number.isFinite(earnings)) return null;
                 return {
                   date,
                   earnings,
                   ...(Number.isFinite(rate) ? { rate } : { rate: null }),
+                  ...(Number.isFinite(baseCostAmount) && baseCostAmount > 0 ? { baseCostAmount } : { baseCostAmount: null }),
                 };
               })
               .filter(Boolean)
@@ -5792,7 +5503,7 @@ export default function HomePage() {
     return { ...cloudFund, ...patch };
   };
 
-  const applyCloudConfig = async (cloudData, cloudUpdatedAt) => {
+  const applyCloudConfig = async (cloudData, cloudUpdatedAt, options = {}) => {
     if (!isPlainObject(cloudData)) return;
     skipSyncRef.current = true;
     try {
@@ -5964,12 +5675,17 @@ export default function HomePage() {
               const rate = rateRaw === null || rateRaw === undefined || rateRaw === ''
                 ? null
                 : Number(rateRaw);
+              const baseCostAmountRaw = item?.baseCostAmount;
+              const baseCostAmount = baseCostAmountRaw === null || baseCostAmountRaw === undefined || baseCostAmountRaw === ''
+                ? null
+                : Number(baseCostAmountRaw);
               if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
               if (!Number.isFinite(earnings)) return null;
               return {
                 date,
                 earnings,
                 ...(Number.isFinite(rate) ? { rate } : { rate: null }),
+                ...(Number.isFinite(baseCostAmount) && baseCostAmount > 0 ? { baseCostAmount } : { baseCostAmount: null }),
               };
             })
             .filter(Boolean)
@@ -5992,7 +5708,15 @@ export default function HomePage() {
             typeof merged.localSortDisplayMode === 'string' &&
             SORT_DISPLAY_MODES.has(merged.localSortDisplayMode)
           ) {
-            setSortDisplayMode(merged.localSortDisplayMode);
+            setPcSortDisplayMode(merged.localSortDisplayMode);
+            setMobileSortDisplayMode(merged.localSortDisplayMode);
+          } else {
+            if (typeof merged.pcLocalSortDisplayMode === 'string' && SORT_DISPLAY_MODES.has(merged.pcLocalSortDisplayMode)) {
+              setPcSortDisplayMode(merged.pcLocalSortDisplayMode);
+            }
+            if (typeof merged.mobileLocalSortDisplayMode === 'string' && SORT_DISPLAY_MODES.has(merged.mobileLocalSortDisplayMode)) {
+              setMobileSortDisplayMode(merged.mobileLocalSortDisplayMode);
+            }
           }
         } catch { }
       }
@@ -6012,7 +5736,8 @@ export default function HomePage() {
                 currentUserId,
                 false,
                 { funds: Array.isArray(latestFunds) ? latestFunds : [] },
-                true
+                true,
+                options
               );
             }
           } catch (e) {
@@ -6028,7 +5753,7 @@ export default function HomePage() {
     }
   };
 
-  const fetchCloudConfig = async (userId, checkConflict = false) => {
+  const fetchCloudConfig = async (userId, checkConflict = false, options = {}) => {
     if (!userId) return;
     try {
       // 一次查询同时拿到 meta 与 data，方便两种模式复用
@@ -6057,7 +5782,7 @@ export default function HomePage() {
 
       // 非冲突检查模式：直接复用上方查询到的 meta 数据，覆盖本地
       if (meta.data && isPlainObject(meta.data) && Object.keys(meta.data).length > 0) {
-        await applyCloudConfig(meta.data, meta.updated_at);
+        await applyCloudConfig(meta.data, meta.updated_at, options);
         return;
       }
 
@@ -6068,7 +5793,8 @@ export default function HomePage() {
     }
   };
 
-  const syncUserConfig = async (userId, showTip = true, payload = null, isPartial = false) => {
+  const syncUserConfig = async (userId, showTip = true, payload = null, isPartial = false, options = {}) => {
+    const forceTakeover = options?.forceTakeover || false;
     if (!userId) {
       showToast(`userId 不存在，请重新登录`, 'error');
       return;
@@ -6106,41 +5832,77 @@ export default function HomePage() {
       if (isPartial) {
         // 增量更新：使用 RPC 调用
         const { error: rpcError } = await supabase.rpc('update_user_config_partial', {
-          payload: dataToSync
+          payload: dataToSync,
+          p_last_device_id: deviceId,
+          p_force_takeover: forceTakeover
         });
 
         if (rpcError) {
-          console.error('增量同步失败，尝试全量同步', rpcError);
+          if (rpcError.message?.includes('DEVICE_CONFLICT')) {
+            setIsSyncing(false);
+            skipSyncRef.current = true;
+            setDeviceConflictModal({
+              open: true,
+              message: '您的账号已在其他设备登录。当前设备的同步已被拦截。是否确认拉取云端最新数据覆盖本地并恢复同步？',
+              userId,
+              payload,
+              isPartial
+            });
+            return;
+          }
+          console.error('增量同步失败，尝试全量同步', rpcError?.message || JSON.stringify(rpcError));
           // RPC 失败回退到全量更新
           const fullPayload = collectLocalPayload();
-          const { error } = await supabase
-            .from('user_configs')
-            .upsert(
-              {
-                user_id: userId,
-                data: fullPayload,
-                updated_at: now
-              },
-              { onConflict: 'user_id' }
-            );
-          if (error) throw error;
+          const { error: fullError } = await supabase.rpc('update_user_config_full', {
+            payload: fullPayload,
+            p_last_device_id: deviceId,
+            p_force_takeover: forceTakeover
+          });
+          if (fullError) {
+            if (fullError.message?.includes('DEVICE_CONFLICT')) {
+              setIsSyncing(false);
+              skipSyncRef.current = true;
+              setDeviceConflictModal({
+                open: true,
+                message: '您的账号已在其他设备登录。当前设备的同步已被拦截。是否确认拉取云端最新数据覆盖本地并恢复同步？',
+                userId,
+                payload,
+                isPartial
+              });
+              return;
+            }
+            throw fullError;
+          }
         }
       } else {
         // 全量更新
-        const { error } = await supabase
-          .from('user_configs')
-          .upsert(
-            {
-              user_id: userId,
-              data: dataToSync,
-              updated_at: now
-            },
-            { onConflict: 'user_id' }
-          );
-        if (error) throw error;
+        const { error } = await supabase.rpc('update_user_config_full', {
+          payload: dataToSync,
+          p_last_device_id: deviceId,
+          p_force_takeover: forceTakeover
+        });
+        if (error) {
+          if (error.message?.includes('DEVICE_CONFLICT')) {
+            setIsSyncing(false);
+            skipSyncRef.current = true;
+            setDeviceConflictModal({
+              open: true,
+              message: '您的账号已在其他设备登录。当前设备的同步已被拦截。是否确认拉取云端最新数据覆盖本地并恢复同步？',
+              userId,
+              payload,
+              isPartial
+            });
+            return;
+          }
+          throw error;
+        }
       }
 
       storageHelper.setItem('localUpdatedAt', now);
+
+      if (forceTakeover) {
+        lastSyncedRef.current = getComparablePayload(dataToSync);
+      }
 
       if (showTip) {
         setSuccessModal({ open: true, message: '已同步云端配置' });
@@ -6158,7 +5920,7 @@ export default function HomePage() {
   const handleSyncLocalConfig = async () => {
     const userId = cloudConfigModal.userId;
     setCloudConfigModal({ open: false, userId: null });
-    await syncUserConfig(userId);
+    await syncUserConfig(userId, true, null, false, { forceTakeover: true });
   };
 
   const exportLocalData = async () => {
@@ -6399,7 +6161,15 @@ export default function HomePage() {
               setSortRules(mergedSettings.localSortRules);
             }
             if (mergedSettings.localSortDisplayMode && SORT_DISPLAY_MODES.has(mergedSettings.localSortDisplayMode)) {
-              setSortDisplayMode(mergedSettings.localSortDisplayMode);
+              setPcSortDisplayMode(mergedSettings.localSortDisplayMode);
+              setMobileSortDisplayMode(mergedSettings.localSortDisplayMode);
+            } else {
+              if (mergedSettings.pcLocalSortDisplayMode && SORT_DISPLAY_MODES.has(mergedSettings.pcLocalSortDisplayMode)) {
+                setPcSortDisplayMode(mergedSettings.pcLocalSortDisplayMode);
+              }
+              if (mergedSettings.mobileLocalSortDisplayMode && SORT_DISPLAY_MODES.has(mergedSettings.mobileLocalSortDisplayMode)) {
+                setMobileSortDisplayMode(mergedSettings.mobileLocalSortDisplayMode);
+              }
             }
             if (typeof mergedSettings.pcContainerWidth === 'number' && Number.isFinite(mergedSettings.pcContainerWidth)) {
               setContainerWidth(Math.min(2000, Math.max(600, mergedSettings.pcContainerWidth)));
@@ -6461,13 +6231,12 @@ export default function HomePage() {
     () =>
       portfolioEarningsOpen ||
       feedbackOpen ||
-      addResultOpen ||
       addFundToGroupOpen ||
       groupManageOpen ||
       groupModalOpen ||
       successModal.open ||
       cloudConfigModal.open ||
-      logoutConfirmOpen ||
+      isLogoutConfirmOpen ||
       holdingModal.open ||
       selectHoldingGroupModal.open ||
       actionModal.open ||
@@ -6480,7 +6249,7 @@ export default function HomePage() {
       donateOpen ||
       !!fundDeleteConfirm ||
       !!fundDeleteBulkConfirm ||
-      updateModalOpen ||
+      isUpdateModalOpen ||
       weChatOpen ||
       scanModalOpen ||
       scanConfirmModalOpen ||
@@ -6494,13 +6263,12 @@ export default function HomePage() {
     [
       portfolioEarningsOpen,
       feedbackOpen,
-      addResultOpen,
       addFundToGroupOpen,
       groupManageOpen,
       groupModalOpen,
       successModal.open,
       cloudConfigModal.open,
-      logoutConfirmOpen,
+      isLogoutConfirmOpen,
       holdingModal.open,
       selectHoldingGroupModal.open,
       actionModal.open,
@@ -6512,7 +6280,7 @@ export default function HomePage() {
       clearConfirm,
       donateOpen,
       fundDeleteConfirm,
-      updateModalOpen,
+      isUpdateModalOpen,
       weChatOpen,
       scanModalOpen,
       scanConfirmModalOpen,
@@ -6526,24 +6294,19 @@ export default function HomePage() {
     ]
   );
 
+  // 用 ref 同步 isAnyModalOpen，避免 scroll listener 因任意弹窗开关而频繁重注册
+  const isAnyModalOpenRef = useRef(false);
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (isAnyModalOpen) {
-      el.style.overflow = 'hidden';
-    } else {
-      el.style.overflow = '';
-    }
-    return () => {
-      if (containerRef.current) containerRef.current.style.overflow = '';
-    };
+    isAnyModalOpenRef.current = isAnyModalOpen;
   }, [isAnyModalOpen]);
 
   useEffect(() => {
-    if (!isMobile || mobileMainTab !== 'home' || isAnyModalOpen) return;
+    if (!isMobile || mobileMainTab !== 'home') return;
 
     let ticking = false;
     const handleScroll = () => {
+      // 从 ref 读取，无需将 isAnyModalOpen 加入 deps，listener 不再因弹窗变化重注册
+      if (isAnyModalOpenRef.current) return;
       if (!ticking) {
         requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
@@ -6568,7 +6331,7 @@ export default function HomePage() {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile, mobileMainTab, isAnyModalOpen]);
+  }, [isMobile, mobileMainTab]); // isAnyModalOpen 已移至 ref，不再触发重注册
 
   useEffect(() => {
     if (!isMobile || mobileMainTab !== 'home') {
@@ -6724,6 +6487,7 @@ export default function HomePage() {
       isHoldingLinked: !!row?.isHoldingLinked,
       fundTags: row?.fundTags || [],
       onFundTagsClick: openFundTagsEdit,
+      fundExtraData: fundExtraDataByCode[fund.code],
     };
   }, [
     todayStr,
@@ -6752,6 +6516,8 @@ export default function HomePage() {
     toggleTrendCollapse,
     toggleEarningsCollapse,
     maskAmounts,
+    openFundTagsEdit,
+    fundExtraDataByCode,
   ]);
 
   return (
@@ -6945,25 +6711,19 @@ export default function HomePage() {
           {error && <div className="muted" style={{ marginTop: 8, color: 'var(--danger)' }}>{error}</div>}
         </div>
         <div className={`actions ${(isSearchFocused || selectedFunds.length > 0) ? 'search-focused-sibling' : ''}`}>
-          {hasUpdate && (
-            <div
-              className="badge"
-              title={`发现新版本 ${latestVersion}，点击前往下载`}
-              style={{ cursor: 'pointer', borderColor: 'var(--success)', color: 'var(--success)' }}
-              onClick={() => setUpdateModalOpen(true)}
+          <UpdateChecker onModalOpenChange={setIsUpdateModalOpen} />
+          <span className="github-icon-wrap">
+            <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/meliauk/fund.git")} />
+          </span>
+            <button
+                className="icon-button"
+                aria-label="板块资金流向"
+                onClick={() => setSectorModalOpen(true)}
+                title="板块流向"
+                style={{ position: 'relative' }}
             >
-              <UpdateIcon width="14" height="14" />
-            </div>
-          )}
-          <button
-            className="icon-button"
-            aria-label="板块资金流向"
-            onClick={() => setSectorModalOpen(true)}
-            title="板块流向"
-            style={{ position: 'relative' }}
-          >
-            <Wallet width="18" height="18" />
-          </button>
+                <Wallet width="18" height="18" />
+            </button>
           {isMobile && (
             <button
               className="icon-button mobile-search-btn"
@@ -6983,16 +6743,8 @@ export default function HomePage() {
             refreshing={refreshing}
             fundsLength={funds.length}
             refreshCycleStartRef={refreshCycleStartRef}
+            paused={deviceConflictModal.open}
           />
-          {/*<button*/}
-          {/*  className="icon-button"*/}
-          {/*  aria-label="打开设置"*/}
-          {/*  onClick={() => setSettingsOpen(true)}*/}
-          {/*  title="设置"*/}
-          {/*  hidden*/}
-          {/*>*/}
-          {/*  <SettingsIcon width="18" height="18" />*/}
-          {/*</button>*/}
           <button
             className="icon-button"
             aria-label={theme === 'dark' ? '切换到亮色主题' : '切换到暗色主题'}
@@ -7001,169 +6753,25 @@ export default function HomePage() {
           >
             {theme === 'dark' ? <SunIcon width="18" height="18" /> : <MoonIcon width="18" height="18" />}
           </button>
-          {/* 用户菜单 */}
-          <div className="user-menu-container" ref={userMenuRef}>
-            <button
-              className={`icon-button user-menu-trigger ${user ? 'logged-in' : ''}`}
-              aria-label={user ? '用户菜单' : '登录'}
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              title={user ? (user.email || '用户') : '用户菜单'}
-            >
-              {user ? (
-                <div className="user-avatar-small">
-                  {userAvatar ? (
-                    <Image
-                      src={userAvatar}
-                      alt="用户头像"
-                      width={20}
-                      height={20}
-                      unoptimized
-                      style={{ borderRadius: '50%' }}
-                    />
-                  ) : (
-                    (user.email?.charAt(0).toUpperCase() || 'U')
-                  )}
-                </div>
-              ) : (
-                <UserIcon width="18" height="18" />
-              )}
-            </button>
-
-            <AnimatePresence>
-              {userMenuOpen && (
-                <motion.div
-                  className="user-menu-dropdown glass"
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  style={{ transformOrigin: 'top right', top: navbarHeight + (isMobile ? -20 : 10) }}
-                >
-                  {user ? (
-                    <>
-                      <div className="user-menu-header">
-                        <div className="user-avatar-large">
-                          {userAvatar ? (
-                            <Image
-                              src={userAvatar}
-                              alt="用户头像"
-                              width={40}
-                              height={40}
-                              unoptimized
-                              style={{ borderRadius: '50%' }}
-                            />
-                          ) : (
-                            (user.email?.charAt(0).toUpperCase() || 'U')
-                          )}
-                        </div>
-                        <div className="user-info">
-                          <span className="user-email">{user.email}</span>
-                          <span className="user-status">已登录</span>
-                          {lastSyncTime && (
-                            <span className="muted" style={{ fontSize: '10px', marginTop: 2 }}>
-                              同步于 {dayjs(lastSyncTime).format('MM-DD HH:mm')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="user-menu-divider" />
-                      {!isMobile && (
-                        <button
-                          className="user-menu-item"
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            setPortfolioEarningsOpen(true);
-                          }}
-                        >
-                          <CalendarIcon width="16" height="16" />
-                          <span>我的收益</span>
-                        </button>
-                      )}
-                      <button
-                        className="user-menu-item"
-                        disabled={isSyncing}
-                        onClick={async () => {
-                          setUserMenuOpen(false);
-                          if (user?.id) await syncUserConfig(user.id);
-                        }}
-                        title="手动同步配置到云端"
-                      >
-                        {isSyncing ? (
-                          <span className="loading-spinner" style={{ width: 16, height: 16, border: '2px solid var(--muted)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                        ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" stroke="var(--primary)" />
-                            <path d="M12 12v9" stroke="var(--accent)" />
-                            <path d="m16 16-4-4-4 4" stroke="var(--accent)" />
-                          </svg>
-                        )}
-                        <span>{isSyncing ? '同步中...' : '同步'}</span>
-                      </button>
-                      <button
-                        className="user-menu-item"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          setSettingsOpen(true);
-                        }}
-                      >
-                        <SettingsIcon width="16" height="16" />
-                        <span>设置</span>
-                      </button>
-                      <button
-                        className="user-menu-item danger"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          setLogoutConfirmOpen(true);
-                        }}
-                      >
-                        <LogoutIcon width="16" height="16" />
-                        <span>登出</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="user-menu-item"
-                        onClick={handleOpenLogin}
-                      >
-                        <LoginIcon width="16" height="16" />
-                        <span>登录</span>
-                      </button>
-                      {!isMobile && (
-                        <button
-                          className="user-menu-item"
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            setPortfolioEarningsOpen(true);
-                          }}
-                        >
-                          <CalendarIcon width="16" height="16" />
-                          <span>我的收益</span>
-                        </button>
-                      )}
-                      <button
-                        className="user-menu-item"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          setSettingsOpen(true);
-                        }}
-                      >
-                        <SettingsIcon width="16" height="16" />
-                        <span>设置</span>
-                      </button>
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <UserMenu
+            user={user}
+            userAvatar={userAvatar}
+            navbarHeight={navbarHeight}
+            lastSyncTime={lastSyncTime}
+            isSyncing={isSyncing}
+            onSync={() => user?.id && syncUserConfig(user.id)}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenPortfolioEarnings={() => setPortfolioEarningsOpen(true)}
+            onOpenLogin={handleOpenLogin}
+            onLogout={handleLogout}
+            onLogoutConfirmOpenChange={setIsLogoutConfirmOpen}
+          />
         </div>
       </div>
       {shouldShowMarketIndex && (
         <MarketIndexAccordion
           navbarHeight={navbarHeight}
           onHeightChange={setMarketIndexAccordionHeight}
-          isMobile={isMobile}
           onCustomSettingsChange={triggerCustomSettingsSync}
           refreshing={refreshing}
         />
@@ -7196,7 +6804,7 @@ export default function HomePage() {
                         exit={{ opacity: 0, scale: 0.8 }}
                         key="portfolio-summary"
                         className={`tab ${currentTab === SUMMARY_TAB_ID ? 'active' : ''}`}
-                        onClick={() => setCurrentTab(SUMMARY_TAB_ID)}
+                        onClick={() => startTransition(() => setCurrentTab(SUMMARY_TAB_ID))}
                         transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                       >
                         汇总
@@ -7209,7 +6817,7 @@ export default function HomePage() {
                       exit={{ opacity: 0, scale: 0.8 }}
                       key="all"
                       className={`tab ${currentTab === 'all' ? 'active' : ''}`}
-                      onClick={() => setCurrentTab('all')}
+                      onClick={() => startTransition(() => setCurrentTab('all'))}
                       transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                     >
                       全部 ({funds.length})
@@ -7221,7 +6829,7 @@ export default function HomePage() {
                       exit={{ opacity: 0, scale: 0.8 }}
                       key="fav"
                       className={`tab ${currentTab === 'fav' ? 'active' : ''}`}
-                      onClick={() => setCurrentTab('fav')}
+                      onClick={() => startTransition(() => setCurrentTab('fav'))}
                       transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                     >
                       自选 ({favorites.size})
@@ -7234,7 +6842,7 @@ export default function HomePage() {
                         exit={{ opacity: 0, scale: 0.8 }}
                         key={g.id}
                         className={`tab ${currentTab === g.id ? 'active' : ''}`}
-                        onClick={() => setCurrentTab(g.id)}
+                        onClick={() => startTransition(() => setCurrentTab(g.id))}
                         transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                       >
                         {g.name} ({g.codes.length})
@@ -7312,13 +6920,15 @@ export default function HomePage() {
                   <span className="muted">排序</span>
                   <SettingsIcon width="14" height="14" />
                 </button>
-                {sortDisplayMode === 'dropdown' ? (
+                { (isMobile ? mobileSortDisplayMode : pcSortDisplayMode) === 'dropdown' ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Select
                       value={sortBy}
                       onValueChange={(nextSortBy) => {
-                        setSortBy(nextSortBy);
-                        if (nextSortBy !== sortBy) setSortOrder('desc');
+                        startTransition(() => {
+                          setSortBy(nextSortBy);
+                          if (nextSortBy !== sortBy) setSortOrder('desc');
+                        });
                       }}
                     >
                       <SelectTrigger
@@ -7337,7 +6947,11 @@ export default function HomePage() {
                     </Select>
                     <Select
                       value={sortOrder}
-                      onValueChange={(value) => setSortOrder(value)}
+                      onValueChange={(value) => {
+                        startTransition(() => {
+                          setSortOrder(value);
+                        });
+                      }}
                     >
                       <SelectTrigger
                         className="h-4 min-w-[84px] py-0 text-xs shadow-none"
@@ -7358,14 +6972,16 @@ export default function HomePage() {
                         key={s.id}
                         className={`chip ${sortBy === s.id ? 'active' : ''}`}
                         onClick={() => {
-                          if (sortBy === s.id) {
-                            // 同一按钮重复点击，切换升序/降序
-                            setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                          } else {
-                            // 切换到新的排序字段，默认用降序
-                            setSortBy(s.id);
-                            setSortOrder('desc');
-                          }
+                          startTransition(() => {
+                            if (sortBy === s.id) {
+                              // 同一按钮重复点击，切换升序/降序
+                              setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                            } else {
+                              // 切换到新的排序字段，默认用降序
+                              setSortBy(s.id);
+                              setSortOrder('desc');
+                            }
+                          });
                         }}
                         style={{ height: '28px', fontSize: '12px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: 4 }}
                       >
@@ -7435,10 +7051,11 @@ export default function HomePage() {
                       }}
                     >
                       <GroupAccountSummaryCard
-                        isMobile={isMobile}
                         onActivate={() =>
-                          setCurrentTab(
-                            row.groupId === SUMMARY_SOURCE_GLOBAL ? 'all' : row.groupId
+                          startTransition(() =>
+                            setCurrentTab(
+                              row.groupId === SUMMARY_SOURCE_GLOBAL ? 'all' : row.groupId
+                            )
                           )
                         }
                         groupName={row.groupName}
@@ -7505,6 +7122,18 @@ export default function HomePage() {
                                 groups={groups}
                                 favorites={favorites}
                                 sortBy={sortBy}
+                                sortOrder={sortOrder}
+                                sortRules={sortRules}
+                                onSortChange={(id) => {
+                                  startTransition(() => {
+                                    if (sortBy === id) {
+                                      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                                    } else {
+                                      setSortBy(id);
+                                      setSortOrder('desc');
+                                    }
+                                  });
+                                }}
                                 onReorder={handleReorder}
                                 onRemoveFund={handleRemoveFundEntry}
                                 onRemoveFunds={removeFundsFromCurrentTabHandler}
@@ -7519,7 +7148,9 @@ export default function HomePage() {
                                 masked={maskAmounts}
                                 getFundCardProps={getFundCardPropsForRow}
                                 onFundTagsClick={openFundTagsEdit}
-                              />
+                                fundExtraDataByCode={fundExtraDataByCode}
+                                />
+
                             </div>
                           </div>
                         </div>
@@ -7533,6 +7164,18 @@ export default function HomePage() {
                         onMoveFunds={handleMoveFunds}
                         favorites={favorites}
                         sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        sortRules={sortRules}
+                        onSortChange={(id) => {
+                          startTransition(() => {
+                            if (sortBy === id) {
+                              setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                            } else {
+                              setSortBy(id);
+                              setSortOrder('desc');
+                            }
+                          });
+                        }}
                         stickyTop={navbarHeight + filterBarHeight + marketIndexAccordionHeight}
                         blockDrawerClose={!!fundDeleteConfirm || !!fundDeleteBulkConfirm}
                         closeDrawerRef={fundDetailDrawerCloseRef}
@@ -7549,6 +7192,7 @@ export default function HomePage() {
                         getFundCardProps={getFundCardPropsForRow}
                         masked={maskAmounts}
                         onFundTagsClick={openFundTagsEdit}
+                        fundExtraDataByCode={fundExtraDataByCode}
                       />
                     )}
                     <AnimatePresence mode="popLayout">
@@ -7597,6 +7241,7 @@ export default function HomePage() {
                               masked={maskAmounts}
                               fundTags={Array.isArray(fundTagListsByCode[f.code]) ? fundTagListsByCode[f.code] : []}
                               onFundTagsClick={openFundTagsEdit}
+                              fundExtraData={fundExtraDataByCode[f.code]}
                             />
                         </motion.div>
                       ))}
@@ -7738,22 +7383,6 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {logoutConfirmOpen && (
-          <ConfirmModal
-            title="确认登出"
-            message="确定要退出当前账号吗？"
-            icon={<LogoutIcon width="20" height="20" className="shrink-0 text-[var(--danger)]" />}
-            confirmText="确认登出"
-            onConfirm={() => {
-              setLogoutConfirmOpen(false);
-              handleLogout();
-            }}
-            onCancel={() => setLogoutConfirmOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
         <div className="footer">
           {!isMobile && (
             <>
@@ -7851,7 +7480,6 @@ export default function HomePage() {
         onOpenChange={setPortfolioEarningsOpen}
         series={portfolioDailySeries}
         masked={maskAmounts}
-        isMobile={isMobile}
         onGoHome={() => {
           setPortfolioEarningsOpen(false);
           setMobileMainTab('home');
@@ -7860,14 +7488,6 @@ export default function HomePage() {
       <AnimatePresence>
         {weChatOpen && (
             <WeChatModal onClose={() => setWeChatOpen(false)} />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {addResultOpen && (
-          <AddResultModal
-            failures={addFailures}
-            onClose={() => setAddResultOpen(false)}
-          />
         )}
       </AnimatePresence>
 
@@ -8040,6 +7660,8 @@ export default function HomePage() {
                 feeMode: 'none',
                 feeValue: 0,
                 date: payload.date,
+                navOffsetDays: -1,
+                netValueSearch: 'backward',
                 isAfter3pm: false,
                 isDca: false,
                 timestamp: nowTs,
@@ -8057,6 +7679,8 @@ export default function HomePage() {
                 feeMode: 'none',
                 feeValue: 0,
                 date: payload.date,
+                navOffsetDays: -1,
+                netValueSearch: 'backward',
                 isAfter3pm: false,
                 isDca: false,
                 timestamp: nowTs + 1,
@@ -8188,7 +7812,6 @@ export default function HomePage() {
           <FundTagsEditDialog
             open={fundTagsEdit.open}
             onOpenChange={(open) => setFundTagsEdit((s) => ({ ...s, open }))}
-            isMobile={isMobile}
             fundCode={fundTagsEdit.code ?? undefined}
             fundName={fundTagsEdit.name}
             tags={fundTagsEdit.tags}
@@ -8280,6 +7903,31 @@ export default function HomePage() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {deviceConflictModal.open && (
+          <ConfirmModal
+            onCancel={() => {
+              setDeviceConflictModal({ ...deviceConflictModal, open: false });
+              skipSyncRef.current = false;
+              refreshCycleStartRef.current = Date.now();
+            }}
+            onConfirm={async () => {
+              const { userId } = deviceConflictModal;
+              setDeviceConflictModal({ ...deviceConflictModal, open: false });
+              refreshCycleStartRef.current = Date.now();
+              // 1. 拉取云端最新数据覆盖本地，传入 forceTakeover 避免拉取后合并数据时触发逆向同步导致的异常拦截
+              await fetchCloudConfig(userId, false, { forceTakeover: true });
+              // 2. 携带 forceTakeover 强制同步一次，夺回设备活跃锁
+              await syncUserConfig(userId, true, null, false, { forceTakeover: true });
+            }}
+            title="其它设备登录提示"
+            message={deviceConflictModal.message}
+            confirmText="确认接管"
+            icon={<RefreshCw width="20" height="20" className="shrink-0 text-[var(--primary)]" />}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {cloudConfigModal.open && (
           <CloudConfigModal
             type={cloudConfigModal.type}
@@ -8287,6 +7935,7 @@ export default function HomePage() {
             onCancel={() => {
               if (cloudConfigModal.type === 'conflict' && cloudConfigModal.cloudData) {
                 applyCloudConfig(cloudConfigModal.cloudData);
+                syncUserConfig(cloudConfigModal.userId, false, cloudConfigModal.cloudData, false, { forceTakeover: true });
               } else {
                 skipSyncRef.current = false;
               }
@@ -8344,7 +7993,6 @@ export default function HomePage() {
             importFileRef={importFileRef}
             handleImportFileChange={handleImportFileChange}
             importMsg={importMsg}
-            isMobile={isMobile}
             containerWidth={containerWidth}
             setContainerWidth={setContainerWidth}
             onResetContainerWidth={handleResetContainerWidth}
@@ -8352,26 +8000,6 @@ export default function HomePage() {
             showMarketIndexMobile={showMarketIndexMobile}
             showGroupFundSearchPc={showGroupFundSearchPc}
             showGroupFundSearchMobile={showGroupFundSearchMobile}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* 更新提示弹窗 */}
-      <AnimatePresence>
-        {updateModalOpen && (
-          <UpdatePromptModal
-            open={updateModalOpen}
-            updateContent={updateContent}
-            onClose={() => {
-              setUpdateModalOpen(false);
-              setHasUpdate(false);
-              setIgnoredVersion(latestVersion);
-              localStorage.setItem('ignoredUpdateVersion', latestVersion);
-            }}
-            onRefresh={() => {
-              localStorage.setItem('ignoredUpdateVersion', latestVersion);
-              window.location.reload();
-            }}
           />
         )}
       </AnimatePresence>
@@ -8423,39 +8051,20 @@ export default function HomePage() {
           <LoginModal
             onClose={() => {
               setLoginModalOpen(false);
-              setLoginError('');
-              setLoginSuccess('');
-              setLoginEmail('');
-              setLoginOtp('');
-              setLoginLoading(false);
+              setLoginInitialError('');
             }}
-            isMobile={isMobile}
-            loginEmail={loginEmail}
-            setLoginEmail={setLoginEmail}
-            loginOtp={loginOtp}
-            setLoginOtp={setLoginOtp}
-            loginLoading={loginLoading}
-            loginError={loginError}
-            loginSuccess={loginSuccess}
-            handleSendOtp={handleSendOtp}
-            handleVerifyEmailOtp={handleVerifyEmailOtp}
-            handleGithubLogin={isSupabaseConfigured && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' ? handleGithubLogin : undefined}
+            showToast={showToast}
+            isExplicitLoginRef={isExplicitLoginRef}
+            initialError={loginInitialError}
           />
         )}
       </AnimatePresence>
-
       {/* 排序个性化设置弹框 */}
       <AnimatePresence>
         {sortSettingOpen && (
           <SortSettingModal
             open={sortSettingOpen}
             onClose={() => setSortSettingOpen(false)}
-            isMobile={isMobile}
-            rules={sortRules}
-            onChangeRules={setSortRules}
-            sortDisplayMode={sortDisplayMode}
-            onChangeSortDisplayMode={setSortDisplayMode}
-            onResetRules={() => setSortRules(DEFAULT_SORT_RULES)}
           />
         )}
       </AnimatePresence>

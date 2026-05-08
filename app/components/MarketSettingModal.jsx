@@ -1,4 +1,5 @@
 "use client";
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -30,7 +31,8 @@ import { CloseIcon, MinusIcon, ResetIcon, SettingsIcon } from "./Icons";
 import ConfirmModal from "./ConfirmModal";
 import { cn } from "@/lib/utils";
 
-function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
+function SortableIndexItem({ item, canRemove, onRemove }) {
+  const isMobile = useIsMobile();
   const {
     attributes,
     listeners,
@@ -135,15 +137,13 @@ function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
  * @param {(codes: string[]) => void} props.onChangeSelected - 更新选中指数集合
  * @param {() => void} props.onResetDefault - 恢复默认选中集合
  */
-export default function MarketSettingModal({
-  open,
+export default function MarketSettingModal({open,
   onClose,
-  isMobile,
   indices = [],
   selectedCodes = [],
   onChangeSelected,
-  onResetDefault,
-}) {
+  onResetDefault}) {
+  const isMobile = useIsMobile();
   const selectedList = useMemo(() => {
     if (!indices?.length || !selectedCodes?.length) return [];
     const map = new Map(indices.map((it) => [it.code, it]));
@@ -253,7 +253,6 @@ export default function MarketSettingModal({
                     item={item}
                     canRemove={selectedCodes.length > 1}
                     onRemove={handleToggleCode}
-                    isMobile={isMobile}
                   />
                 ))}
               </div>

@@ -1,27 +1,120 @@
 'use client';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import Image from 'next/image';
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { MailIcon } from './Icons';
 import githubImg from "../assets/github.svg";
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-export default function LoginModal({
-  onClose,
-  isMobile,
-  loginEmail,
-  setLoginEmail,
-  loginOtp,
-  setLoginOtp,
-  loginLoading,
-  loginError,
-  loginSuccess,
-  handleSendOtp,
-  handleVerifyEmailOtp,
-  handleGithubLogin
-}) {
+export default function LoginModal({onClose,
+  showToast,
+  isExplicitLoginRef,
+  initialError = ''}) {
+  const isMobile = useIsMobile();
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginOtp, setLoginOtp] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState(initialError);
+  const [loginSuccess, setLoginSuccess] = useState('');
+
   const loginModalCardRef = useRef(null);
   const otpTouchWrapRef = useRef(null);
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginSuccess('');
+    if (!isSupabaseConfigured) {
+      showToast('未配置 Supabase，无法登录', 'error');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!loginEmail.trim()) {
+      setLoginError('请输入邮箱地址');
+      return;
+    }
+    if (!emailRegex.test(loginEmail.trim())) {
+      setLoginError('请输入有效的邮箱地址');
+      return;
+    }
+
+    setLoginLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: loginEmail.trim(),
+        options: {
+          shouldCreateUser: true
+        }
+      });
+      if (error) throw error;
+      setLoginSuccess('验证码已发送，请查收邮箱输入验证码完成注册/登录');
+    } catch (err) {
+      if (err.message?.includes('rate limit')) {
+        setLoginError('请求过于频繁，请稍后再试');
+      } else if (err.message?.includes('network')) {
+        setLoginError('网络错误，请检查网络连接');
+      } else {
+        setLoginError(err.message || '发送验证码失败，请稍后再试');
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    setLoginError('');
+    if (!loginOtp || loginOtp.length < 4) {
+      setLoginError('请输入邮箱中的验证码');
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      showToast('未配置 Supabase，无法登录', 'error');
+      return;
+    }
+    try {
+      if (isExplicitLoginRef) isExplicitLoginRef.current = true;
+      setLoginLoading(true);
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: loginEmail.trim(),
+        token: loginOtp.trim(),
+        type: 'email'
+      });
+      if (error) throw error;
+      if (data?.user) {
+        onClose();
+      }
+    } catch (err) {
+      setLoginError(err.message || '验证失败，请检查验证码或稍后再试');
+      if (isExplicitLoginRef) isExplicitLoginRef.current = false;
+    }
+    setLoginLoading(false);
+  };
+
+  const handleGithubLogin = async () => {
+    setLoginError('');
+    if (!isSupabaseConfigured) {
+      showToast('未配置 Supabase，无法登录', 'error');
+      return;
+    }
+    try {
+      if (isExplicitLoginRef) isExplicitLoginRef.current = true;
+      setLoginLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      setLoginError(err.message || 'GitHub 登录失败，请稍后再试');
+      if (isExplicitLoginRef) isExplicitLoginRef.current = false;
+      setLoginLoading(false);
+    }
+  };
 
   // iOS 等系统仅在「用户手势」触发的 focus 上弹出软键盘；触摸验证码区域时同步 focus 可稳定唤起键盘
   const focusOtpInput = useCallback(() => {
@@ -51,6 +144,7 @@ export default function LoginModal({
       window.clearTimeout(t2);
     };
   }, [loginSuccess, isMobile, focusOtpInput]);
+
   return (
     <div
       className="modal-overlay"
@@ -149,7 +243,7 @@ export default function LoginModal({
           </div>
         </form>
 
-        {handleGithubLogin && !loginSuccess && (
+        {!loginSuccess && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' && (
           <>
             <div
               className="login-divider"
@@ -188,9 +282,9 @@ export default function LoginModal({
                 transition: 'all 0.2s ease',
               }}
             >
-          <span className="github-icon-wrap">
-            <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '24px', height: '24px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/meliauk/fund")} />
-          </span>
+              <span className="github-icon-wrap">
+                <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '24px', height: '24px', cursor: 'pointer' }} />
+              </span>
               <span>使用 GitHub 登录</span>
             </button>
           </>

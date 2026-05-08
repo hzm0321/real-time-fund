@@ -1,4 +1,5 @@
 'use client';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useMemo, useState, useCallback } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -45,7 +46,8 @@ function earningsClass(v) {
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-export default function MyEarningsCalendarPage({ open, onOpenChange, series = [], masked, onGoHome, isMobile }) {
+export default function MyEarningsCalendarPage({open, onOpenChange, series = [], masked, onGoHome}) {
+  const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
 
   const hasData = Array.isArray(series) && series.length > 0;

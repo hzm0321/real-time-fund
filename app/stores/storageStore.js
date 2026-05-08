@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isEqual } from 'lodash';
 import { getFundCodesFromTagRecord } from '@/app/lib/fundHelpers';
 
 /**
@@ -53,6 +54,30 @@ const SYNC_KEYS = new Set([
   'transactions', 'dcaPlans', 'customSettings', 'fundDailyEarnings'
 ]);
 
+/** 排序展示模式的合法值集合 */
+export const SORT_DISPLAY_MODES = new Set(['buttons', 'dropdown']);
+
+/** 排序规则的默认配置 */
+export const DEFAULT_SORT_RULES = [
+  { id: 'default', label: '默认', enabled: true },
+  { id: 'yield', label: '估算涨幅', alias: '涨跌幅', enabled: true },
+  { id: 'yesterdayIncrease', label: '最新涨幅', enabled: false },
+  { id: 'holdingAmount', label: '持仓金额', enabled: false },
+  { id: 'todayProfit', label: '当日收益', enabled: false },
+  { id: 'yesterdayProfit', label: '昨日收益', enabled: false },
+  { id: 'holdingDays', label: '持有天数', enabled: false },
+  { id: 'holding', label: '持有收益', enabled: true },
+  { id: 'estimateProfit', label: '估算收益', enabled: true },
+  { id: 'holdingCost', label: '持仓成本', enabled: false },
+  { id: 'last1Week', label: '近1周', enabled: false },
+  { id: 'last1Month', label: '近1月', enabled: false },
+  { id: 'last3Months', label: '近3月', enabled: false },
+  { id: 'last6Months', label: '近6月', enabled: false },
+  { id: 'last1Year', label: '近1年', enabled: false },
+  { id: 'tags', label: '基金标签', enabled: false },
+  { id: 'name', label: '基金名称', alias: '名称', enabled: true },
+];
+
 /**
  * 管理 localStorage 数据的 Zustand Store
  */
@@ -77,6 +102,13 @@ export const useStorageStore = create((set, get) => ({
   dcaPlans: {},
   customSettings: {},
   fundDailyEarnings: {},
+
+  // 排序相关状态
+  sortBy: 'default',
+  sortOrder: 'desc',
+  pcSortDisplayMode: 'buttons',
+  mobileSortDisplayMode: 'buttons',
+  sortRules: DEFAULT_SORT_RULES,
 
   initFunds: () => {
     if (typeof window !== 'undefined') {
@@ -169,6 +201,72 @@ export const useStorageStore = create((set, get) => ({
     }
   },
 
+  /**
+   * 初始化排序相关状态，从 localStorage 恢复持久化的排序偏好
+   */
+  initSort: () => {
+    if (typeof window === 'undefined') return;
+
+    const savedSortBy = get().getItem('localSortBy');
+    const savedSortOrder = get().getItem('localSortOrder');
+
+    const nextState = {};
+    if (savedSortBy) nextState.sortBy = savedSortBy;
+    if (savedSortOrder) nextState.sortOrder = savedSortOrder;
+
+    // 从 customSettings 读取排序规则和展示模式
+    try {
+      const settings = get().getItem('customSettings', {});
+      if (settings && typeof settings === 'object') {
+        // 展示模式：优先读取按端口分别存储的字段，向后兼容旧版单一字段
+        if (typeof settings.localSortDisplayMode === 'string' && SORT_DISPLAY_MODES.has(settings.localSortDisplayMode)) {
+          nextState.pcSortDisplayMode = settings.localSortDisplayMode;
+          nextState.mobileSortDisplayMode = settings.localSortDisplayMode;
+        } else {
+          if (typeof settings.pcLocalSortDisplayMode === 'string' && SORT_DISPLAY_MODES.has(settings.pcLocalSortDisplayMode)) {
+            nextState.pcSortDisplayMode = settings.pcLocalSortDisplayMode;
+          }
+          if (typeof settings.mobileLocalSortDisplayMode === 'string' && SORT_DISPLAY_MODES.has(settings.mobileLocalSortDisplayMode)) {
+            nextState.mobileSortDisplayMode = settings.mobileLocalSortDisplayMode;
+          }
+        }
+
+        // 排序规则：优先从 customSettings.localSortRules 读取，兼容旧版独立 localSortRules 字段
+        let rulesFromSettings = null;
+        if (Array.isArray(settings.localSortRules)) {
+          rulesFromSettings = settings.localSortRules;
+        }
+        if (!rulesFromSettings) {
+          const legacyRules = get().getItem('localSortRules');
+          if (Array.isArray(legacyRules)) rulesFromSettings = legacyRules;
+        }
+
+        if (rulesFromSettings && rulesFromSettings.length) {
+          const defaultMap = new Map(DEFAULT_SORT_RULES.map((r) => [r.id, r]));
+          const merged = [];
+          for (const stored of rulesFromSettings) {
+            const base = defaultMap.get(stored.id);
+            if (!base) continue;
+            merged.push({
+              ...base,
+              enabled: typeof stored.enabled === 'boolean' ? stored.enabled : base.enabled,
+              alias: typeof stored.alias === 'string' && stored.alias.trim() ? stored.alias.trim() : base.alias,
+            });
+          }
+          // 追加新版本新增但本地未记录的规则
+          DEFAULT_SORT_RULES.forEach((rule) => {
+            if (!merged.some((r) => r.id === rule.id)) merged.push(rule);
+          });
+          nextState.sortRules = merged;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    if (Object.keys(nextState).length) set(nextState);
+  },
+
   setFunds: (nextFunds) => {
     const next = typeof nextFunds === 'function' ? nextFunds(get().funds) : nextFunds;
     set({ funds: next });
@@ -246,6 +344,58 @@ export const useStorageStore = create((set, get) => ({
     get().setItem('customSettings', JSON.stringify(next));
   },
 
+  setSortBy: (nextSortBy) => {
+    const val = typeof nextSortBy === 'function' ? nextSortBy(get().sortBy) : nextSortBy;
+    set({ sortBy: val });
+    get().setItem('localSortBy', val);
+  },
+
+  setSortOrder: (nextSortOrder) => {
+    const val = typeof nextSortOrder === 'function' ? nextSortOrder(get().sortOrder) : nextSortOrder;
+    set({ sortOrder: val });
+    get().setItem('localSortOrder', val);
+  },
+
+  setPcSortDisplayMode: (nextMode) => {
+    const val = typeof nextMode === 'function' ? nextMode(get().pcSortDisplayMode) : nextMode;
+    set({ pcSortDisplayMode: val });
+    get()._persistSortSettings({ pcSortDisplayMode: val });
+  },
+
+  setMobileSortDisplayMode: (nextMode) => {
+    const val = typeof nextMode === 'function' ? nextMode(get().mobileSortDisplayMode) : nextMode;
+    set({ mobileSortDisplayMode: val });
+    get()._persistSortSettings({ mobileSortDisplayMode: val });
+  },
+
+  setSortRules: (nextRules) => {
+    const val = typeof nextRules === 'function' ? nextRules(get().sortRules) : nextRules;
+    set({ sortRules: val });
+    get()._persistSortSettings({ sortRules: val });
+  },
+
+  /**
+   * 将排序展示模式和规则合并写入 customSettings 持久化
+   * @param {object} patch - 可包含 pcSortDisplayMode / mobileSortDisplayMode / sortRules
+   */
+  _persistSortSettings: (patch = {}) => {
+    try {
+      const current = get().customSettings || {};
+      const next = {
+        ...current,
+        localSortRules: patch.sortRules !== undefined ? patch.sortRules : get().sortRules,
+        pcLocalSortDisplayMode: patch.pcSortDisplayMode !== undefined ? patch.pcSortDisplayMode : get().pcSortDisplayMode,
+        mobileLocalSortDisplayMode: patch.mobileSortDisplayMode !== undefined ? patch.mobileSortDisplayMode : get().mobileSortDisplayMode,
+      };
+      // 删除旧字段兼容历史数据
+      delete next.localSortDisplayMode;
+      set({ customSettings: next });
+      get().setItem('customSettings', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  },
+
   setFundDailyEarnings: (nextFundDailyEarnings) => {
     const next = typeof nextFundDailyEarnings === 'function' ? nextFundDailyEarnings(get().fundDailyEarnings) : nextFundDailyEarnings;
     set({ fundDailyEarnings: next });
@@ -258,10 +408,24 @@ export const useStorageStore = create((set, get) => ({
    * @param {string} value JSON 字符串或普通字符串
    */
   setItem: (key, value) => {
-    const prevValue = (key === 'funds' || key === 'tags') ? window.localStorage.getItem(key) : null;
+    const prevValue = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
     
+    // 检查内容是否真的发生了变化 (使用 lodash isEqual 进行深对比)
+    if (prevValue !== null) {
+      try {
+        const parsedNew = JSON.parse(value);
+        const parsedOld = JSON.parse(prevValue);
+        if (isEqual(parsedNew, parsedOld)) return;
+      } catch (e) {
+        // 非 JSON 或解析失败时使用字符串直接对比
+        if (prevValue === value) return;
+      }
+    }
+
     // 更新本地存储
-    window.localStorage.setItem(key, value);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, value);
+    }
 
     // 同步更新 Store 状态，确保 UI 响应
     try {
@@ -280,15 +444,21 @@ export const useStorageStore = create((set, get) => ({
       else if (key === 'dcaPlans') set({ dcaPlans: parsed });
       else if (key === 'customSettings') set({ customSettings: parsed });
       else if (key === 'fundDailyEarnings') set({ fundDailyEarnings: parsed });
+      else if (key === 'localSortBy') set({ sortBy: parsed });
+      else if (key === 'localSortOrder') set({ sortOrder: parsed });
     } catch (e) {
       // 如果不是 JSON，或者是 refreshMs 这种数字字符串
       if (key === 'refreshMs') set({ refreshMs: Number(value) });
+      else if (key === 'localSortBy') set({ sortBy: value });
+      else if (key === 'localSortOrder') set({ sortOrder: value });
     }
 
     // 触发同步逻辑
     const { onSync } = get();
     if (onSync && SYNC_KEYS.has(key)) {
       // 特殊逻辑：如果是 funds 或 tags，通过签名判断是否真的需要同步
+      // 注意：isEqual 已经过滤了完全一致的情况，这里依然保留签名判断
+      // 是为了过滤“实质性”无变化的更新（如 jzrq, dwjz 没变，但其他非核心字段变了）
       if (key === 'funds') {
         if (getFundCodesSignature(prevValue) === getFundCodesSignature(value)) {
           return;

@@ -366,13 +366,21 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
               const cls = !isValid || masked ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '';
               const text = masked ? '***' : isValid ? `${sign}${Math.abs(v).toFixed(2)}` : '—';
               const rv = row?.rate;
-              const rateValid = typeof rv === 'number' && Number.isFinite(rv);
-              const rateSign = rateValid && rv > 0 ? '+' : '';
-              const rateCls = masked || !rateValid ? '' : rv > 0 ? 'up' : rv < 0 ? 'down' : '';
+              const snapshotCost = Number(row?.baseCostAmount);
+              const derivedRate = isValid && Number.isFinite(snapshotCost) && snapshotCost > 0
+                ? (v / snapshotCost) * 100
+                : null;
+              const rateValue =
+                typeof rv === 'number' && Number.isFinite(rv)
+                  ? rv
+                  : derivedRate;
+              const rateValid = typeof rateValue === 'number' && Number.isFinite(rateValue);
+              const rateSign = rateValid && rateValue > 0 ? '+' : '';
+              const rateCls = masked || !rateValid ? '' : rateValue > 0 ? 'up' : rateValue < 0 ? 'down' : '';
               const rateText = masked
                 ? '***'
                 : rateValid
-                  ? `${rateSign}${rv.toFixed(2)}%`
+                  ? `${rateSign}${rateValue.toFixed(2)}%`
                   : '—';
               return (
                 <tr key={`${row?.date || 'row'}_${idx}`} style={{ borderBottom: '1px solid var(--border)' }}>

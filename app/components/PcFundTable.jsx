@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon, LinkIcon } from './Icons';
+import { ConsecutiveTrendBadge } from './Common';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
@@ -51,6 +52,7 @@ const NON_FROZEN_COLUMN_IDS = [
   'relatedSector',
   'yesterdayChangePercent',
   'estimateChangePercent',
+  'sinceAddedChangePercent',
   'todayProfit',
   'totalChangePercent',
   'yesterdayProfit',
@@ -69,7 +71,7 @@ const NON_FROZEN_COLUMN_IDS = [
 ];
 
 /** 已保存列显示偏好时，新增列默认隐藏；未保存时随「全展示」 */
-const PC_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav']);
+const PC_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav', 'sinceAddedChangePercent']);
 
 /** 非冻结列中右对齐的（标签列左对齐） */
 const isPcDataColumnRightAligned = (id) =>
@@ -86,6 +88,7 @@ const COLUMN_HEADERS = {
   estimateNav: '估算净值',
   yesterdayChangePercent: '最新涨幅',
   estimateChangePercent: '估算涨幅',
+  sinceAddedChangePercent: '自添加来',
   totalChangePercent: '估算收益',
   holdingAmount: '持仓金额',
   holdingCost: '持仓成本',
@@ -198,6 +201,9 @@ export default function PcFundTable({
   onHoldingAmountClick,
   onHoldingProfitClick, // 保留以兼容调用方，表格内已不再使用点击切换
   sortBy = 'default',
+  sortOrder = 'desc',
+  sortRules = [],
+  onSortChange,
   onReorder,
   onCustomSettingsChange,
   getFundCardProps,
@@ -206,9 +212,11 @@ export default function PcFundTable({
   blockDialogClose = false,
   stickyTop = 0,
   masked = false,
-  relatedSectorSessionKey = '',
+  relatedSectorSessionKey,
   onFundTagsClick,
-}) {
+  fundExtraDataByCode = {},
+  }) {
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -796,22 +804,16 @@ export default function PcFundTable({
     if (!periodReturnsEnabled) return;
     if (dataCodes.length === 0) return;
 
-    const missing = dataCodes.filter((code) => !periodReturnsCacheRef.current.has(code));
-    if (missing.length === 0) return;
-
-    let cancelled = false;
-    (async () => {
-      const batch = {};
-      await asyncPool(4, missing, async (code) => {
-        const value = await fetchFundPeriodReturns(code);
-        periodReturnsCacheRef.current.set(code, value);
-        batch[code] = value;
-      });
-      if (cancelled) return;
+    const cachedBatch = {};
+    for (const code of dataCodes) {
+      if (!periodReturnsCacheRef.current.has(code)) continue;
+      cachedBatch[code] = periodReturnsCacheRef.current.get(code);
+    }
+    if (Object.keys(cachedBatch).length > 0) {
       setPeriodReturnsByCode((prev) => {
         let changed = false;
         const next = { ...prev };
-        for (const [code, value] of Object.entries(batch)) {
+        for (const [code, value] of Object.entries(cachedBatch)) {
           const prevVal = next[code];
           if (
             prevVal
@@ -827,6 +829,32 @@ export default function PcFundTable({
           changed = true;
         }
         return changed ? next : prev;
+      });
+    }
+
+    const missing = dataCodes.filter((code) => !periodReturnsCacheRef.current.has(code));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      await asyncPool(4, missing, async (code) => {
+        const value = await fetchFundPeriodReturns(code);
+        periodReturnsCacheRef.current.set(code, value);
+        if (cancelled) return;
+        setPeriodReturnsByCode((prev) => {
+          const prevVal = prev[code];
+          if (
+            prevVal
+            && prevVal.week === value.week
+            && prevVal.month === value.month
+            && prevVal.month3 === value.month3
+            && prevVal.month6 === value.month6
+            && prevVal.year1 === value.year1
+          ) {
+            return prev;
+          }
+          return { ...prev, [code]: value };
+        });
       });
     })();
 
@@ -960,6 +988,7 @@ export default function PcFundTable({
                 <LinkIcon width="14" height="14" />
               </span>
             ) : null}
+            <ConsecutiveTrendBadge trend={fundExtraDataByCode?.[code]?.consecutiveTrend} />
             {info.getValue() ?? '—'}
           </span>
           {code ? <span className="muted code-text">
@@ -1116,6 +1145,17 @@ export default function PcFundTable({
                 gap: 2,
               }}
             >
+              {pctText != null ? (
+                <FitText
+                  className={pctCls}
+                  style={{ fontWeight: 500, textAlign: 'right' }}
+                  maxFontSize={14}
+                  minFontSize={10}
+                  as="div"
+                >
+                  {pctText}
+                </FitText>
+              ) : null}
               <span
                 title={firstLine !== '—' ? firstLine : undefined}
                 style={{
@@ -1126,19 +1166,11 @@ export default function PcFundTable({
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                   textAlign: 'right',
-                  fontSize: '14px',
+                  fontSize: pctText != null ? '11px' : '14px',
                 }}
               >
                 {firstLine}
               </span>
-              {pctText != null ? (
-                <span
-                  className={pctCls}
-                  style={{ fontSize: '11px', fontWeight: 600, textAlign: 'right' }}
-                >
-                  {pctText}
-                </span>
-              ) : null}
             </div>
           );
         },
@@ -1376,6 +1408,37 @@ export default function PcFundTable({
         },
       },
       {
+        accessorKey: 'sinceAddedChangePercent',
+        header: '自添加来',
+        size: 135,
+        minSize: 100,
+        cell: (info) => {
+          const original = info.row.original || {};
+          const value = original.sinceAddedChangeValue;
+          const cls = value == null ? 'muted' : value > 0 ? 'up' : value < 0 ? 'down' : '';
+          const rawDate = original.sinceAddedDateRaw ?? '';
+          const displayDate = original.sinceAddedDate ?? '';
+          const text = info.getValue();
+          const hasText = text != null && text !== '—';
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
+              <FitText className={cls} style={{ fontWeight: 500 }} maxFontSize={14} minFontSize={10} as="div">
+                {text ?? '—'}
+              </FitText>
+              {hasText && displayDate ? (
+                <span className="muted" title={rawDate && rawDate !== displayDate ? rawDate : undefined} style={{ fontSize: '11px' }}>
+                  {displayDate}
+                </span>
+              ) : null}
+            </div>
+          );
+        },
+        meta: {
+          align: 'right',
+          cellClassName: 'since-added-cell',
+        },
+      },
+      {
         accessorKey: 'totalChangePercent',
         header: '估算收益',
         size: 135,
@@ -1440,7 +1503,6 @@ export default function PcFundTable({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (holdingLocked) return;
                     onHoldingAmountClickRef.current?.(original, { hasHolding: false });
                   }
                 }}
@@ -1484,7 +1546,7 @@ export default function PcFundTable({
                   flexShrink: 0,
                   backgroundColor: 'transparent',
                   color: holdingLocked ? 'var(--muted)' : undefined,
-                  cursor: holdingLocked ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                 }}
               >
                 <SettingsIcon width="14" height="14" />
@@ -1850,19 +1912,77 @@ export default function PcFundTable({
             header.column.columnDef?.accessorKey === 'fundName';
           const isRightAligned = NON_FROZEN_COLUMN_IDS.includes(header.column.id);
           const align = isNameColumn ? '' : isRightAligned ? 'text-right' : 'text-center';
+
+          // 匹配排序状态
+          const colId = header.column.id || header.column.columnDef?.accessorKey;
+          const sortMap = {
+            'fundName': 'name',
+            'tags': 'tags',
+            'yesterdayChangePercent': 'yesterdayIncrease',
+            'estimateChangePercent': 'yield',
+            'totalChangePercent': 'estimateProfit',
+            'holdingAmount': 'holdingAmount',
+            'todayProfit': 'todayProfit',
+            'yesterdayProfit': 'yesterdayProfit',
+            'holdingProfit': 'holding',
+            'holdingDays': 'holdingDays',
+            'holdingCost': 'holdingCost',
+            'period1w': 'last1Week',
+            'period1m': 'last1Month',
+            'period3m': 'last3Months',
+            'period6m': 'last6Months',
+            'period1y': 'last1Year'
+          };
+          const sortKey = sortMap[colId];
+          const isSorted = sortBy && sortKey === sortBy;
+          let isSortEnabled = sortKey && sortRules.find(r => r.id === sortKey)?.enabled;
+          
+          // 选择默认排序的时候，隐藏基金名称表头的排序和箭头
+          if (sortBy === 'default' && sortKey === 'name') {
+            isSortEnabled = false;
+          }
+
           return (
             <div
               key={header.id}
-              className={`table-header-cell ${align}`}
-              style={style}
+              className={`table-header-cell ${align} ${isSortEnabled ? 'sortable' : ''}`}
+              style={{
+                ...style,
+                cursor: isSortEnabled ? 'pointer' : 'default',
+                userSelect: isSortEnabled ? 'none' : 'auto'
+              }}
+              onClick={() => {
+                if (isSortEnabled && onSortChange) {
+                  onSortChange(sortKey);
+                }
+              }}
             >
-              <div style={{ paddingRight: isRightAligned ? '20px' : '0' }}>
+              <div style={{
+                paddingRight: isRightAligned ? '20px' : '0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4
+              }}>
                 {header.isPlaceholder
                   ? null
                   : flexRender(
                     header.column.columnDef.header,
                     header.getContext(),
                   )}
+                {isSortEnabled && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      lineHeight: 1,
+                      fontSize: '8px',
+                      opacity: isSorted ? 1 : 0.3
+                    }}
+                  >
+                    <span style={{ opacity: isSorted && sortOrder === 'asc' ? 1 : 0.3 }}>▲</span>
+                    <span style={{ opacity: isSorted && sortOrder === 'desc' ? 1 : 0.3 }}>▼</span>
+                  </span>
+                )}
               </div>
               {!forPortal && (
                 <div
@@ -1870,6 +1990,7 @@ export default function PcFundTable({
                   onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
                   className={`resizer ${header.column.getIsResizing() ? 'isResizing' : ''
                     } ${header.column.getCanResize() ? '' : 'disabled'}`}
+                  onClick={(e) => e.stopPropagation()}
                 />
               )}
             </div>

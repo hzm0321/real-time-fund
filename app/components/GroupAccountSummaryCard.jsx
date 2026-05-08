@@ -1,4 +1,5 @@
 'use client';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 /**
  * 分组账户汇总卡片（只读展示，不包含任何持仓编辑/交易入口）
@@ -124,9 +125,7 @@ function Sparkline({ series, className = '' }) {
   );
 }
 
-export default function GroupAccountSummaryCard({
-  /** 与首页 `isMobile` 一致：true 为移动布局，false 为 PC */
-  isMobile = false,
+export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 为移动布局，false 为 PC */
   /** 点击整张卡片时回调（如切换到对应分组 / 「全部」） */
   onActivate,
   groupName,
@@ -139,8 +138,8 @@ export default function GroupAccountSummaryCard({
   upCount = 0,
   downCount = 0,
   sparkSeries = [],
-  masked = false,
-}) {
+  masked = false}) {
+  const isMobile = useIsMobile();
   const holdingTone = toneSignedAmount(holdingReturn, 2);
   const holdingPctTone = tonePercent(holdingReturnPercent, 2);
   const accountTone = hasAnyTodayData ? toneSignedAmount(accountReturn, 2) : { className: 'muted', color: 'var(--muted)' };

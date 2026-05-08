@@ -1,4 +1,5 @@
 'use client';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -72,17 +73,8 @@ const columns = [
 
 export default function FundHistoryNetValueModal({ open, onOpenChange, code, theme }) {
   const [visibleCount, setVisibleCount] = useState(30);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 768px)');
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
 
   useEffect(() => {
     if (!open) return;

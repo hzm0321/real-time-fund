@@ -2,13 +2,14 @@
  * 每日收益数据管理（按作用域分桶）：
  * {
  *   [scope]: {
- *     [code]: Array<{ date: string, earnings: number, rate?: number|null }>
+ *     [code]: Array<{ date: string, earnings: number, rate?: number|null, baseCostAmount?: number|null }>
  *   }
  * }
  * - scope: 'all'（全局）或自定义分组 id
  * - date: YYYY-MM-DD
  * - earnings: 当日收益（元）
  * - rate: 当日收益率（百分比数值，如 1.23 表示 +1.23%），基于用户成本价计算，即 (当日收益 / 成本金额) × 100
+ * - baseCostAmount: 当日成本快照金额（元），用于冻结当日收益率分母
  */
 import { isPlainObject, isString, isNumber } from 'lodash';
 import { storageStore } from '@/app/stores';
@@ -21,11 +22,16 @@ function normalizeItem(item) {
   const date = item.date;
   const earnings = item.earnings;
   const rate = item.rate;
+  const baseCostAmount = item.baseCostAmount;
   if (!isString(date) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   if (!isNumber(earnings) || !Number.isFinite(earnings)) return null;
   const normalizedRate =
     isNumber(rate) && Number.isFinite(rate) ? rate : null;
-  return { date, earnings, rate: normalizedRate };
+  const normalizedBaseCostAmount =
+    isNumber(baseCostAmount) && Number.isFinite(baseCostAmount) && baseCostAmount > 0
+      ? baseCostAmount
+      : null;
+  return { date, earnings, rate: normalizedRate, baseCostAmount: normalizedBaseCostAmount };
 }
 
 function getStored() {
@@ -70,9 +76,13 @@ export function recordDailyEarnings(code, earnings, dateStr) {
   const list = Array.isArray(scoped[code]) ? scoped[code] : [];
   const existingIndex = list.findIndex(item => item.date === dateStr);
 
+  const baseCostAmount = arguments.length >= 6 && isNumber(arguments[5]) && Number.isFinite(arguments[5]) && arguments[5] > 0
+    ? arguments[5]
+    : null;
+
   const nextList = existingIndex >= 0
-    ? list.map((item, i) => i === existingIndex ? { date: dateStr, earnings, rate: normalizedRate } : item)
-    : [...list, { date: dateStr, earnings, rate: normalizedRate }];
+    ? list.map((item, i) => i === existingIndex ? { date: dateStr, earnings, rate: normalizedRate, baseCostAmount } : item)
+    : [...list, { date: dateStr, earnings, rate: normalizedRate, baseCostAmount }];
 
   nextList.sort((a, b) => a.date.localeCompare(b.date));
 

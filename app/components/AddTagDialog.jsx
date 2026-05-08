@@ -13,104 +13,104 @@ import { cn } from '@/lib/utils';
 export const TAG_THEME_OPTIONS = [
   {
     key: 'default',
-    label: 'Default',
+    label: '默认',
     badgeVariant: 'outline',
     badgeClassName: '',
   },
   {
     key: 'blue',
-    label: 'Blue',
+    label: '蓝色',
     badgeVariant: 'default',
     badgeClassName:
       'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300',
   },
   {
     key: 'green',
-    label: 'Green',
+    label: '绿色',
     badgeVariant: 'default',
     badgeClassName:
       'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300',
   },
   {
     key: 'sky',
-    label: 'Sky',
+    label: '天空蓝',
     badgeVariant: 'default',
     badgeClassName:
       'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300',
   },
   {
     key: 'purple',
-    label: 'Purple',
+    label: '紫色',
     badgeVariant: 'default',
     badgeClassName:
       'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300',
   },
   {
     key: 'red',
-    label: 'Red',
+    label: '红色',
     badgeVariant: 'default',
     badgeClassName:
       'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300',
   },
   {
     key: 'orange',
-    label: 'Orange',
+    label: '橙色',
     badgeVariant: 'default',
     badgeClassName:
       'border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300',
   },
   {
     key: 'amber',
-    label: 'Amber',
+    label: '琥珀色',
     badgeVariant: 'default',
     badgeClassName:
       'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300',
   },
   {
     key: 'lime',
-    label: 'Lime',
+    label: '柠檬绿',
     badgeVariant: 'default',
     badgeClassName:
       'border-lime-200 bg-lime-50 text-lime-800 dark:border-lime-800 dark:bg-lime-950 dark:text-lime-300',
   },
   {
     key: 'teal',
-    label: 'Teal',
+    label: '水鸭色',
     badgeVariant: 'default',
     badgeClassName:
       'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
   },
   {
     key: 'cyan',
-    label: 'Cyan',
+    label: '青色',
     badgeVariant: 'default',
     badgeClassName:
       'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
   },
   {
     key: 'indigo',
-    label: 'Indigo',
+    label: '靛蓝色',
     badgeVariant: 'default',
     badgeClassName:
       'border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
   },
   {
     key: 'violet',
-    label: 'Violet',
+    label: '罗兰紫',
     badgeVariant: 'default',
     badgeClassName:
       'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300',
   },
   {
     key: 'pink',
-    label: 'Pink',
+    label: '粉红色',
     badgeVariant: 'default',
     badgeClassName:
       'border-pink-200 bg-pink-50 text-pink-800 dark:border-pink-800 dark:bg-pink-950 dark:text-pink-300',
   },
   {
     key: 'rose',
-    label: 'Rose',
+    label: '玫瑰色',
     badgeVariant: 'default',
     badgeClassName:
       'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300',

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { RefreshIcon } from './Icons';
 
-export default function RefreshButton({ refreshCycleStartRef, refreshMs, manualRefresh, refreshing, fundsLength }) {
+export default function RefreshButton({ refreshCycleStartRef, refreshMs, manualRefresh, refreshing, fundsLength, paused }) {
 
   // 刷新周期进度 0~1，用于环形进度条
   const [refreshProgress, setRefreshProgress] = useState(0);
@@ -12,17 +12,18 @@ export default function RefreshButton({ refreshCycleStartRef, refreshMs, manualR
   useEffect(() => {
     if (fundsLength === 0 || refreshMs <= 0) return;
     const t = setInterval(() => {
+      if (paused) return; // 暂停时光条静止
       const elapsed = Date.now() - refreshCycleStartRef.current;
       const p = Math.min(1, elapsed / refreshMs);
       setRefreshProgress(p);
     }, 100);
     return () => clearInterval(t);
-  }, [fundsLength, refreshMs]);
+  }, [fundsLength, refreshMs, paused, refreshCycleStartRef]);
 
   return (
     <div
-      className="refresh-btn-wrap"
-      style={{ '--progress': refreshProgress }}
+      className={`refresh-btn-wrap ${refreshing ? 'is-refreshing' : ''}`}
+      style={{ '--progress': refreshing ? 0 : refreshProgress }}
       title={`刷新周期 ${Math.round(refreshMs / 1000)} 秒`}
     >
       <button

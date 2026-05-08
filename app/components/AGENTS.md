@@ -16,7 +16,7 @@ app/components/
 │   ├── GroupSummary.jsx        # Group portfolio summary
 │   └── MarketIndexAccordion.jsx# Market indices (24 A/HK/US)
 ├── Modals (26)
-│   ├── Fund ops: AddFundToGroupModal, GroupManageModal, GroupModal, AddResultModal
+│   ├── Fund ops: AddFundToGroupModal, GroupManageModal, GroupModal
 │   ├── Trading: TradeModal, HoldingEditModal, HoldingActionModal, TransactionHistoryModal, PendingTradesModal, DcaModal, AddHistoryModal
 │   ├── Settings: SettingsModal, MarketSettingModal, MobileSettingModal, PcTableSettingModal, SortSettingModal
 │   ├── Auth: LoginModal, CloudConfigModal

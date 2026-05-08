@@ -1,4 +1,5 @@
 "use client";
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -7,8 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import ConfirmModal from './ConfirmModal';
 import { ResetIcon, SettingsIcon } from './Icons';
 
-export default function SettingsModal({
-  onClose,
+export default function SettingsModal({onClose,
   tempSeconds,
   setTempSeconds,
   saveSettings,
@@ -16,15 +16,14 @@ export default function SettingsModal({
   importFileRef,
   handleImportFileChange,
   importMsg,
-  isMobile,
   containerWidth = 1200,
   setContainerWidth,
   onResetContainerWidth,
   showMarketIndexPc = true,
   showMarketIndexMobile = true,
   showGroupFundSearchPc = true,
-  showGroupFundSearchMobile = true,
-}) {
+  showGroupFundSearchMobile = true}) {
+  const isMobile = useIsMobile();
   const [sliderDragging, setSliderDragging] = useState(false);
   const [resetWidthConfirmOpen, setResetWidthConfirmOpen] = useState(false);
   const [localSeconds, setLocalSeconds] = useState(tempSeconds);

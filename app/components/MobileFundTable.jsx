@@ -30,6 +30,7 @@ import MobileSettingModal from './MobileSettingModal';
 import MoveGroupModal from './MoveGroupModal';
 import SuccessModal from './SuccessModal';
 import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, LinkIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+import { ConsecutiveTrendBadge } from './Common';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
@@ -47,6 +48,7 @@ const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'relatedSector',
   'yesterdayChangePercent',
   'estimateChangePercent',
+  'sinceAddedChangePercent',
   'todayProfit',
   'totalChangePercent',
   'yesterdayProfit',
@@ -63,7 +65,7 @@ const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'estimateNav',
 ];
 
-const MOBILE_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav']);
+const MOBILE_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav', 'sinceAddedChangePercent']);
 
 const MOBILE_COLUMN_HEADERS = {
   relatedSector: '关联板块',
@@ -76,6 +78,7 @@ const MOBILE_COLUMN_HEADERS = {
   estimateNav: '估算净值',
   yesterdayChangePercent: '最新涨幅',
   estimateChangePercent: '估算涨幅',
+  sinceAddedChangePercent: '自添加来',
   totalChangePercent: '估算收益',
   holdingCost: '持仓成本',
   costNav: '成本净值',
@@ -335,6 +338,9 @@ export default function MobileFundTable({
   onHoldingAmountClick,
   onHoldingProfitClick, // 保留以兼容调用方，表格内已不再使用点击切换
   sortBy = 'default',
+  sortOrder = 'desc',
+  sortRules = [],
+  onSortChange,
   onReorder,
   onCustomSettingsChange,
   stickyTop = 0,
@@ -348,6 +354,7 @@ export default function MobileFundTable({
   onFundCardDrawerOpenChange,
   onMobileSettingModalOpenChange,
   onFundTagsClick,
+  fundExtraDataByCode = {},
 }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editSelectedCodes, setEditSelectedCodes] = useState(() => new Set());
@@ -837,6 +844,7 @@ export default function MobileFundTable({
     estimateNav: 64,
     yesterdayChangePercent: 72,
     estimateChangePercent: 80,
+    sinceAddedChangePercent: 80,
     totalChangePercent: 80,
     holdingDays: 64,
     todayProfit: 80,
@@ -971,6 +979,34 @@ export default function MobileFundTable({
     if (!Array.isArray(data) || data.length === 0) return;
 
     const codes = Array.from(new Set(data.map((d) => d?.code).filter(Boolean)));
+    const cachedBatch = {};
+    for (const code of codes) {
+      if (!periodReturnsCacheRef.current.has(code)) continue;
+      cachedBatch[code] = periodReturnsCacheRef.current.get(code);
+    }
+    if (Object.keys(cachedBatch).length > 0) {
+      setPeriodReturnsByCode((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [code, value] of Object.entries(cachedBatch)) {
+          const prevVal = next[code];
+          if (
+            prevVal
+            && prevVal.week === value.week
+            && prevVal.month === value.month
+            && prevVal.month3 === value.month3
+            && prevVal.month6 === value.month6
+            && prevVal.year1 === value.year1
+          ) {
+            continue;
+          }
+          next[code] = value;
+          changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }
+
     const missing = codes.filter((code) => !periodReturnsCacheRef.current.has(code));
     if (missing.length === 0) return;
 
@@ -1140,6 +1176,7 @@ export default function MobileFundTable({
                   <LinkIcon width="14" height="14" />
                 </span>
               ) : null}
+              <ConsecutiveTrendBadge trend={fundExtraDataByCode?.[code]?.consecutiveTrend} />
               {info.getValue() ?? '—'}
             </span>
             {holdingAmountDisplay ? (
@@ -1236,6 +1273,7 @@ export default function MobileFundTable({
                 <LinkIcon width="14" height="14" />
               </span>
             ) : null}
+            <ConsecutiveTrendBadge trend={fundExtraDataByCode?.[code]?.consecutiveTrend} />
             {info.getValue() ?? '—'}
           </span>
           {holdingAmountDisplay ? (
@@ -1527,6 +1565,17 @@ export default function MobileFundTable({
                 gap: 2,
               }}
             >
+              {pctText != null ? (
+                <FitText
+                  className={pctCls}
+                  style={{ fontWeight: 500, textAlign: 'right' }}
+                  maxFontSize={12}
+                  minFontSize={9}
+                  as="div"
+                >
+                  {pctText}
+                </FitText>
+              ) : null}
               <span
                 title={firstLine !== '—' ? firstLine : undefined}
                 style={{
@@ -1537,19 +1586,11 @@ export default function MobileFundTable({
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                   textAlign: 'right',
-                  fontSize: '12px',
+                  fontSize: pctText != null ? '10px' : '12px',
                 }}
               >
                 {firstLine}
               </span>
-              {pctText != null ? (
-                <span
-                  className={pctCls}
-                  style={{ fontSize: '10px', fontWeight: 600, textAlign: 'right' }}
-                >
-                  {pctText}
-                </span>
-              ) : null}
             </div>
           );
         },
@@ -1738,8 +1779,10 @@ export default function MobileFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span className={cls} style={{ fontWeight: 500 }}>
-                {info.getValue() ?? '—'}
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
+                <FitText maxFontSize={14} minFontSize={10}>
+                  {info.getValue() ?? '—'}
+                </FitText>
               </span>
               <span className="muted" style={{ fontSize: '10px' }}>{displayDate}</span>
             </div>
@@ -1761,8 +1804,10 @@ export default function MobileFundTable({
           const hasText = text != null && text !== '—';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span className={cls} style={{ fontWeight: 500 }}>
-                {text ?? '—'}
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
+                <FitText maxFontSize={14} minFontSize={10}>
+                  {text ?? '—'}
+                </FitText>
               </span>
               {hasText && displayTime && displayTime !== '-' ? (
                 <span className="muted" style={{ fontSize: '10px' }}>{displayTime}</span>
@@ -1771,6 +1816,34 @@ export default function MobileFundTable({
           );
         },
         meta: { align: 'right', cellClassName: 'est-change-cell', width: columnWidthMap.estimateChangePercent },
+      },
+      {
+        accessorKey: 'sinceAddedChangePercent',
+        header: '自添加来',
+        cell: (info) => {
+          const original = info.row.original || {};
+          const value = original.sinceAddedChangeValue;
+          const cls = value == null ? 'muted' : value > 0 ? 'up' : value < 0 ? 'down' : '';
+          const rawDate = original.sinceAddedDateRaw ?? '';
+          const displayDate = original.sinceAddedDate ?? '';
+          const text = info.getValue();
+          const hasText = text != null && text !== '—';
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
+                <FitText maxFontSize={14} minFontSize={10}>
+                  {text ?? '—'}
+                </FitText>
+              </span>
+              {hasText && displayDate ? (
+                <span className="muted" title={rawDate && rawDate !== displayDate ? rawDate : undefined} style={{ fontSize: '10px' }}>
+                  {displayDate}
+                </span>
+              ) : null}
+            </div>
+          );
+        },
+        meta: { align: 'right', cellClassName: 'since-added-cell', width: columnWidthMap.sinceAddedChangePercent },
       },
       {
         accessorKey: 'totalChangePercent',
@@ -2069,7 +2142,7 @@ export default function MobileFundTable({
   const getAlignClass = (columnId) => {
     if (columnId === 'fundName') return '';
     if (columnId === EDIT_MOVE_TO_FRONT_COL || columnId === EDIT_DRAG_COL) return 'text-center';
-    if (['latestNav', 'estimateNav', 'yesterdayChangePercent', 'estimateChangePercent', 'totalChangePercent', 'holdingDays', 'todayProfit', 'yesterdayProfit', 'holdingProfit', 'holdingCost', 'costNav', 'period1w', 'period1m', 'period3m', 'period6m', 'period1y', 'tags'].includes(columnId)) return 'text-right';
+    if (['latestNav', 'estimateNav', 'yesterdayChangePercent', 'estimateChangePercent', 'sinceAddedChangePercent', 'totalChangePercent', 'holdingDays', 'todayProfit', 'yesterdayProfit', 'holdingProfit', 'holdingCost', 'costNav', 'period1w', 'period1m', 'period3m', 'period6m', 'period1y', 'tags'].includes(columnId)) return 'text-right';
     return 'text-right';
   };
 
@@ -2085,15 +2158,75 @@ export default function MobileFundTable({
           const pinClass = getPinClass(columnId, true);
           const alignClass = getAlignClass(columnId);
           const isLastColumn = headerIndex === headerGroup.headers.length - 1;
+
+          // 匹配排序状态
+          const sortMap = {
+            'fundName': 'name',
+            'tags': 'tags',
+            'yesterdayChangePercent': 'yesterdayIncrease',
+            'estimateChangePercent': 'yield',
+            'totalChangePercent': 'estimateProfit',
+            'holdingAmount': 'holdingAmount',
+            'todayProfit': 'todayProfit',
+            'yesterdayProfit': 'yesterdayProfit',
+            'holdingProfit': 'holding',
+            'holdingDays': 'holdingDays',
+            'holdingCost': 'holdingCost',
+            'period1w': 'last1Week',
+            'period1m': 'last1Month',
+            'period3m': 'last3Months',
+            'period6m': 'last6Months',
+            'period1y': 'last1Year'
+          };
+          const sortKey = sortMap[columnId];
+          const isSorted = sortBy && sortKey === sortBy;
+          let isSortEnabled = sortKey && sortRules.find(r => r.id === sortKey)?.enabled;
+          
+          // 选择默认排序的时候，隐藏基金名称表头的排序和箭头
+          if (sortBy === 'default' && sortKey === 'name') {
+            isSortEnabled = false;
+          }
+
           return (
             <div
               key={header.id}
               className={`table-header-cell ${alignClass} ${pinClass}`}
-              style={isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : undefined}
+              style={{
+                ...(isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : {}),
+                cursor: isSortEnabled ? 'pointer' : 'default',
+                userSelect: isSortEnabled ? 'none' : 'auto'
+              }}
+              onClick={() => {
+                if (isSortEnabled && onSortChange) {
+                  onSortChange(sortKey);
+                }
+              }}
             >
-              {header.isPlaceholder
-                ? null
-                : flexRender(header.column.columnDef.header, header.getContext())}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 2,
+                justifyContent: alignClass.includes('text-center') ? 'center' : alignClass.includes('text-right') ? 'flex-end' : 'flex-start',
+                width: '100%'
+              }}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(header.column.columnDef.header, header.getContext())}
+                {isSortEnabled && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      lineHeight: 1,
+                      fontSize: '8px',
+                      opacity: isSorted ? 1 : 0.3
+                    }}
+                  >
+                    <span style={{ opacity: isSorted && sortOrder === 'asc' ? 1 : 0.3 }}>▲</span>
+                    <span style={{ opacity: isSorted && sortOrder === 'desc' ? 1 : 0.3 }}>▼</span>
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}

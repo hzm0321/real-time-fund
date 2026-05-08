@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import zhifubaoImg from "../assets/zhifubao.jpg";
 import weixinImg from "../assets/weixin.jpg";
-import { CalendarIcon, MinusIcon, PlusIcon } from './Icons';
+import { CalendarIcon, MinusIcon, PlusIcon, TrendUpIcon, TrendDownIcon } from './Icons';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -28,6 +28,37 @@ dayjs.tz.setDefault(TZ);
 const nowInTz = () => dayjs().tz(TZ);
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 const formatDate = (input) => toTz(input).format('YYYY-MM-DD');
+
+export function ConsecutiveTrendBadge({ trend }) {
+  if (!trend || !trend.type || !trend.days || trend.days < 3) return null;
+
+  const isUp = trend.type === 'up';
+  // 连涨红(danger)，连跌绿(success)
+  const color = isUp ? 'var(--danger)' : 'var(--success)';
+  const Icon = isUp ? TrendUpIcon : TrendDownIcon;
+
+  return (
+    <span
+      className="consecutive-trend-badge"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '1px',
+        color: color,
+        fontSize: '11px',
+        fontWeight: 'bold',
+        marginRight: '4px',
+        verticalAlign: 'middle',
+        position: 'relative',
+        bottom: '1px',
+      }}
+      title={`连续${trend.days}天${isUp ? '上涨' : '下跌'}`}
+    >
+      <Icon width="12" height="12" />
+      <span style={{ lineHeight: 1 }}>{trend.days}</span>
+    </span>
+  );
+}
 
 export function DatePicker({ value, onChange, position = 'bottom', minDate }) {
   const [open, setOpen] = useState(false);
