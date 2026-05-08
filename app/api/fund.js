@@ -93,6 +93,53 @@ export const fetchFundSecidByRelatedSector = async (relatedSector, { cacheTime =
 };
 
 /**
+ * 根据关键词模糊搜索 fund_secid 表中的板块
+ * @param {string} keyword - 搜索关键词
+ * @param {number} limit - 返回结果数量限制
+ * @returns {Promise<Array<{related_sector: string, secid: string}>>}
+ */
+export const searchSectorsByRelatedSector = async (keyword, { limit = 10, cacheTime = 60 * 1000 } = {}) => {
+    const normalized = keyword != null ? String(keyword).trim().toUpperCase() : '';
+    if (!normalized) {
+    console.log('[搜索板块] 关键词为空');
+    return [];
+  }
+  if (!isSupabaseConfigured) {
+    console.log('[搜索板块] Supabase 未配置');
+    return [];
+  }
+
+  console.log('[搜索板块] 搜索关键词:', normalized);
+
+  try {
+    const results = await getQueryClient().fetchQuery({
+      queryKey: ['sectorSearchByKeyword', normalized, limit],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('fund_secid')
+          .select('related_sector, secid')
+          .ilike('related_sector', `%${normalized}%`)
+          .limit(limit);
+
+        if (error) {
+          console.error('[搜索板块] 查询失败:', error);
+          return [];
+        }
+        console.log('[搜索板块] 查询结果:', data);
+        return data || [];
+      },
+      staleTime: cacheTime,
+    });
+
+    console.log('[搜索板块] 返回结果数:', results.length);
+    return results;
+  } catch (e) {
+    console.error('[搜索板块] 异常:', e);
+    return [];
+  }
+};
+
+/**
  * 东方财富 push2delay 板块/指数行情（涨跌幅等）
  * @returns {{ name: string, code: string, pct: number|null }|null}
  */
@@ -134,6 +181,93 @@ export const fetchRelatedSectorLiveQuote = async (relatedSectorLabel) => {
   const secid = await fetchFundSecidByRelatedSector(relatedSectorLabel);
   if (!secid) return null;
   return fetchEastmoneySectorQuote(secid);
+};
+
+/**
+ * 获取板块/指数实时详情（包含涨跌幅和资金流入）
+ * @param {string} secid - 板块secid，如 "0.399006"
+ * @returns {Promise<{name: string, code: string, price: number, change: number, fundFlow: number}|null>}
+ */
+export const fetchSectorDetail = async (secid) => {
+  const s = secid != null ? String(secid).trim() : '';
+  if (!s || typeof fetch === 'undefined') return null;
+
+  try {
+    const detail = await getQueryClient().fetchQuery({
+      queryKey: ['sectorDetail', s],
+      queryFn: async () => {
+        const url = `https://push2delay.eastmoney.com/api/qt/stock/get?secid=${encodeURIComponent(s)}&fields=f58,f57,f43,f170,f169,f124,f86`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const json = await res.json();
+        const d = json?.data;
+        if (!d) return null;
+        const change = d.f170 != null && Number.isFinite(Number(d.f170)) ? Number(d.f170) / 100 : 0;
+        const fundFlow = d.f184 != null && Number.isFinite(Number(d.f184)) ? Number(d.f184) * 10000 : 0;
+        return {
+          name: d.f58 != null ? String(d.f58) : '',
+          code: d.f57 != null ? String(d.f57) : '',
+          price: d.f43 != null && Number.isFinite(Number(d.f43)) ? Number(d.f43) / 1000 : 0,
+          change,
+          fundFlow,
+        };
+      },
+      staleTime: 60 * 1000, // 1分钟缓存
+    });
+    return detail || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * 获取板块资金流向K线数据
+ * @param {string} secid - 板块secid，如 "90.BK1128"
+ * @returns {Promise<{time: string, mainFlow: number, smallFlow: number, mediumFlow: number, largeFlow: number, superLargeFlow: number}|null>}
+ */
+export const fetchSectorFlowKline = async (secid) => {
+  const timestamp = Date.now();
+  const url = `https://push2.eastmoney.com/api/qt/stock/fflow/kline/get?lmt=1&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56&ut=fa5fd1943c7b386f172d6893dbfba10b&_=${timestamp}`;
+
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+
+    // 解析响应（可能是 JSON 或 JSONP）
+    let json;
+    try {
+      // 先尝试直接解析 JSON
+      json = JSON.parse(text);
+    } catch {
+      // 如果不是纯JSON，尝试JSONP格式
+      const match = text.match(/\(({.*})\)/);
+      if (!match) return null;
+      json = JSON.parse(match[1]);
+    }
+
+    if (!json.data?.klines?.length) return null;
+
+    // 取最新的一条数据
+    const latest = json.data.klines[json.data.klines.length - 1];
+    const parts = latest.split(',');
+
+    // 检查数据长度：至少有 6 个字段（时间+5个资金流）
+    if (parts.length < 6) return null;
+
+    // f52:主力净流入, f53:小单净流入, f54:中单净流入, f55:大单净流入, f56:超大单净流入
+    return {
+      //格式2026-04-27 14:49
+      time: parts[0],
+      mainFlow: parseFloat(parts[1]) || 0,      // 主力净流入
+      smallFlow: parseFloat(parts[2]) || 0,     // 小单净流入
+      mediumFlow: parseFloat(parts[3]) || 0,    // 中单净流入
+      largeFlow: parseFloat(parts[4]) || 0,     // 大单净流入
+      superLargeFlow: parseFloat(parts[5]) || 0,             // 超大单净流入（可能为0）
+    };
+  } catch (e) {
+    console.error('获取板块资金流向失败:', e);
+    return null;
+  }
 };
 
 function normalizeEastmoneyScriptUrl(url) {
@@ -493,7 +627,7 @@ function fundDebugEnabled() {
 function fundDebugLog(...args) {
   try {
     if (!fundDebugEnabled()) return;
-     
+
     console.debug('[fund][debug]', ...args);
   } catch (e) {
   }
