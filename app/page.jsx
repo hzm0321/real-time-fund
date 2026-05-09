@@ -82,6 +82,10 @@ const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr:
 import MarketIndexAccordion from "./components/MarketIndexAccordion";
 import SortSettingModal from "./components/SortSettingModal";
 import githubImg from "./assets/github.svg";
+import SectorFlowModal from './components/SectorFlowModal';
+import SectorFlowDetailModal from './components/SectorFlowDetailModal';
+import { fetchSectorDetail, fetchRelatedSectors } from './api/fund';
+import { Wallet } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { recordValuation, getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
 import {
@@ -477,8 +481,138 @@ export default function HomePage() {
 
   // 交易日检测（抽离到 useTradingDay）
   const { isTradingDay } = useTradingDay();
+  // 板块资金流向
+  const [sectors, setSectors] = useState([]);
+  const [sectorModalOpen, setSectorModalOpen] = useState(false);
+  const [sectorDetailModalOpen, setSectorDetailModalOpen] = useState(false);
+  const [selectedSector, setSelectedSector] = useState(null);
 
-  const activeGroupId =
+
+  // 从 localStorage 加载板块列表
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('sectors');
+      if (saved) {
+        setSectors(JSON.parse(saved));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 保存板块列表到 localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('sectors', JSON.stringify(sectors));
+    } catch {
+      // ignore
+    }
+  }, [sectors]);
+
+  // 定时刷新板块数据 - 使用ref避免依赖sectors导致无限循环
+  const sectorsRef = useRef(sectors);
+  useEffect(() => {
+    sectorsRef.current = sectors;
+  }, [sectors]);
+
+  useEffect(() => {
+    if (sectors.length === 0) return;
+
+    const refreshSectors = async () => {
+      const currentSectors = sectorsRef.current;
+      const updated = [];
+      for (const s of currentSectors) {
+        if (!s.secid) continue;
+        try {
+          const data = await fetchSectorDetail(s.secid);
+          if (data) {
+            updated.push({ ...s, ...data });
+          } else {
+            updated.push(s);
+          }
+        } catch {
+          updated.push(s);
+        }
+      }
+      setSectors(updated);
+    };
+
+    refreshSectors();
+    const interval = setInterval(refreshSectors, 5 * 60 * 1000); // 每5分钟刷新
+    return () => clearInterval(interval);
+  }, []); // 空依赖，只在组件挂载时启动定时器
+
+  // 根据基金列表初始化板块（如果没有板块）
+  useEffect(() => {
+    if (sectors.length > 0 || funds.length === 0) return;
+
+    const initSectors = async () => {
+      const relatedSet = new Set();
+      // 遍历前10个基金，获取关联板块
+      for (const fund of funds) {
+        try {
+          const related = await fetchRelatedSectors(fund.code);
+          if (related) {
+            related.split(/[,，]/).forEach(r => {
+              const name = r.trim();
+              if (name) relatedSet.add(name);
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+    };
+
+    initSectors();
+  }, [funds.length]);
+
+  // 存储当前被划开的基金代码
+  const [swipedFundCode, setSwipedFundCode] = useState(null);
+
+  // 点击页面其他区域时收起删除按钮
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      // 检查点击事件是否来自删除按钮
+      // 如果点击的是 .swipe-action-bg 或其子元素，不执行收起逻辑
+      if (e.target.closest('.swipe-action-bg')) {
+        return;
+      }
+
+      if (swipedFundCode) {
+        setSwipedFundCode(null);
+      }
+    };
+
+    if (swipedFundCode) {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [swipedFundCode]);
+
+
+
+    // 板块操作函数
+    const handleAddSector = async (sector) => {
+        if (sectors.some(s => s.name === sector.name)) return;
+        // 直接使用传入的 sector 数据（已包含 fundFlow 等字段）
+        setSectors(prev => [...prev, sector]);
+    };
+
+    const handleRemoveSector = (name) => {
+        setSectors(prev => prev.filter(s => s.name !== name));
+    };
+
+
+    const activeGroupId =
     currentTab !== 'all' &&
     currentTab !== 'fav' &&
     currentTab !== SUMMARY_TAB_ID &&
@@ -6597,6 +6731,15 @@ export default function HomePage() {
           <span className="github-icon-wrap">
             <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} />
           </span>
+            <button
+                className="icon-button"
+                aria-label="板块资金流向"
+                onClick={() => setSectorModalOpen(true)}
+                title="板块流向"
+                style={{ position: 'relative' }}
+            >
+                <Wallet width="18" height="18" />
+            </button>
           {isMobile && (
             <button
               className="icon-button mobile-search-btn"
@@ -7890,6 +8033,35 @@ export default function HomePage() {
             showMarketIndexMobile={showMarketIndexMobile}
             showGroupFundSearchPc={showGroupFundSearchPc}
             showGroupFundSearchMobile={showGroupFundSearchMobile}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 板块资金流向弹窗 */}
+      {sectorModalOpen && (
+        <SectorFlowModal
+          open={sectorModalOpen}
+          onClose={() => setSectorModalOpen(false)}
+          sectors={sectors}
+          onAddSector={handleAddSector}
+          onRemoveSector={handleRemoveSector}
+          onSectorClick={(sector) => {
+            setSelectedSector(sector);
+            setSectorDetailModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* 板块资金流向详情弹窗 */}
+      <AnimatePresence>
+        {sectorDetailModalOpen && selectedSector && (
+          <SectorFlowDetailModal
+            open={sectorDetailModalOpen}
+            onClose={() => {
+              setSectorDetailModalOpen(false);
+              setSelectedSector(null);
+            }}
+            sector={selectedSector}
           />
         )}
       </AnimatePresence>
