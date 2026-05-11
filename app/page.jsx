@@ -3986,13 +3986,14 @@ export default function HomePage() {
         if (!data || !fundCodeStillInStorage(c)) return;
 
         const oldData = getStoredFundSnapshot(c);
-        // 如果估值接口本轮失败（回退到 fallback），说明盘中估值（gsz）获取失败。
-        // 为了防止前端估值变为空白，我们将本地旧数据的 gsz 等估值字段保留下来，但依然让最新的持仓和历史净值覆盖上去。
-        if (data.valuationSource === 'fallback' && oldData) {
+        // 估值查询失败或返回空 gsz 时复用本地上一轮有效估值，避免界面估清；持仓/净值仍用本轮接口结果。
+        const hasValidGsz = (row) => Number.isFinite(Number(row?.gsz));
+        if (oldData && !hasValidGsz(data) && hasValidGsz(oldData)) {
           data.gsz = oldData.gsz;
           data.gszzl = oldData.gszzl;
           data.gztime = oldData.gztime;
-          data.valuationSource = oldData.valuationSource; // 维持原有来源标识
+          if (oldData.valuationSource) data.valuationSource = oldData.valuationSource;
+          data.noValuation = false;
         }
 
         updated.push(data);
