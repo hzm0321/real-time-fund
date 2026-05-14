@@ -12,6 +12,7 @@ export const getFundCodesSignature = (value, extraFields = []) => {
     const fields = Array.from(new Set([
       'jzrq',
       'dwjz',
+      'dataSource',
       ...(Array.isArray(extraFields) ? extraFields : [])
     ]));
     const items = list.map((item) => {

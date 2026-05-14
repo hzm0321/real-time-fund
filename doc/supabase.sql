@@ -7,7 +7,6 @@ create table public.user_configs (
   user_id uuid not null,
   last_device_id text null, -- 1.3.5 新增
   constraint user_configs_pkey primary key (id),
-  constraint user_configs_last_device_id_key unique (last_device_id),
   constraint user_configs_user_id_key unique (user_id)
 ) TABLESPACE pg_default;
 

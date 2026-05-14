@@ -27,6 +27,7 @@ import {
 import Announcement from "./components/Announcement";
 import EmptyStateCard from "./components/EmptyStateCard";
 import FundCard from "./components/FundCard";
+import FundDataSourceSelector from "./components/FundDataSourceSelector";
 import GroupSummary from "./components/GroupSummary";
 import GroupAccountSummaryCard from "./components/GroupAccountSummaryCard";
 import {
@@ -86,7 +87,7 @@ import SectorFlowDetailModal from './components/SectorFlowDetailModal';
 import { fetchSectorDetail, fetchRelatedSectors } from './api/fund';
 import { Wallet } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { recordValuation, getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
+import { recordValuation, setValuationSeries as persistValuationSeries, getAllValuationSeries, getAllValuationSeriesRaw, clearFund } from './lib/valuationTimeseries';
 import {
   DAILY_EARNINGS_SCOPE_ALL,
   aggregatePortfolioDailyEarnings,
@@ -400,6 +401,7 @@ export default function HomePage() {
   const [convertModal, setConvertModal] = useState({ open: false, fund: null });
   const [selectFundSingleModal, setSelectFundSingleModal] = useState({ open: false, excludeCodes: [], initialSelectedCode: '' });
   const [selectHoldingGroupModal, setSelectHoldingGroupModal] = useState({ open: false, fund: null });
+  const [dataSourceModal, setDataSourceModal] = useState({ open: false, fund: null });
   const [dcaModal, setDcaModal] = useState({ open: false, fund: null });
   const [clearConfirm, setClearConfirm] = useState(null); // { fund }
   const [donateOpen, setDonateOpen] = useState(false);
@@ -3427,7 +3429,7 @@ export default function HomePage() {
         }
        setTempSeconds(Math.round(useStorageStore.getState().refreshMs / 1000));
        // 加载估值分时记录（用于分时图）
-      setValuationSeries(getAllValuationSeries());
+      setValuationSeries(getAllValuationSeries(funds));
       // 加载自选状态：只保留存在于 funds 中的 code，避免“自选数量 > 全部数量”
       const savedFavorites = Array.from(favorites);
       const storedFundCodeSet = new Set(funds.map((f) => f?.code).filter(Boolean));
@@ -3766,7 +3768,7 @@ export default function HomePage() {
         const nextSeries = {};
         added.forEach(u => {
           if (u?.code != null && !u.noValuation && Number.isFinite(Number(u.gsz))) {
-            nextSeries[u.code] = recordValuation(u.code, { gsz: u.gsz, gztime: u.gztime });
+            nextSeries[u.code] = recordValuation(u.code, { gsz: u.gsz, gztime: u.gztime }, 1);
           }
         });
         if (Object.keys(nextSeries).length > 0) setValuationSeries(prev => ({ ...prev, ...nextSeries }));
@@ -3802,7 +3804,7 @@ export default function HomePage() {
         const nextSeries = {};
         newFunds.forEach(u => {
           if (u?.code != null && !u.noValuation && Number.isFinite(Number(u.gsz))) {
-            nextSeries[u.code] = recordValuation(u.code, { gsz: u.gsz, gztime: u.gztime });
+            nextSeries[u.code] = recordValuation(u.code, { gsz: u.gsz, gztime: u.gztime }, 1);
           }
         });
         if (Object.keys(nextSeries).length > 0) setValuationSeries(prev => ({ ...prev, ...nextSeries }));
@@ -3996,26 +3998,24 @@ export default function HomePage() {
 
         updated.push(data);
 
-        // 【步骤 3.2】估值时序记录：提取实时估值点（gsz），用于绘制分时图
+        // 【步骤 3.2】估值时序记录
+        const storedFund = getStoredFundSnapshot(data.code);
+        const fundDs = storedFund?.dataSource || 1;
         if (data.code != null && !data.noValuation && Number.isFinite(Number(data.gsz))) {
-          const value = Number(data.gsz);
-          const gztime = data.gztime ?? null;
-          const dateStr = (isString(gztime) && /^\d{4}-\d{2}-\d{2}/.test(gztime))
-            ? gztime.slice(0, 10)
-            : dayjs().tz(TZ).format('YYYY-MM-DD');
-          const timeLabel = (isString(gztime) && gztime.length > 10)
-            ? gztime.slice(11, 16)
-            : dayjs().tz(TZ).format('HH:mm');
-
-          const list = Array.isArray(nextValuationSeries[data.code]) ? nextValuationSeries[data.code] : [];
-          const lastDate = list.length ? list[list.length - 1].date : '';
-
-          if (dateStr > lastDate) {
-            nextValuationSeries[data.code] = [{ time: timeLabel, value, date: dateStr }];
-            valuationChanged = true;
-          } else if (dateStr === lastDate) {
-            if (!list.some(p => p.time === timeLabel)) {
-              nextValuationSeries[data.code] = [...list, { time: timeLabel, value, date: dateStr }];
+          if (data.fundValuationTimeseries && isPlainObject(data.fundValuationTimeseries)) {
+            // 数据源 2/3：使用 API 返回的完整分时序列，写入对应数据源桶
+            for (const [tsCode, tsList] of Object.entries(data.fundValuationTimeseries)) {
+              if (Array.isArray(tsList) && tsList.length > 0) {
+                persistValuationSeries(tsCode, fundDs, tsList);
+                nextValuationSeries[tsCode] = tsList;
+                valuationChanged = true;
+              }
+            }
+          } else {
+            // 数据源 1：逐点记录分时估值
+            const recorded = recordValuation(data.code, { gsz: data.gsz, gztime: data.gztime }, fundDs);
+            if (recorded) {
+              nextValuationSeries[data.code] = recorded;
               valuationChanged = true;
             }
           }
@@ -4145,6 +4145,7 @@ export default function HomePage() {
             if (f.addedAt != null) merged.addedAt = f.addedAt;
             if (f.addBaseNav != null) merged.addBaseNav = f.addBaseNav;
             if (f.addBaseDate != null) merged.addBaseDate = f.addBaseDate;
+            if (f.dataSource != null) merged.dataSource = f.dataSource;
             if (merged.addedAt == null || merged.addBaseNav == null || merged.addBaseDate == null) {
               const snap = getAddBaseSnapshotFromFund(merged);
               if (merged.addedAt == null) merged.addedAt = Date.now();
@@ -4164,7 +4165,6 @@ export default function HomePage() {
             });
             return next;
           });
-          storageStore.setItem('fundValuationTimeseries', JSON.stringify(nextValuationSeries));
         }
       }
 
@@ -5695,36 +5695,44 @@ export default function HomePage() {
         const localTimeseries = storageStore.getItem('fundValuationTimeseries', {});
         const mergedTimeseries = { ...localTimeseries };
 
+        // 兼容旧格式（扁平）和新格式（分数据源）
+        const mergeSeries = (cloudArr, localArr) => {
+          const pointsMap = new Map();
+          localArr.forEach(pt => {
+            if (pt && pt.date && pt.time) pointsMap.set(`${pt.date}_${pt.time}`, pt);
+          });
+          cloudArr.forEach(pt => {
+            if (pt && pt.date && pt.time) pointsMap.set(`${pt.date}_${pt.time}`, pt);
+          });
+          let mergedArr = Array.from(pointsMap.values()).sort((a, b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            return a.time.localeCompare(b.time);
+          });
+          const maxDate = mergedArr.reduce((max, pt) => (pt.date > max ? pt.date : max), '');
+          if (maxDate) mergedArr = mergedArr.filter(pt => pt.date === maxDate);
+          return mergedArr;
+        };
+
         Object.keys(nextTimeseries).forEach(code => {
-          if (nextFundCodes.has(code) && Array.isArray(nextTimeseries[code])) {
-            const cloudArr = nextTimeseries[code];
-            const localArr = Array.isArray(mergedTimeseries[code]) ? mergedTimeseries[code] : [];
-
-            const pointsMap = new Map();
-
-            localArr.forEach(pt => {
-              if (pt && pt.date && pt.time) {
-                pointsMap.set(`${pt.date}_${pt.time}`, pt);
-              }
+          if (!nextFundCodes.has(code)) return;
+          const cloudEntry = nextTimeseries[code];
+          const localEntry = mergedTimeseries[code];
+          // 旧格式：{ [code]: [...] }
+          if (Array.isArray(cloudEntry)) {
+            const localArr = Array.isArray(localEntry) ? localEntry : [];
+            mergedTimeseries[code] = { '1': mergeSeries(cloudEntry, localArr) };
+            return;
+          }
+          // 新格式：{ [code]: { [ds]: [...] } }
+          if (isPlainObject(cloudEntry)) {
+            const localDsMap = isPlainObject(localEntry) ? localEntry : {};
+            const mergedDsMap = { ...localDsMap };
+            Object.keys(cloudEntry).forEach(ds => {
+              if (!Array.isArray(cloudEntry[ds])) return;
+              const localArr = Array.isArray(mergedDsMap[ds]) ? mergedDsMap[ds] : [];
+              mergedDsMap[ds] = mergeSeries(cloudEntry[ds], localArr);
             });
-
-            cloudArr.forEach(pt => {
-              if (pt && pt.date && pt.time) {
-                pointsMap.set(`${pt.date}_${pt.time}`, pt);
-              }
-            });
-
-            let mergedArr = Array.from(pointsMap.values()).sort((a, b) => {
-              if (a.date !== b.date) return a.date.localeCompare(b.date);
-              return a.time.localeCompare(b.time);
-            });
-
-            const maxDate = mergedArr.reduce((max, pt) => (pt.date > max ? pt.date : max), '');
-            if (maxDate) {
-              mergedArr = mergedArr.filter(pt => pt.date === maxDate);
-            }
-
-            mergedTimeseries[code] = mergedArr;
+            mergedTimeseries[code] = mergedDsMap;
           }
         });
 
@@ -6482,6 +6490,24 @@ export default function HomePage() {
 
     setHoldingModal({ open: true, fund });
   }, [activeGroupId, currentTab, groupHoldings, holdings, linkedHoldingsForAllFav]);
+  const openDataSourceModal = useCallback((fund) => {
+    setDataSourceModal({ open: true, fund });
+  }, []);
+
+  const handleDataSourceSelect = useCallback((fundCode, sourceId) => {
+    setFunds((prev) => {
+      const next = [...prev];
+      const idx = next.findIndex(f => f.code === fundCode);
+      if (idx !== -1) {
+        next[idx] = { ...next[idx], dataSource: sourceId };
+      }
+      return next;
+    });
+    // Immediately fetch new data for this fund so the UI updates
+    refreshAll([fundCode]);
+    showToast('切换数据源成功', 'success');
+  }, [setFunds]); // refreshAll is omitted from deps to avoid loop, it's stable enough in page scope
+
   const openActionModal = useCallback((fund) => {
     const code = fund?.code;
     if ((currentTab === 'all' || currentTab === 'fav') && code && linkedHoldingsForAllFav.linked?.has?.(code)) {
@@ -6501,7 +6527,7 @@ export default function HomePage() {
     const fund = row?.rawFund || (row ? { code: row.code, name: row.fundName } : null);
     if (!fund) return {};
     return {
-      fund,
+      fundCode: fund.code,
       todayStr,
       currentTab,
       favorites,
@@ -6522,6 +6548,7 @@ export default function HomePage() {
       onRemoveFund: handleRemoveFundEntry,
       onHoldingClick: openHoldingModal,
       onActionClick: openActionModal,
+      onDataSourceClick: openDataSourceModal,
       onPercentModeToggle: togglePercentMode,
       onTodayPercentModeToggle: toggleTodayPercentMode,
       onToggleCollapse: toggleCollapse,
@@ -6555,6 +6582,7 @@ export default function HomePage() {
     handleRemoveFundEntry,
     openHoldingModal,
     openActionModal,
+    openDataSourceModal,
     togglePercentMode,
     toggleTodayPercentMode,
     toggleCollapse,
@@ -7253,7 +7281,7 @@ export default function HomePage() {
                           style={{ position: 'relative', overflow: 'hidden' }}
                         >
                             <FundCard
-                              fund={f}
+                              fundCode={f.code}
                               isHoldingLinked={
                                 (currentTab === 'all' || currentTab === 'fav') &&
                                 linkedHoldingsForAllFav.linked?.has?.(f?.code)
@@ -7278,6 +7306,7 @@ export default function HomePage() {
                               onRemoveFund={handleRemoveFundEntry}
                               onHoldingClick={openHoldingModal}
                               onActionClick={openActionModal}
+                              onDataSourceClick={openDataSourceModal}
                               onPercentModeToggle={togglePercentMode}
                               onTodayPercentModeToggle={toggleTodayPercentMode}
                               onToggleCollapse={toggleCollapse}
@@ -7562,6 +7591,16 @@ export default function HomePage() {
               setSelectHoldingGroupModal({ open: false, fund: null });
               setActionModal({ open: true, fund, groupId });
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {dataSourceModal.open && dataSourceModal.fund && (
+          <FundDataSourceSelector
+            fund={dataSourceModal.fund}
+            onClose={() => setDataSourceModal({ open: false, fund: null })}
+            onSelect={(sourceId) => handleDataSourceSelect(dataSourceModal.fund.code, sourceId)}
           />
         )}
       </AnimatePresence>

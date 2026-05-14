@@ -24,6 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { getTagThemeBadgeProps } from './AddTagDialog';
 import { cn } from '@/lib/utils';
+import { useStorageStore } from "@/app/stores";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -52,7 +53,7 @@ const formatDisplayDate = (value) => {
 };
 
 export default function FundCard({
-  fund: f,
+  fundCode,
   isHoldingLinked = false,
   todayStr,
   currentTab,
@@ -84,7 +85,12 @@ export default function FundCard({
   fundTags = [],
   onFundTagsClick,
   fundExtraData,
+  onDataSourceClick,
 }) {
+  const {
+    funds,
+  } = useStorageStore();
+  const f = useMemo(() => funds?.find((item) => item.code === fundCode), [funds, fundCode]);
   const holding = holdings[f?.code];
   const profit = getHoldingProfit?.(f, holding) ?? null;
   const hasHoldings = f.holdingsIsLastQuarter && Array.isArray(f.holdings) && f.holdings.length > 0;
@@ -233,6 +239,15 @@ export default function FundCard({
         </div>
 
         <div className="actions">
+          <div
+            className="badge-v"
+            style={{ cursor: 'pointer', background: 'var(--primary-light, rgba(34, 211, 238, 0.1))', color: 'var(--primary)' }}
+            onClick={() => onDataSourceClick?.(f)}
+            title="点击切换估值数据源"
+          >
+            <span>数据源</span>
+            <strong>{f.dataSource || 1}</strong>
+          </div>
           <div className="badge-v">
             <span>{f.noValuation ? '净值日期' : '估值时间'}</span>
             <strong>
@@ -527,11 +542,17 @@ export default function FundCard({
           return null;
         }
 
+        // 以昨日收盘净值为基准，与估算涨幅 gszzl 保持一致
+        const dwjz = f.dwjz != null ? Number(f.dwjz) : null;
+        const zzl = f.zzl != null ? Number(f.zzl) : null;
+        const yesterdayNav = dwjz != null && zzl != null && Number.isFinite(zzl)
+          ? dwjz / (1 + zzl / 100)
+          : dwjz;
         return (
           <FundIntradayChart
             key={`${f.code}-intraday-${theme}`}
             series={valuationSeries[f.code]}
-            referenceNav={f.dwjz != null ? Number(f.dwjz) : undefined}
+            referenceNav={yesterdayNav != null && Number.isFinite(yesterdayNav) ? yesterdayNav : undefined}
             theme={theme}
           />
         );

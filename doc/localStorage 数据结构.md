@@ -30,6 +30,7 @@
     gszzl: number,     // 估算涨跌幅
     jzrq: string,      // 净值日期
     gztime: string,    // 估值时间
+    dataSource?: number, // 估值数据源标识（1=天天基金，2=新浪基金预估等，缺省为1）
     // ... 其他基金字段
   }
 ]

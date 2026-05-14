@@ -256,29 +256,7 @@ export default function FundIntradayChart({ series = [], referenceNav, theme = '
     <div style={{ marginTop: 12, marginBottom: 4 }}>
       <div className="muted" style={{ fontSize: 11, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          实时估值分时（按刷新记录）
-          <span
-            style={{
-              fontSize: 9,
-              padding: '2px 6px',
-              borderRadius: 4,
-              ...(theme === 'light'
-                ? {
-                    border: '1px solid',
-                    borderColor: chartColors.primary,
-                    color: chartColors.primary,
-                    background: 'transparent',
-                  }
-                : {
-                    background: 'var(--primary)',
-                    color: '#0f172a',
-                  }),
-              fontWeight: 600,
-            }}
-            title="正在测试中的功能"
-          >
-            Beta
-          </span>
+          实时估值分时
         </span>
         {displayDate && <span style={{ fontSize: 11 }}>估值日期 {displayDate}</span>}
       </div>

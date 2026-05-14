@@ -724,15 +724,235 @@ function ensureJsonpgzDispatcher() {
   return api;
 }
 
+/** 同一基金代码并发的新浪估值 JSONP 去重，避免数据源 2/3 各打一遍 */
+const sinaEstimateNetworthInflight = new Map();
+
+function normalizeValuationDataSource(dataSource) {
+  const n = Number(dataSource);
+  if (n === 2) return 2;
+  if (n === 3) return 3;
+  return 1;
+}
+
+/**
+ * 新浪 FdFundService.getEstimateNetworthPic 原始响应（含 networth 序列）
+ * @param {string} code
+ * @returns {Promise<object|null>}
+ */
+function fetchSinaEstimateNetworthResponse(code) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.reject(new Error('无浏览器环境'));
+  }
+  const c = code != null ? String(code).trim() : '';
+  if (!c) return Promise.reject(new Error('基金编码无效'));
+
+  const existing = sinaEstimateNetworthInflight.get(c);
+  if (existing) return existing;
+
+  const p = new Promise((resolve, reject) => {
+    fundDebugLog('fetchSinaEstimateNetworth start', { code: c });
+    const callbackName = `jsonp_sina_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const url = `https://stock.finance.sina.com.cn/fundInfo/api/openapi.php/FdFundService.getEstimateNetworthPic?symbol=${c}&callback=${callbackName}`;
+
+    const scriptSina = document.createElement('script');
+    let timer;
+
+    const cleanupScript = () => {
+      if (timer) clearTimeout(timer);
+      try {
+        delete window[callbackName];
+      } catch (e) {}
+      if (document.body && document.body.contains(scriptSina)) {
+        document.body.removeChild(scriptSina);
+      }
+    };
+
+    window[callbackName] = (res) => {
+      cleanupScript();
+      resolve(res);
+    };
+
+    timer = setTimeout(() => {
+      cleanupScript();
+      resolve(null);
+    }, 10000);
+
+    scriptSina.src = url;
+    scriptSina.async = true;
+    scriptSina.onerror = () => {
+      cleanupScript();
+      reject(new Error('sina script error'));
+    };
+    document.body.appendChild(scriptSina);
+  }).finally(() => {
+    sinaEstimateNetworthInflight.delete(c);
+  });
+
+  sinaEstimateNetworthInflight.set(c, p);
+  return p;
+}
+
+/**
+ * 统一估值结构（仅估值相关字段）
+ * @typedef {object} UnifiedFundValuation
+ * @property {string} code
+ * @property {number | null} gsz - 估算净值
+ * @property {string | null} gztime - 估值时间
+ * @property {number | null} gszzl - 估算涨跌幅（百分比数值，如 1.23 表示 +1.23%）
+ * @property {string} valuationSource - 如 fundgz、sina_ds2、sina_ds3
+ */
+
+/**
+ * 按基金编码与数据源类型获取估值（天天基金 fundgz 或新浪估算曲线末点）。
+ * @param {string} code - 基金编码
+ * @param {number | string} [dataSource=1] - 1 天天基金；2、3 新浪估算不同口径
+ * @returns {Promise<UnifiedFundValuation>}
+ */
+export async function fetchFundValuationBySource(code, dataSource = 1) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    throw new Error('无浏览器环境');
+  }
+  const c = code != null ? String(code).trim() : '';
+  if (!c) throw new Error('基金编码无效');
+
+  const ds = normalizeValuationDataSource(dataSource);
+
+  if (ds === 2 || ds === 3) {
+    fundDebugLog('fetchFundValuationBySource sina', { code: c, dataSource: ds });
+    const res = await fetchSinaEstimateNetworthResponse(c);
+    if (!res?.result?.data?.networth || !Array.isArray(res.result.data.networth) || res.result.data.networth.length === 0) {
+      throw new Error('sina no data');
+    }
+    const networth = res.result.data.networth;
+    const lastPoint = networth[networth.length - 1];
+    const gRate = ds === 2 ? parseFloat(lastPoint.growthrate) : parseFloat(lastPoint.growthrate2);
+    const preNav = ds === 2 ? parseFloat(lastPoint.pre_nav) : parseFloat(lastPoint.pre_nav2);
+    const gsz = Number.isFinite(preNav) ? preNav : null;
+    const gszzl = Number.isFinite(gRate) ? gRate * 100 : null;
+    if (gsz == null && gszzl == null) {
+      throw new Error('sina empty point');
+    }
+
+    // 构建分时估值序列，格式与 fundValuationTimeseries 一致
+    const navKey = ds === 2 ? 'pre_nav' : 'pre_nav2';
+    const timeseries = [];
+    const seen = new Set();
+    for (const point of networth) {
+      const value = parseFloat(point[navKey]);
+      if (!Number.isFinite(value)) continue;
+      const time = point.min_time || null;
+      const date = point.pre_date || null;
+      if (!time || !date) continue;
+      const key = `${date} ${time}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      timeseries.push({ time, value, date });
+    }
+
+    return {
+      code: c,
+      gsz,
+      gztime: lastPoint.min_time ? `${lastPoint.pre_date} ${lastPoint.min_time}` : null,
+      gszzl,
+      valuationSource: `sina_ds${ds}`,
+      fundValuationTimeseries: { [c]: timeseries },
+    };
+  }
+
+  const dispatcher = ensureJsonpgzDispatcher();
+  if (!dispatcher) throw new Error('无浏览器环境');
+
+  fundDebugLog('fetchFundValuationBySource fundgz', { code: c });
+  const gzUrl = `https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const settleOnce = (fn) => (arg) => {
+      if (settled) return;
+      settled = true;
+      fn(arg);
+    };
+    const safeResolve = settleOnce(resolve);
+    const safeReject = settleOnce(reject);
+
+    const scriptGz = document.createElement('script');
+    scriptGz.src = gzUrl;
+    scriptGz.async = true;
+
+    const cleanupScript = () => {
+      try {
+        if (timer) clearTimeout(timer);
+      } catch (e) {}
+      try {
+        if (document.body && document.body.contains(scriptGz)) document.body.removeChild(scriptGz);
+      } catch (e) {}
+      try {
+        if (removePending) removePending();
+      } catch (e) {}
+    };
+
+    const onTimeout = () => {
+      fundDebugLog('fetchFundValuationBySource gz timeout', { code: c, timeoutMs: 10000 });
+      cleanupScript();
+      safeReject(new Error('gz timeout'));
+    };
+
+    const timer = setTimeout(onTimeout, 10000);
+
+    let removePending = null;
+    removePending = dispatcher.add(c, {
+      cleanup: cleanupScript,
+      onJson: (json) => {
+        fundDebugLog('fetchFundValuationBySource jsonpgz', { code: c, fundcode: json?.fundcode });
+        cleanupScript();
+
+        if (!json || typeof json !== 'object') {
+          safeReject(new Error('invalid json'));
+          return;
+        }
+
+        const gszzlNum = Number(json.gszzl);
+        const gszNum = Number(json.gsz);
+        safeResolve({
+          code: json.fundcode != null ? String(json.fundcode).trim() : c,
+          gsz: Number.isFinite(gszNum) ? gszNum : json.gsz,
+          gztime: json.gztime != null ? String(json.gztime) : null,
+          gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
+          valuationSource: 'fundgz',
+        });
+      },
+      onError: (e) => {
+        cleanupScript();
+        safeReject(e || new Error('gz error callback'));
+      },
+    });
+
+    scriptGz.onerror = () => {
+      fundDebugLog('fetchFundValuationBySource gz script error', { code: c, url: gzUrl });
+      cleanupScript();
+      safeReject(new Error('gz script error'));
+    };
+
+    document.body.appendChild(scriptGz);
+  });
+}
+
 export const fetchFundData = async (c) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     throw new Error('无浏览器环境');
   }
-  const dispatcher = ensureJsonpgzDispatcher();
-  if (!dispatcher) throw new Error('无浏览器环境');
 
   const code = c != null ? String(c).trim() : '';
   if (!code) return fetchFundDataFallback(c);
+
+  let dataSource = 1;
+  try {
+    const arr = storageStore.getItem('funds', []);
+    if (Array.isArray(arr)) {
+      const f = arr.find(x => x.code === code);
+      if (f && f.dataSource) dataSource = f.dataSource;
+    }
+  } catch (e) {}
 
   // 1. 发起并发的历史净值和重仓请求
   const lsjzPromise = new Promise((resolveT) => {
@@ -943,84 +1163,8 @@ export const fetchFundData = async (c) => {
       .catch(() => resolveH({ holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false }));
   });
 
-  // 2. 发起估值请求 (gzPromise)
-  const gzPromise = new Promise((resolveGz, rejectGz) => {
-    fundDebugLog('fetchFundData start gz', { code });
-    const gzUrl = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`;
-    const scriptGz = document.createElement('script');
-    scriptGz.src = gzUrl;
-    scriptGz.async = true;
-
-    let settled = false;
-    const settleOnce = (fn) => (arg) => {
-      if (settled) return;
-      settled = true;
-      fn(arg);
-    };
-    const safeResolve = settleOnce(resolveGz);
-    const safeReject = settleOnce(rejectGz);
-
-    const cleanupScript = () => {
-      try {
-        if (timer) clearTimeout(timer);
-      } catch (e) {}
-      try {
-        if (document.body && document.body.contains(scriptGz)) document.body.removeChild(scriptGz);
-      } catch (e) {}
-      try {
-        if (removePending) removePending();
-      } catch (e) {}
-    };
-
-    const onTimeout = () => {
-      fundDebugLog('fetchFundData timeout -> reject gz', { code, timeoutMs: 10000 });
-      cleanupScript();
-      safeReject(new Error('gz timeout'));
-    };
-
-    const timer = setTimeout(onTimeout, 10000);
-
-    let removePending = null;
-    removePending = dispatcher.add(code, {
-      cleanup: cleanupScript,
-      onJson: (json) => {
-        fundDebugLog('fetchFundData jsonpgz received', { code, fundcode: json?.fundcode });
-        cleanupScript();
-
-        if (!json || typeof json !== 'object') {
-          fundDebugLog('fetchFundData invalid json -> reject gz', { code });
-          safeReject(new Error('invalid json'));
-          return;
-        }
-
-        const gszzlNum = Number(json.gszzl);
-        safeResolve({
-          code: json.fundcode,
-          name: json.name,
-          dwjz: json.dwjz,
-          gsz: json.gsz,
-          gztime: json.gztime,
-          jzrq: json.jzrq,
-          gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
-          valuationSource: 'fundgz'
-        });
-      },
-      onError: (e) => {
-        fundDebugLog('fetchFundData onError -> reject gz', { code });
-        cleanupScript();
-        safeReject(e || new Error('gz error callback'));
-      },
-    });
-
-    scriptGz.onerror = () => {
-      fundDebugLog('fetchFundData script error -> reject gz', { code, url: gzUrl });
-      cleanupScript();
-      safeReject(new Error('gz script error'));
-    };
-
-    document.body.appendChild(scriptGz);
-    fundDebugLog('fetchFundData script appended', { code, url: gzUrl });
-  });
+  // 2. 发起估值请求（各数据源统一走 fetchFundValuationBySource）
+  const gzPromise = fetchFundValuationBySource(code, dataSource);
 
   // 3. 编排并合并数据
   return new Promise(async (resolve, reject) => {
@@ -1050,6 +1194,12 @@ export const fetchFundData = async (c) => {
         baseData.jzrq = tData.jzrq;
         baseData.zzl = tData.zzl;
         baseData.lastNav = tData.lastNav;
+      } else if (!baseData.dwjz && tData.dwjz) {
+        // Fallback for Sina which doesn't provide dwjz/jzrq
+        baseData.dwjz = tData.dwjz;
+        baseData.jzrq = tData.jzrq;
+        baseData.zzl = tData.zzl;
+        baseData.lastNav = tData.lastNav;
       }
       if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayZzl')) {
         baseData.yesterdayZzl = tData.yesterdayZzl;
@@ -1057,6 +1207,14 @@ export const fetchFundData = async (c) => {
       if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayNavDelta')) {
         baseData.yesterdayNavDelta = tData.yesterdayNavDelta;
       }
+    }
+
+    if (!baseData.name) {
+      try {
+        const results = await searchFunds(code);
+        const found = results.find((item) => item.CODE === code);
+        if (found) baseData.name = found.NAME || found.SHORTNAME;
+      } catch (e) {}
     }
 
     resolve({
