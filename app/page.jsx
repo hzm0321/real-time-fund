@@ -4124,6 +4124,17 @@ export default function HomePage() {
                   }
                 }
               }
+            } else if (isValidDateStr(lastRecordedDate) && lastRecordedDate === latestNavDate) {
+              // 当日收益已记录但净值可能已更新，用最新净值重新计算当日收益
+              const share = getEffectiveShare(latestNavDate);
+              const unitCost = Number(h?.cost);
+              const baseCostAmount = Number.isFinite(unitCost) && unitCost > 0 ? unitCost * share : null;
+              if (share > 0) {
+                const v = calcLatestDayFromFund(data, share, baseCostAmount);
+                if (v && Number.isFinite(v.earnings) && fundCodeStillInStorage(data.code)) {
+                  localRecordToChanges(scope, data.code, v.earnings, latestNavDate, v.rate, baseCostAmount, true);
+                }
+              }
             }
           }
         } catch (e) {
