@@ -852,7 +852,7 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
     return {
       code: c,
       gsz,
-      gztime: lastPoint.min_time ? `${lastPoint.pre_date} ${lastPoint.min_time}` : null,
+      gztime: lastPoint.min_time ? `${lastPoint.pre_date} ${lastPoint.min_time}`.replace(/:(\d{2}):\d{2}$/, ':$1') : null,
       gszzl,
       valuationSource: `sina_ds${ds}`,
       fundValuationTimeseries: { [c]: timeseries },
@@ -916,7 +916,7 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
         safeResolve({
           code: json.fundcode != null ? String(json.fundcode).trim() : c,
           gsz: Number.isFinite(gszNum) ? gszNum : json.gsz,
-          gztime: json.gztime != null ? String(json.gztime) : null,
+          gztime: json.gztime != null ? String(json.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
           gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
           valuationSource: 'fundgz',
         });
