@@ -591,7 +591,7 @@ export default function PcFundTable({
     const currentPinned = currentGroupPc?.pcTableColumnPinned || [];
     let nextPinned;
     let nextOrder;
-    
+
     if (currentPinned.includes(id)) {
       nextPinned = currentPinned.filter(c => c !== id);
       const pinnedPart = columnOrder.filter(c => nextPinned.includes(c));
@@ -603,7 +603,7 @@ export default function PcFundTable({
       const existingUnpinnedWithoutId = columnOrder.filter(c => !currentPinned.includes(c) && c !== id);
       nextOrder = [...existingPinned, id, ...existingUnpinnedWithoutId];
     }
-    
+
     persistPcGroupConfig({
       pcTableColumnPinned: nextPinned,
       pcTableColumnOrder: nextOrder,
@@ -1000,7 +1000,7 @@ export default function PcFundTable({
         >
           <span
             className={`name-text ${showFullFundName ? 'show-full' : ''}`}
-            title={isUpdated ? '今日净值已更新' : ''}
+            title={info.getValue() ?? undefined}
           >
             {holdingLocked ? (
               <span
