@@ -3987,7 +3987,7 @@ export default function HomePage() {
 
         const oldData = getStoredFundSnapshot(c);
         // 估值查询失败或返回空 gsz 时复用本地上一轮有效估值，避免界面估清；持仓/净值仍用本轮接口结果。
-        const hasValidGsz = (row) => Number.isFinite(Number(row?.gsz));
+        const hasValidGsz = (row) => row?.gsz != null && row?.gsz !== '' && Number.isFinite(Number(row?.gsz));
         if (oldData && !hasValidGsz(data) && hasValidGsz(oldData)) {
           data.gsz = oldData.gsz;
           data.gszzl = oldData.gszzl;
@@ -6510,7 +6510,15 @@ export default function HomePage() {
       const next = [...prev];
       const idx = next.findIndex(f => f.code === fundCode);
       if (idx !== -1) {
-        next[idx] = { ...next[idx], dataSource: sourceId };
+        next[idx] = { 
+          ...next[idx], 
+          dataSource: sourceId,
+          gsz: null,
+          gszzl: null,
+          gztime: null,
+          valuationSource: null,
+          noValuation: false
+        };
       }
       return next;
     });

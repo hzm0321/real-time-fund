@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v1.3.5';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v1.4.1';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -78,11 +78,10 @@ export default function Announcement() {
               <span>公告</span>
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
-              <p>v1.3.5 更新内容如下：</p>
-              <p>1. 新增单账号多设备同步乐观锁，避免因设备同步失败导致数据丢失。</p>
-              <p>2. 新增连续涨跌标识。</p>
-              <p>3. 截图识别允许覆盖已添加数据的持仓金额。</p>
-              <p>4. 移动端rem适配。</p>
+              <p>v1.4.1 更新内容如下：</p>
+              <p>1. 新增估值数据源切换。</p>
+              <p>2. 实时估值数据加入云端存储。</p>
+              <p>3. 修复近1周、近1月等排序箭头不显示问题。</p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
