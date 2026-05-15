@@ -142,7 +142,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                     )}
                   </div>
                   <span 
-                    className={item.est.startsWith('+') ? 'up' : item.est.startsWith('-') ? 'down' : 'muted'}
+                    className={item.est === '--' ? 'muted' : item.est.startsWith('+') ? 'up' : item.est.startsWith('-') ? 'down' : 'muted'}
                     style={{ 
                       fontSize: '16px', 
                       fontWeight: 500,
