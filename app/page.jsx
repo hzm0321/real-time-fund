@@ -94,7 +94,7 @@ import {
 } from './lib/dailyEarnings';
 import { loadHolidaysForYears, isTradingDay as isDateTradingDay } from './lib/tradingCalendar';
 import { asyncPool } from './lib/asyncHelper';
-import { parseFundTextWithLLM, fetchFundData, fetchFundNetValueRange, fetchShanghaiIndexDate, fetchSmartFundNetValue, fetchSmartFundNetValueBackward, searchFunds, fetchFundPeriodReturns } from './api/fund';
+import { parseFundTextWithLLM, fetchFundData, fetchNetValueRangeFromTrend, fetchShanghaiIndexDate, fetchSmartFundNetValue, fetchSmartFundNetValueBackward, searchFunds, fetchFundPeriodReturns } from './api/fund';
 import PcFundTable from './components/PcFundTable';
 import MobileFundTable from './components/MobileFundTable';
 import FundTagsEditDialog from './components/FundTagsEditDialog';
@@ -3922,7 +3922,7 @@ export default function HomePage() {
         }
         const end = subDays(dateStr, 1);
         const start = subDays(dateStr, 120);
-        const rows = await fetchFundNetValueRange(code, start, end);
+        const rows = await fetchNetValueRangeFromTrend(code, start, end);
         for (const r of rows) {
           if (navCache) navCache.set(r.date, r.nav);
         }
@@ -4098,7 +4098,7 @@ export default function HomePage() {
               if (Number.isFinite(latestNav) && latestNav > 0) navCache.set(latestNavDate, latestNav);
 
               const start = addDays(lastRecordedDate, 1);
-              const navRows = await fetchFundNetValueRange(data.code, lastRecordedDate, latestNavDate);
+              const navRows = await fetchNetValueRangeFromTrend(data.code, lastRecordedDate, latestNavDate);
               if (Number.isFinite(latestNav) && latestNav > 0 && !navRows.some(r => r.date === latestNavDate)) {
                 navRows.push({ date: latestNavDate, nav: latestNav });
                 navRows.sort((a, b) => a.date.localeCompare(b.date));
