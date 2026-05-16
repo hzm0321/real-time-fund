@@ -373,7 +373,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         }
 
         hoverTimeoutRef.current = setTimeout(() => {
-          if (!chart) return;
+          if (!chart || !chartRef.current || chart !== chartRef.current) return;
           chart.setActiveElements([]);
           if (chart.tooltip) {
             chart.tooltip.setActiveElements([], { x: 0, y: 0 });
