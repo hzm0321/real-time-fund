@@ -32,7 +32,7 @@ import MoveGroupModal from './MoveGroupModal';
 import SuccessModal from './SuccessModal';
 import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, LinkIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
 import { ConsecutiveTrendBadge } from './Common';
-import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
+import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuote } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
 import { Badge } from '@/components/ui/badge';
@@ -865,11 +865,6 @@ export default function MobileFundTable({
 
   const sectorAuthSegment = relatedSectorSessionKey || 'anon';
 
-  const fetchRelatedSector = useCallback(
-    (code) => fetchRelatedSectors(code, { authSegment: sectorAuthSegment }),
-    [sectorAuthSegment],
-  );
-
   useEffect(() => {
     relatedSectorCacheRef.current.clear();
     setRelatedSectorByCode({});
@@ -886,19 +881,31 @@ export default function MobileFundTable({
 
     let cancelled = false;
     (async () => {
-      await asyncPool(4, missing, async (code) => {
-        const value = await fetchRelatedSector(code);
-        relatedSectorCacheRef.current.set(code, value);
+      try {
+        const batchResults = await fetchRelatedSectorsBatch(missing, { authSegment: sectorAuthSegment });
         if (cancelled) return;
-        setRelatedSectorByCode((prev) => {
-          if (prev[code] === value) return prev;
-          return { ...prev, [code]: value };
+
+        Object.entries(batchResults).forEach(([code, value]) => {
+          relatedSectorCacheRef.current.set(code, value);
         });
-      });
+
+        setRelatedSectorByCode((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [code, value] of Object.entries(batchResults)) {
+            if (next[code] === value) continue;
+            next[code] = value;
+            changed = true;
+          }
+          return changed ? next : prev;
+        });
+      } catch (e) {
+        console.error('Fetch related sectors batch error (mobile):', e);
+      }
     })();
 
     return () => { cancelled = true; };
-  }, [relatedSectorEnabled, data, sectorAuthSegment, fetchRelatedSector]);
+  }, [relatedSectorEnabled, data, sectorAuthSegment]);
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;
@@ -911,28 +918,42 @@ export default function MobileFundTable({
       const t = lbl != null ? String(lbl).trim() : '';
       if (t) labels.add(t);
     }
-    if (labels.size === 0) return;
+    const labelList = Array.from(labels);
+    if (labelList.length === 0) return;
 
     let cancelled = false;
     (async () => {
-      await asyncPool(4, [...labels], async (label) => {
-        const quote = await fetchRelatedSectorLiveQuote(label);
+      try {
+        // 1. 批量获取 secid
+        const secidResults = await fetchFundSecidsBatch(labelList);
         if (cancelled) return;
-        setSectorQuoteByLabel((prev) => {
-          const prevQ = prev[label];
-          if (prevQ === quote) return prev;
-          if (
-            prevQ &&
-            quote &&
-            prevQ.pct === quote.pct &&
-            prevQ.name === quote.name &&
-            prevQ.code === quote.code
-          ) {
-            return prev;
+
+        // 2. 逐个获取行情（外部接口暂不支持批量）
+        await asyncPool(4, labelList, async (label) => {
+          const secid = secidResults[label];
+          if (!secid) return;
+          const quote = await fetchEastmoneySectorQuote(secid);
+          if (cancelled) return;
+          if (quote) {
+            setSectorQuoteByLabel((prev) => {
+              const prevQ = prev[label];
+              if (prevQ === quote) return prev;
+              if (
+                prevQ &&
+                quote &&
+                prevQ.pct === quote.pct &&
+                prevQ.name === quote.name &&
+                prevQ.code === quote.code
+              ) {
+                return prev;
+              }
+              return { ...prev, [label]: quote };
+            });
           }
-          return { ...prev, [label]: quote };
         });
-      });
+      } catch (e) {
+        console.error('Fetch sector quotes batch error (mobile):', e);
+      }
     })();
 
     return () => { cancelled = true; };

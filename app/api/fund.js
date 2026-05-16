@@ -92,6 +92,67 @@ export const fetchRelatedSectors = async (code, { cacheTime = ONE_DAY_MS, authSe
   }
 };
 
+/**
+ * 批量获取基金「关联板块」
+ * @param {string[]} codes
+ */
+export const fetchRelatedSectorsBatch = async (codes, { cacheTime = ONE_DAY_MS, authSegment = 'anon' } = {}) => {
+  if (!Array.isArray(codes) || codes.length === 0) return {};
+  if (!isSupabaseConfigured) return {};
+
+  const seg = authSegment != null && authSegment !== '' ? String(authSegment) : 'anon';
+  const qc = getQueryClient();
+  const results = {};
+
+  // 1. 筛选出缓存中没有的数据
+  const missingCodes = [];
+  for (const c of codes) {
+    const normalized = String(c).trim();
+    if (!normalized) continue;
+    const cached = qc.getQueryData(qk.relatedSectors(normalized, seg));
+    if (cached !== undefined) {
+      results[normalized] = cached;
+    } else {
+      missingCodes.push(normalized);
+    }
+  }
+
+  if (missingCodes.length === 0) return results;
+
+  // 2. 批量从 Supabase 查询
+  try {
+    const { data, error } = await supabase
+      .from('fund_related')
+      .select('fund_code, related_sector')
+      .in('fund_code', missingCodes);
+
+    if (error) throw error;
+
+    const foundMap = new Map();
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        const c = String(item.fund_code).trim();
+        const v = item.related_sector != null ? String(item.related_sector).trim() : '';
+        foundMap.set(c, v);
+      });
+    }
+
+    // 3. 填充结果并更新 React Query 缓存
+    for (const code of missingCodes) {
+      const value = foundMap.get(code) || '';
+      results[code] = value;
+      qc.setQueryData(qk.relatedSectors(code, seg), value, { staleTime: cacheTime });
+    }
+  } catch (e) {
+    // 失败时，为 missingCodes 填充空字符串避免重复查询
+    missingCodes.forEach(code => {
+      if (results[code] === undefined) results[code] = '';
+    });
+  }
+
+  return results;
+};
+
 const SECTOR_QUOTE_CACHE_MS = 60 * 1000;
 
 /**
@@ -124,50 +185,59 @@ export const fetchFundSecidByRelatedSector = async (relatedSector, { cacheTime =
 };
 
 /**
- * 根据关键词模糊搜索 fund_secid 表中的板块
- * @param {string} keyword - 搜索关键词
- * @param {number} limit - 返回结果数量限制
- * @returns {Promise<Array<{related_sector: string, secid: string}>>}
+ * 批量获取板块 secid
+ * @param {string[]} labels
  */
-export const searchSectorsByRelatedSector = async (keyword, { limit = 10, cacheTime = 60 * 1000 } = {}) => {
-    const normalized = keyword != null ? String(keyword).trim().toUpperCase() : '';
-    if (!normalized) {
-    console.log('[搜索板块] 关键词为空');
-    return [];
-  }
-  if (!isSupabaseConfigured) {
-    console.log('[搜索板块] Supabase 未配置');
-    return [];
+export const fetchFundSecidsBatch = async (labels, { cacheTime = ONE_DAY_MS } = {}) => {
+  if (!Array.isArray(labels) || labels.length === 0) return {};
+  if (!isSupabaseConfigured) return {};
+
+  const qc = getQueryClient();
+  const results = {};
+
+  const missingLabels = [];
+  for (const label of labels) {
+    const normalized = String(label).trim();
+    if (!normalized) continue;
+    const cached = qc.getQueryData(qk.fundSecid(normalized));
+    if (cached !== undefined) {
+      results[normalized] = cached;
+    } else {
+      missingLabels.push(normalized);
+    }
   }
 
-  console.log('[搜索板块] 搜索关键词:', normalized);
+  if (missingLabels.length === 0) return results;
 
   try {
-    const results = await getQueryClient().fetchQuery({
-      queryKey: ['sectorSearchByKeyword', normalized, limit],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from('fund_secid')
-          .select('related_sector, secid')
-          .ilike('related_sector', `%${normalized}%`)
-          .limit(limit);
+    const { data, error } = await supabase
+      .from('fund_secid')
+      .select('related_sector, secid')
+      .in('related_sector', missingLabels);
 
-        if (error) {
-          console.error('[搜索板块] 查询失败:', error);
-          return [];
-        }
-        console.log('[搜索板块] 查询结果:', data);
-        return data || [];
-      },
-      staleTime: cacheTime,
-    });
+    if (error) throw error;
 
-    console.log('[搜索板块] 返回结果数:', results.length);
-    return results;
+    const foundMap = new Map();
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        const l = String(item.related_sector).trim();
+        const s = item.secid != null ? String(item.secid).trim() : '';
+        foundMap.set(l, s);
+      });
+    }
+
+    for (const label of missingLabels) {
+      const value = foundMap.get(label) || '';
+      results[label] = value;
+      qc.setQueryData(qk.fundSecid(label), value, { staleTime: cacheTime });
+    }
   } catch (e) {
-    console.error('[搜索板块] 异常:', e);
-    return [];
+    missingLabels.forEach(label => {
+      if (results[label] === undefined) results[label] = '';
+    });
   }
+
+  return results;
 };
 
 /**

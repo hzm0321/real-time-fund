@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon, LinkIcon } from './Icons';
 import { ConsecutiveTrendBadge } from './Common';
-import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
+import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuote } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
 import MoveGroupModal from './MoveGroupModal';
@@ -704,11 +704,6 @@ export default function PcFundTable({
   );
   const dataCodesKey = useMemo(() => dataCodes.join('|'), [dataCodes]);
 
-  const fetchRelatedSector = useCallback(
-    (code) => fetchRelatedSectors(code, { authSegment: sectorAuthSegment }),
-    [sectorAuthSegment],
-  );
-
   useEffect(() => {
     relatedSectorCacheRef.current.clear();
     setRelatedSectorByCode({});
@@ -724,27 +719,31 @@ export default function PcFundTable({
 
     let cancelled = false;
     (async () => {
-      const batch = {};
-      await asyncPool(4, missing, async (code) => {
-        const value = await fetchRelatedSector(code);
-        relatedSectorCacheRef.current.set(code, value);
-        batch[code] = value;
-      });
-      if (cancelled) return;
-      setRelatedSectorByCode((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        for (const [code, value] of Object.entries(batch)) {
-          if (next[code] === value) continue;
-          next[code] = value;
-          changed = true;
-        }
-        return changed ? next : prev;
-      });
+      try {
+        const batchResults = await fetchRelatedSectorsBatch(missing, { authSegment: sectorAuthSegment });
+        if (cancelled) return;
+
+        Object.entries(batchResults).forEach(([code, value]) => {
+          relatedSectorCacheRef.current.set(code, value);
+        });
+
+        setRelatedSectorByCode((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [code, value] of Object.entries(batchResults)) {
+            if (next[code] === value) continue;
+            next[code] = value;
+            changed = true;
+          }
+          return changed ? next : prev;
+        });
+      } catch (e) {
+        console.error('Fetch related sectors batch error:', e);
+      }
     })();
 
     return () => { cancelled = true; };
-  }, [relatedSectorEnabled, dataCodesKey, sectorAuthSegment, fetchRelatedSector, dataCodes]);
+  }, [relatedSectorEnabled, dataCodesKey, sectorAuthSegment, dataCodes]);
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;
@@ -756,36 +755,49 @@ export default function PcFundTable({
       const t = lbl != null ? String(lbl).trim() : '';
       if (t) labels.add(t);
     }
-    if (labels.size === 0) return;
+    const labelList = Array.from(labels);
+    if (labelList.length === 0) return;
 
     let cancelled = false;
     (async () => {
-      const batch = {};
-      await asyncPool(4, [...labels], async (label) => {
-        const quote = await fetchRelatedSectorLiveQuote(label);
-        batch[label] = quote;
-      });
-      if (cancelled) return;
-      setSectorQuoteByLabel((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        for (const [label, quote] of Object.entries(batch)) {
-          const prevQ = next[label];
-          if (prevQ === quote) continue;
-          if (
-            prevQ &&
-            quote &&
-            prevQ.pct === quote.pct &&
-            prevQ.name === quote.name &&
-            prevQ.code === quote.code
-          ) {
-            continue;
+      try {
+        // 1. 批量获取 secid
+        const secidResults = await fetchFundSecidsBatch(labelList);
+        if (cancelled) return;
+
+        // 2. 逐个获取行情（外部接口暂不支持批量）
+        const batch = {};
+        await asyncPool(4, labelList, async (label) => {
+          const secid = secidResults[label];
+          if (!secid) return;
+          const quote = await fetchEastmoneySectorQuote(secid);
+          if (quote) batch[label] = quote;
+        });
+
+        if (cancelled) return;
+        setSectorQuoteByLabel((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [label, quote] of Object.entries(batch)) {
+            const prevQ = next[label];
+            if (prevQ === quote) continue;
+            if (
+              prevQ &&
+              quote &&
+              prevQ.pct === quote.pct &&
+              prevQ.name === quote.name &&
+              prevQ.code === quote.code
+            ) {
+              continue;
+            }
+            next[label] = quote;
+            changed = true;
           }
-          next[label] = quote;
-          changed = true;
-        }
-        return changed ? next : prev;
-      });
+          return changed ? next : prev;
+        });
+      } catch (e) {
+        console.error('Fetch sector quotes batch error:', e);
+      }
     })();
 
     return () => { cancelled = true; };
