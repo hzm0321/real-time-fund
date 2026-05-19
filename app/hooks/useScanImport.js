@@ -30,7 +30,7 @@ export function useScanImport({
   const funds = useStorageStore((s) => s.funds);
   const favorites = useStorageStore((s) => s.favorites);
   const groups = useStorageStore((s) => s.groups);
-  
+
   const setFunds = useStorageStore((s) => s.setFunds);
   const setHoldings = useStorageStore((s) => s.setHoldings);
   const setFavorites = useStorageStore((s) => s.setFavorites);
@@ -94,7 +94,6 @@ export function useScanImport({
       let worker = ocrWorkerRef.current;
       if (!worker) {
         const cdnBases = [
-          'https://01kjzb6fhx9f8rjstc8c21qadx.esa.staticdn.net/npm',
           'https://fastly.jsdelivr.net/npm',
           'https://cdn.jsdelivr.net/npm',
         ];
