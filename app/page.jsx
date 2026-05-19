@@ -8076,6 +8076,7 @@ export default function HomePage() {
             existingAllCodes={funds.map((f) => f?.code).filter(Boolean)}
             existingFavCodes={Array.from(favorites || [])}
             isOcrScan={isOcrScan}
+            currentGroup={currentTab === 'summary' ? 'all' : currentTab}
           />
         )}
       </AnimatePresence>
