@@ -270,7 +270,7 @@ export default function HomePage() {
   const [refreshing, setRefreshing] = useState(false);
 
   // 估值分时序列（每次调用估值接口记录，用于分时图）
-  const [valuationSeries, setValuationSeries] = useState(() => (typeof window !== 'undefined' ? getAllValuationSeries() : {}));
+  const [valuationSeries, setValuationSeries] = useState({});
   // 自选状态
   const [currentTab, setCurrentTab] = useState('all');
   const [isPending, startTransition] = useTransition();
@@ -6512,8 +6512,8 @@ export default function HomePage() {
       const next = [...prev];
       const idx = next.findIndex(f => f.code === fundCode);
       if (idx !== -1) {
-        next[idx] = { 
-          ...next[idx], 
+        next[idx] = {
+          ...next[idx],
           dataSource: sourceId,
           gsz: null,
           gszzl: null,
