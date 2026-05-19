@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
+
 import ReactDOM from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -709,9 +709,6 @@ export default function MobileFundTable({
 
   const tableContainerRef = useRef(null);
   const portalHeaderRef = useRef(null);
-  /** 窗口虚拟列表锚点：用于 scrollMargin（.mobile-fund-table-scroll 仅横向滚动，纵向为整页滚动） */
-  const virtualScrollAnchorRef = useRef(null);
-  const [virtualScrollMargin, setVirtualScrollMargin] = useState(0);
   const [tableContainerWidth, setTableContainerWidth] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showPortalHeader, setShowPortalHeader] = useState(false);
@@ -2091,37 +2088,6 @@ export default function MobileFundTable({
 
   const headerGroup = table.getHeaderGroups()[0];
   const tableRows = table.getRowModel().rows;
-  const enableVirtualization = data.length > 40;
-  const rowVirtualizer = useWindowVirtualizer({
-    count: tableRows.length,
-    estimateSize: () => 52,
-    measureElement: (el) => el.getBoundingClientRect().height,
-    overscan: 8,
-    scrollMargin: virtualScrollMargin,
-    enabled: enableVirtualization,
-  });
-
-  useLayoutEffect(() => {
-    if (!enableVirtualization) return;
-    const el = virtualScrollAnchorRef.current;
-    if (!el) return;
-    const update = () => {
-      setVirtualScrollMargin(el.getBoundingClientRect().top + window.scrollY);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    window.addEventListener('resize', update);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, [enableVirtualization, tableRows.length, stickyTop]);
-
-  useEffect(() => {
-    if (!enableVirtualization) return;
-    rowVirtualizer.measure();
-  }, [enableVirtualization, tableRows.length, rowVirtualizer]);
 
   const snapPositionsRef = useRef([]);
   const scrollEndTimerRef = useRef(null);
@@ -2383,63 +2349,7 @@ export default function MobileFundTable({
         >
           {renderTableHeader()}
 
-          {!onlyShowHeader && enableVirtualization ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragCancel={handleDragCancel}
-              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-            >
-              <SortableContext
-                items={data.map((item) => item.code)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div
-                  ref={virtualScrollAnchorRef}
-                  className="mobile-fund-table-body-virtual"
-                  style={{ position: 'relative', width: '100%' }}
-                >
-                  <div
-                    style={{
-                      height: rowVirtualizer.getTotalSize(),
-                      position: 'relative',
-                      width: '100%',
-                    }}
-                  >
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const row = tableRows[virtualRow.index];
-                      if (!row) return null;
-                      return (
-                        <div
-                          key={row.original.code || row.id}
-                          data-index={virtualRow.index}
-                          ref={rowVirtualizer.measureElement}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
-                            zIndex: activeId === row.original.code ? 9999 : 1,
-                          }}
-                        >
-                          <SortableRow
-                            row={row}
-                            isTableDragging={!!activeId}
-                            disabled={sortBy !== 'default' || !isEditMode}
-                          >
-                            {() => renderMobileRow(row, virtualRow.index)}
-                          </SortableRow>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </SortableContext>
-            </DndContext>
-          ) : !onlyShowHeader ? (
+          {!onlyShowHeader && (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -2466,7 +2376,7 @@ export default function MobileFundTable({
                 </AnimatePresence>
               </SortableContext>
             </DndContext>
-          ) : null}
+          )}
         </div>
 
         {table.getRowModel().rows.length === 0 && !onlyShowHeader && (
