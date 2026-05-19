@@ -276,6 +276,85 @@ export const fetchEastmoneySectorQuote = async (secid, { cacheTime = SECTOR_QUOT
 };
 
 /**
+ * 批量获取东方财富板块/指数行情（单次请求）
+ * @param {string[]} secids
+ * @returns {Promise<Record<string, { name: string, code: string, pct: number|null }|null>>}
+ */
+export const fetchEastmoneySectorQuotesBatch = async (secids, { cacheTime = SECTOR_QUOTE_CACHE_MS } = {}) => {
+  if (!Array.isArray(secids) || secids.length === 0) return {};
+  if (typeof fetch === 'undefined') return {};
+
+  const qc = getQueryClient();
+  const results = {};
+  const missingSecids = [];
+
+  for (const secid of secids) {
+    const s = secid != null ? String(secid).trim() : '';
+    if (!s) continue;
+    const cached = qc.getQueryData(qk.eastSectorQuote(s));
+    if (cached !== undefined) {
+      results[s] = cached;
+    } else {
+      missingSecids.push(s);
+    }
+  }
+
+  if (missingSecids.length === 0) return results;
+
+  const chunkSize = 20;
+  const chunks = [];
+  for (let i = 0; i < missingSecids.length; i += chunkSize) {
+    chunks.push(missingSecids.slice(i, i + chunkSize));
+  }
+
+  try {
+    await Promise.all(chunks.map(async (chunk) => {
+      try {
+        const url = `https://push2delay.eastmoney.com/api/qt/ulist.np/get?fields=f12,f13,f14,f3&secids=${encodeURIComponent(chunk.join(','))}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const json = await res.json();
+        const diff = json?.data?.diff;
+        if (!Array.isArray(diff)) return;
+
+        for (const item of diff) {
+          const code = item.f12 != null ? String(item.f12) : '';
+          const market = item.f13 != null ? String(item.f13) : '';
+          const key = market && code ? `${market}.${code}` : '';
+          if (!key) continue;
+
+          const f3 = item.f3;
+          const pct = f3 != null && Number.isFinite(Number(f3)) ? Number(f3) / 100 : null;
+          const quote = {
+            name: item.f14 != null ? String(item.f14) : '',
+            code,
+            pct,
+          };
+
+          results[key] = quote;
+          qc.setQueryData(qk.eastSectorQuote(key), quote, { staleTime: cacheTime });
+        }
+      } catch (e) {
+        console.error('Fetch sector quotes batch chunk error:', e);
+      }
+    }));
+
+    for (const s of missingSecids) {
+      if (results[s] === undefined) {
+        results[s] = null;
+        qc.setQueryData(qk.eastSectorQuote(s), null, { staleTime: cacheTime });
+      }
+    }
+  } catch (e) {
+    for (const s of missingSecids) {
+      if (results[s] === undefined) results[s] = null;
+    }
+  }
+
+  return results;
+};
+
+/**
  * 关联板块名称 → 实时涨跌幅（先查 fund_secid，再拉东方财富）
  */
 export const fetchRelatedSectorLiveQuote = async (relatedSectorLabel) => {

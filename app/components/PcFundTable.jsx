@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon, LinkIcon } from './Icons';
 import { ConsecutiveTrendBadge } from './Common';
-import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuote } from '@/app/api/fund';
+import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuotesBatch } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
 import MoveGroupModal from './MoveGroupModal';
@@ -765,14 +765,16 @@ export default function PcFundTable({
         const secidResults = await fetchFundSecidsBatch(labelList);
         if (cancelled) return;
 
-        // 2. 逐个获取行情（外部接口暂不支持批量）
+        // 2. 批量获取行情
+        const secids = labelList.map(label => secidResults[label]).filter(Boolean);
+        const quotes = await fetchEastmoneySectorQuotesBatch(secids);
         const batch = {};
-        await asyncPool(4, labelList, async (label) => {
+        for (const label of labelList) {
           const secid = secidResults[label];
-          if (!secid) return;
-          const quote = await fetchEastmoneySectorQuote(secid);
+          if (!secid) continue;
+          const quote = quotes[secid];
           if (quote) batch[label] = quote;
-        });
+        }
 
         if (cancelled) return;
         setSectorQuoteByLabel((prev) => {

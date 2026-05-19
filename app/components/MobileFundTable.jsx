@@ -32,7 +32,7 @@ import MoveGroupModal from './MoveGroupModal';
 import SuccessModal from './SuccessModal';
 import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, LinkIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
 import { ConsecutiveTrendBadge } from './Common';
-import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuote } from '@/app/api/fund';
+import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuotesBatch } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
 import { Badge } from '@/components/ui/badge';
@@ -925,28 +925,36 @@ export default function MobileFundTable({
         const secidResults = await fetchFundSecidsBatch(labelList);
         if (cancelled) return;
 
-        // 2. 逐个获取行情（外部接口暂不支持批量）
-        await asyncPool(4, labelList, async (label) => {
+        // 2. 批量获取行情
+        const secids = labelList.map(label => secidResults[label]).filter(Boolean);
+        const quotes = await fetchEastmoneySectorQuotesBatch(secids);
+        if (cancelled) return;
+        const batch = {};
+        for (const label of labelList) {
           const secid = secidResults[label];
-          if (!secid) return;
-          const quote = await fetchEastmoneySectorQuote(secid);
-          if (cancelled) return;
-          if (quote) {
-            setSectorQuoteByLabel((prev) => {
-              const prevQ = prev[label];
-              if (prevQ === quote) return prev;
-              if (
-                prevQ &&
-                quote &&
-                prevQ.pct === quote.pct &&
-                prevQ.name === quote.name &&
-                prevQ.code === quote.code
-              ) {
-                return prev;
-              }
-              return { ...prev, [label]: quote };
-            });
+          if (!secid) continue;
+          const quote = quotes[secid];
+          if (quote) batch[label] = quote;
+        }
+        setSectorQuoteByLabel((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [label, quote] of Object.entries(batch)) {
+            const prevQ = next[label];
+            if (prevQ === quote) continue;
+            if (
+              prevQ &&
+              quote &&
+              prevQ.pct === quote.pct &&
+              prevQ.name === quote.name &&
+              prevQ.code === quote.code
+            ) {
+              continue;
+            }
+            next[label] = quote;
+            changed = true;
           }
+          return changed ? next : prev;
         });
       } catch (e) {
         console.error('Fetch sector quotes batch error (mobile):', e);
