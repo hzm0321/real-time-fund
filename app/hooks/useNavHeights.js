@@ -20,7 +20,6 @@ export function useNavHeights({ groups, currentTab }) {
   const filterBarRef = useRef(null);
   const [navbarHeight, setNavbarHeight] = useState(0);
   const [filterBarHeight, setFilterBarHeight] = useState(0);
-  const [marketIndexAccordionHeight, setMarketIndexAccordionHeight] = useState(0);
 
   useEffect(() => {
     let rafId = null;
@@ -56,8 +55,6 @@ export function useNavHeights({ groups, currentTab }) {
     filterBarRef,
     navbarHeight,
     filterBarHeight,
-    marketIndexAccordionHeight,
-    setMarketIndexAccordionHeight,
   };
 }
 

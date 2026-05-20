@@ -193,7 +193,6 @@ function IndexCard({ item }) {
 const DEFAULT_SELECTED_CODES = ['sh000001', 'sz399001', 'sz399006'];
 
 export default function MarketIndexAccordion({navbarHeight = 0,
-  onHeightChange,
   onCustomSettingsChange,
   refreshing = false}) {
   const isMobile = useIsMobile();
@@ -208,18 +207,27 @@ export default function MarketIndexAccordion({navbarHeight = 0,
 
   useEffect(() => {
     const el = rootRef.current;
-    if (!el || typeof onHeightChange !== 'function') return;
+    if (!el) return;
+
+    const updateCssVar = (val) => {
+      document.documentElement.style.setProperty('--market-index-height', `${val}px`);
+    };
+
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) onHeightChange(entry.contentRect.height);
+      if (entry) {
+        updateCssVar(entry.contentRect.height);
+      }
     });
+
     ro.observe(el);
-    onHeightChange(el.getBoundingClientRect().height);
+    updateCssVar(el.getBoundingClientRect().height);
+
     return () => {
       ro.disconnect();
-      onHeightChange(0);
+      document.documentElement.style.setProperty('--market-index-height', '0px');
     };
-  }, [onHeightChange, loading, indices.length]);
+  }, [loading, indices.length]);
 
   const loadIndices = () => {
     let cancelled = false;

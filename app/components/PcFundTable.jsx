@@ -638,15 +638,19 @@ export default function PcFundTable({
     if (typeof window === 'undefined') return;
     const getEffectiveStickyTop = () => {
       const stickySummaryCard = document.querySelector('.group-summary-sticky .group-summary-card');
-      if (!stickySummaryCard) return stickyTop;
+      const marketIndexEl = document.querySelector('.market-index-accordion-root');
+      const currentMarketIndexHeight = marketIndexEl ? marketIndexEl.offsetHeight : 0;
+      const baseStickyTop = stickyTop + currentMarketIndexHeight;
+
+      if (!stickySummaryCard) return baseStickyTop;
 
       const stickySummaryWrapper = stickySummaryCard.closest('.group-summary-sticky');
-      if (!stickySummaryWrapper) return stickyTop;
+      if (!stickySummaryWrapper) return baseStickyTop;
 
       const wrapperRect = stickySummaryWrapper.getBoundingClientRect();
-      const isSummaryStuck = wrapperRect.top <= stickyTop + 1;
+      const isSummaryStuck = wrapperRect.top <= baseStickyTop + 1;
 
-      return isSummaryStuck ? stickyTop + stickySummaryWrapper.offsetHeight : stickyTop;
+      return isSummaryStuck ? baseStickyTop + stickySummaryWrapper.offsetHeight : baseStickyTop;
     };
 
     const updateVerticalState = () => {

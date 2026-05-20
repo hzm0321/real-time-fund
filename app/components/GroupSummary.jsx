@@ -99,7 +99,7 @@ export default function GroupSummary({
   onToggleSticky,
   masked,
   onToggleMasked,
-  marketIndexAccordionHeight,
+  shouldShowMarketIndex,
   navbarHeight,
 }) {
   const isMobile = useIsMobile();
@@ -206,12 +206,12 @@ export default function GroupSummary({
   const style = useMemo(()=>{
     const style = {};
     if (isSticky) {
-      style.top = stickyTop + 14;
-    }else if(!marketIndexAccordionHeight) {
+      style.top = `calc(${stickyTop}px + var(--market-index-height, 0px) + 14px)`;
+    } else if (!shouldShowMarketIndex) {
       style.marginTop = navbarHeight;
     }
     return style;
-  },[isSticky, stickyTop, marketIndexAccordionHeight, navbarHeight])
+  }, [isSticky, stickyTop, shouldShowMarketIndex, navbarHeight]);
 
   if (!summary.hasHolding) return null;
 

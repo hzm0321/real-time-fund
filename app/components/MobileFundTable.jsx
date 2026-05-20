@@ -739,20 +739,24 @@ export default function MobileFundTable({
     if (typeof window === 'undefined') return;
     const getEffectiveStickyTop = () => {
       const stickySummaryCard = document.querySelector('.group-summary-sticky .group-summary-card');
-      if (!stickySummaryCard) return stickyTop;
+      const marketIndexEl = document.querySelector('.market-index-accordion-root');
+      const currentMarketIndexHeight = marketIndexEl ? marketIndexEl.offsetHeight : 0;
+      const baseStickyTop = stickyTop + currentMarketIndexHeight;
+
+      if (!stickySummaryCard) return baseStickyTop;
 
       const stickySummaryWrapper = stickySummaryCard.closest('.group-summary-sticky');
-      if (!stickySummaryWrapper) return stickyTop;
+      if (!stickySummaryWrapper) return baseStickyTop;
 
       const wrapperRect = stickySummaryWrapper.getBoundingClientRect();
       // 用“实际 DOM 的 top”判断 sticky 是否已生效，避免 mobile 下 stickyTop 入参与 GroupSummary 不一致导致的偏移。
       const computedTopStr = window.getComputedStyle(stickySummaryWrapper).top;
       const computedTop = Number.parseFloat(computedTopStr);
-      const baseTop = Number.isFinite(computedTop) ? computedTop : stickyTop;
+      const baseTop = Number.isFinite(computedTop) ? computedTop : baseStickyTop;
       const isSummaryStuck = wrapperRect.top <= baseTop + 1;
 
       // header 使用固定定位(top)，所以也用视口坐标系下的 wrapperRect.top + 高度，确保不重叠
-      return isSummaryStuck ? wrapperRect.top + stickySummaryWrapper.offsetHeight : stickyTop;
+      return isSummaryStuck ? wrapperRect.top + stickySummaryWrapper.offsetHeight : baseStickyTop;
     };
 
     const updateVerticalState = () => {

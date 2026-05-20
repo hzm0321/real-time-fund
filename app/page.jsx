@@ -381,8 +381,6 @@ export default function HomePage() {
     filterBarRef,
     navbarHeight,
     filterBarHeight,
-    marketIndexAccordionHeight,
-    setMarketIndexAccordionHeight,
   } = useNavHeights({ groups, currentTab });
 
   const handleMobileSearchClick = (e) => {
@@ -474,10 +472,7 @@ export default function HomePage() {
   const shouldShowMarketIndex = isMobile ? showMarketIndexMobile : showMarketIndexPc;
   const shouldShowGroupFundSearch = isMobile ? showGroupFundSearchMobile : showGroupFundSearchPc;
 
-  // 当关闭大盘指数时，重置它的高度，避免 top/stickyTop 仍沿用旧值
-  useEffect(() => {
-    if (!shouldShowMarketIndex) setMarketIndexAccordionHeight(0);
-  }, [shouldShowMarketIndex, setMarketIndexAccordionHeight]);
+
 
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -6886,14 +6881,13 @@ export default function HomePage() {
       {shouldShowMarketIndex && (
         <MarketIndexAccordion
           navbarHeight={navbarHeight}
-          onHeightChange={setMarketIndexAccordionHeight}
           onCustomSettingsChange={triggerCustomSettingsSync}
           refreshing={refreshing}
         />
       )}
       <div className="grid">
         <div className="col-12">
-          <div ref={filterBarRef} className="filter-bar" style={{ top: navbarHeight + marketIndexAccordionHeight, marginTop: 0, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div ref={filterBarRef} className="filter-bar" style={{ top: `calc(${navbarHeight}px + var(--market-index-height, 0px))`, marginTop: 0, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div className="tabs-container">
               <div
                 className="tabs-scroll-area"
@@ -7140,12 +7134,12 @@ export default function HomePage() {
                   summaryTotalsOverride={
                     currentTab === SUMMARY_TAB_ID ? summaryTabPortfolioTotals : null
                   }
-                  stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight + (isMobile ? -14 : 0)}
+                  stickyTop={navbarHeight + filterBarHeight + (isMobile ? -14 : 0)}
                   isSticky={isGroupSummarySticky}
                   onToggleSticky={(next) => setIsGroupSummarySticky(next)}
                   masked={maskAmounts}
                   onToggleMasked={() => setMaskAmounts((v) => !v)}
-                  marketIndexAccordionHeight={marketIndexAccordionHeight}
+                  shouldShowMarketIndex={shouldShowMarketIndex}
                   navbarHeight={navbarHeight}
                 />
               {currentTab === SUMMARY_TAB_ID && summaryCardItems.length > 0 && (
@@ -7230,7 +7224,7 @@ export default function HomePage() {
                           <div className="table-scroll-area">
                             <div className="table-scroll-area-inner">
                               <PcFundTable
-                                stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight}
+                                stickyTop={navbarHeight + filterBarHeight}
                                 data={pcFundTableData}
                                 relatedSectorSessionKey={user?.id ?? ''}
                                 currentTab={currentTab}
@@ -7291,7 +7285,7 @@ export default function HomePage() {
                             }
                           });
                         }}
-                        stickyTop={navbarHeight + filterBarHeight + marketIndexAccordionHeight}
+                        stickyTop={navbarHeight + filterBarHeight}
                         blockDrawerClose={!!fundDeleteConfirm || !!fundDeleteBulkConfirm}
                         closeDrawerRef={fundDetailDrawerCloseRef}
                         onReorder={handleReorder}
