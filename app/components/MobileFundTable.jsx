@@ -61,12 +61,13 @@ const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'period3m',
   'period6m',
   'period1y',
+  'holdingRatio',
   'holdingCost',
   'costNav',
   'estimateNav',
 ];
 
-const MOBILE_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav', 'sinceAddedChangePercent']);
+const MOBILE_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav', 'sinceAddedChangePercent', 'holdingRatio']);
 
 const MOBILE_COLUMN_HEADERS = {
   relatedSector: '关联板块',
@@ -82,6 +83,7 @@ const MOBILE_COLUMN_HEADERS = {
   sinceAddedChangePercent: '自添加来',
   totalChangePercent: '估算收益',
   holdingCost: '持仓成本',
+  holdingRatio: '持仓占比',
   costNav: '成本净值',
   holdingDays: '持有天数',
   todayProfit: '当日收益',
@@ -1724,6 +1726,24 @@ export default function MobileFundTable({
           );
         },
         meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1y ?? 72 },
+      },
+      {
+        id: 'holdingRatio',
+        header: '持仓占比',
+        cell: (info) => {
+          const original = info.row.original || {};
+          const value = original.holdingRatioValue;
+          if (value == null) {
+            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+          }
+          const text = `${(value * 100).toFixed(2)}%`;
+          return (
+            <FitText style={{ fontWeight: 700, textAlign: 'right' }} maxFontSize={14} minFontSize={10}>
+              {masked ? <span className="mask-text">******</span> : text}
+            </FitText>
+          );
+        },
+        meta: { align: 'right', cellClassName: 'holding-ratio-cell', width: columnWidthMap.holdingRatio ?? 72 },
       },
       {
         accessorKey: 'holdingCost',

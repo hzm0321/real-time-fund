@@ -1370,7 +1370,7 @@ export default function HomePage() {
       }
 
       const profitByCode =
-        sortBy === 'holdingAmount' || sortBy === 'todayProfit' || sortBy === 'holding'
+        sortBy === 'holdingAmount' || sortBy === 'holdingRatio' || sortBy === 'todayProfit' || sortBy === 'holding'
           ? new Map(filtered.map((f) => [f.code, getHoldingProfitForTab(f, holdingsForTabWithLinked[f.code])]))
           : null;
 
@@ -1404,6 +1404,19 @@ export default function HomePage() {
           const pb = profitByCode?.get(b.code);
           const amountA = pa?.amount ?? Number.NEGATIVE_INFINITY;
           const amountB = pb?.amount ?? Number.NEGATIVE_INFINITY;
+          return sortOrder === 'asc' ? amountA - amountB : amountB - amountA;
+        }
+        if (sortBy === 'holdingRatio') {
+          const pa = profitByCode?.get(a.code);
+          const pb = profitByCode?.get(b.code);
+          const amountA = pa?.amount;
+          const amountB = pb?.amount;
+          const hasA = amountA != null && Number.isFinite(amountA) && amountA > 0;
+          const hasB = amountB != null && Number.isFinite(amountB) && amountB > 0;
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          // holdingRatio sort is equivalent to holdingAmount sort (same denominator within group)
           return sortOrder === 'asc' ? amountA - amountB : amountB - amountA;
         }
         if (sortBy === 'yesterdayIncrease') {
@@ -1586,8 +1599,15 @@ export default function HomePage() {
 
   // PC 端表格数据（用于 PcFundTable）
   const pcFundTableData = useMemo(
-    () =>
-      displayFunds.map((f) => {
+    () => {
+      // 计算分组内所有基金持仓金额之和，用于持仓占比
+      let groupTotalHoldingAmount = 0;
+      for (const ff of displayFunds) {
+        const h = holdingsForTabWithLinked[ff.code];
+        const p = getHoldingProfitForTab(ff, h);
+        if (p && p.amount != null && Number.isFinite(p.amount) && p.amount > 0) groupTotalHoldingAmount += p.amount;
+      }
+      return displayFunds.map((f) => {
         const hasTodayData = f.jzrq === todayStr;
         const latestNav = f.dwjz != null && f.dwjz !== '' ? (typeof f.dwjz === 'number' ? Number(f.dwjz).toFixed(4) : String(f.dwjz)) : '—';
         const estimateNav = f.noValuation
@@ -1622,6 +1642,10 @@ export default function HomePage() {
         const holdingAmount =
           amount == null ? '未设置' : `¥${Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const holdingAmountValue = amount;
+        const holdingRatioValue =
+          amount != null && Number.isFinite(amount) && amount > 0 && groupTotalHoldingAmount > 0
+            ? amount / groupTotalHoldingAmount
+            : null;
         const holdingDaysValue = holding?.firstPurchaseDate
           ? dayjs.tz(todayStr, TZ).diff(dayjs.tz(holding.firstPurchaseDate, TZ), 'day')
           : null;
@@ -1799,6 +1823,7 @@ export default function HomePage() {
           sinceAddedDateRaw: sinceAddedDateRaw || undefined,
           holdingAmount,
           holdingAmountValue,
+          holdingRatioValue,
           holdingCost,
           holdingCostValue,
           costNav,
@@ -1817,7 +1842,8 @@ export default function HomePage() {
           holdingTargetGroupId:
             currentTab === SUMMARY_TAB_ID ? summaryHoldingSourceGroupByCode[f.code] : undefined,
         };
-      }),
+      });
+    },
     [
       displayFunds,
       holdingsForTabWithLinked,
