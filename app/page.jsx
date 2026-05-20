@@ -414,17 +414,6 @@ export default function HomePage() {
   const [percentModes, setPercentModes] = useState({}); // { [code]: boolean }
   const [todayPercentModes, setTodayPercentModes] = useState({}); // { [code]: boolean }
 
-  const holdingsRef = useRef(null);
-  const groupHoldingsRef = useRef(null);
-  const pendingTradesRef = useRef(null);
-  const transactionsRef = useRef(null);
-
-  useEffect(() => {
-    holdingsRef.current = holdings;
-    groupHoldingsRef.current = groupHoldings;
-    pendingTradesRef.current = pendingTrades;
-    transactionsRef.current = transactions;
-  }, [holdings, groupHoldings, pendingTrades, transactions]);
 
   const tabsRef = useRef(null);
   const [fundDeleteConfirm, setFundDeleteConfirm] = useState(null); // { code, name }
@@ -1991,16 +1980,16 @@ export default function HomePage() {
   };
 
   const processPendingQueue = async () => {
-    const currentPending = pendingTradesRef.current;
+    const currentPending = useStorageStore.getState().pendingTrades;
     if (currentPending.length === 0) return;
 
     let stateChanged = false;
-    let tempHoldings = { ...holdingsRef.current };
+    let tempHoldings = { ...useStorageStore.getState().holdings };
     let tempGroupHoldings;
     try {
-      tempGroupHoldings = JSON.parse(JSON.stringify(groupHoldingsRef.current || {}));
+      tempGroupHoldings = JSON.parse(JSON.stringify(useStorageStore.getState().groupHoldings || {}));
     } catch {
-      tempGroupHoldings = { ...(groupHoldingsRef.current || {}) };
+      tempGroupHoldings = { ...(useStorageStore.getState().groupHoldings || {}) };
     }
     const processedIds = new Set();
     const newTransactions = [];
@@ -2793,18 +2782,22 @@ export default function HomePage() {
 
   const scheduleDcaTrades = useCallback(async () => {
     if (!isTradingDay) return;
-    if (!isPlainObject(dcaPlans)) return;
-    const codesSet = new Set(funds.map((f) => f.code));
+    const storeState = useStorageStore.getState();
+    const currentDcaPlans = storeState.dcaPlans;
+    if (!isPlainObject(currentDcaPlans)) return;
+    const currentFunds = storeState.funds;
+    const codesSet = new Set(currentFunds.map((f) => f.code));
     if (codesSet.size === 0) return;
 
     if (isSchedulingDcaRef.current) return;
     isSchedulingDcaRef.current = true;
 
     try {
-      const scoped = migrateDcaPlansToScoped(dcaPlans);
-      const groupIdSet = new Set(groups.map((g) => g?.id).filter(Boolean));
+      const scoped = migrateDcaPlansToScoped(currentDcaPlans);
+      const groupIdSet = new Set(storeState.groups.map((g) => g?.id).filter(Boolean));
 
-      const today = toTz(todayStr).startOf('day');
+      const todayStrDynamic = formatDate();
+      const today = toTz(todayStrDynamic).startOf('day');
       let nextPlans;
       try {
         nextPlans = JSON.parse(JSON.stringify(scoped));
@@ -2879,7 +2872,7 @@ export default function HomePage() {
               const pending = {
                 id: `dca_${scopeKey}_${code}_${dateStr}`,
                 fundCode: code,
-                fundName: (funds.find(f => f.code === code) || {}).name,
+                fundName: (currentFunds.find(f => f.code === code) || {}).name,
                 type: 'buy',
                 share: null,
                 amount,
@@ -2940,14 +2933,7 @@ export default function HomePage() {
     } finally {
       isSchedulingDcaRef.current = false;
     }
-  }, [isTradingDay, dcaPlans, funds, todayStr, storageHelper, groups]);
-
-  useEffect(() => {
-    if (!isTradingDay) return;
-    scheduleDcaTrades().catch((e) => {
-      console.error('[scheduleDcaTrades]', e);
-    });
-  }, [isTradingDay, scheduleDcaTrades]);
+  }, [isTradingDay, setDcaPlans, setPendingTrades]);
 
   const handleAddGroup = (name) => {
     const newGroup = {
@@ -4219,7 +4205,14 @@ export default function HomePage() {
         if (codes.length) refreshAll(codes);
       }, refreshMs);
 
-      // 【步骤 6】队列处理：执行可能积压的待处理交易（如到达触发价格的自动交易）
+      // 【步骤 5.5】定投处理：自动生成定投待处理交易
+      try {
+        await scheduleDcaTrades();
+      } catch (e) {
+        console.warn('生成定投待处理交易出错', e);
+      }
+
+      // 【步骤 6】队列处理：执行可能积压的待处理交易（如到达触发价格的自动交易、定投交易等）
       try {
         await processPendingQueue();
       } catch (e) {
