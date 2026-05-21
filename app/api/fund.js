@@ -1268,8 +1268,73 @@ export const fetchFundData = async (c) => {
       .catch(() => resolveT(null));
   });
 
-  const holdingsPromise = new Promise((resolveH) => {
-    fundDebugLog('holdingsPromise start', { code });
+  // 2. 发起估值请求（各数据源统一走 fetchFundValuationBySource）
+  const gzPromise = fetchFundValuationBySource(code, dataSource);
+
+  // 3. 编排并合并数据
+  return new Promise(async (resolve, reject) => {
+    let baseData = null;
+    try {
+      baseData = await gzPromise;
+    } catch (e) {
+      try {
+        baseData = await fetchFundDataFallback(code);
+      } catch (fbErr) {
+        reject(fbErr);
+        return;
+      }
+    }
+
+    const [tData] = await Promise.all([lsjzPromise]);
+
+    if (tData) {
+      if (tData.jzrq && (!baseData.jzrq || tData.jzrq >= baseData.jzrq)) {
+        baseData.dwjz = tData.dwjz;
+        baseData.jzrq = tData.jzrq;
+        baseData.zzl = tData.zzl;
+        baseData.lastNav = tData.lastNav;
+      } else if (!baseData.dwjz && tData.dwjz) {
+        // Fallback for Sina which doesn't provide dwjz/jzrq
+        baseData.dwjz = tData.dwjz;
+        baseData.jzrq = tData.jzrq;
+        baseData.zzl = tData.zzl;
+        baseData.lastNav = tData.lastNav;
+      }
+      if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayZzl')) {
+        baseData.yesterdayZzl = tData.yesterdayZzl;
+      }
+      if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayNavDelta')) {
+        baseData.yesterdayNavDelta = tData.yesterdayNavDelta;
+      }
+    }
+
+    // 针对 supabase_qdii 等仅提供 gszzl 的数据源，使用最新的 dwjz 计算 gsz
+    if (baseData.valuationSource === 'supabase_qdii' || (baseData.gsz == null && baseData.gszzl != null)) {
+      const nav = Number(baseData.dwjz);
+      const gszzl = Number(baseData.gszzl);
+      if (Number.isFinite(nav) && Number.isFinite(gszzl)) {
+        baseData.gsz = nav * (1 + gszzl / 100);
+      }
+    }
+
+    if (!baseData.name) {
+      try {
+        const results = await searchFunds(code);
+        const found = results.find((item) => item.CODE === code);
+        if (found) baseData.name = found.NAME || found.SHORTNAME;
+      } catch (e) {}
+    }
+
+    resolve({
+      ...baseData,
+    });
+  });
+};
+
+export const fetchFundHoldings = async (code) => {
+  if (!code) return { holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false };
+  return new Promise((resolveH) => {
+    fundDebugLog('fetchFundHoldings start', { code });
     const holdingsUrl = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${code}&topline=10&year=&month=&_=${Date.now()}`;
     getQueryClient()
       .fetchQuery({
@@ -1401,7 +1466,7 @@ export const fetchFundData = async (c) => {
       try {
         const tencentCodes = needQuotes.map((x) => x.tencentCode).join(',');
         if (!tencentCodes) {
-          resolveH(holdings);
+          resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter });
           return;
         }
         const quoteUrl = `https://qt.gtimg.cn/q=${tencentCodes}`;
@@ -1446,82 +1511,13 @@ export const fetchFundData = async (c) => {
       }
     }
       resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter });
-    fundDebugLog('holdingsPromise resolved', { code, holdingsCount: holdings?.length || 0, holdingsReportDate, holdingsIsLastQuarter });
+    fundDebugLog('fetchFundHoldings resolved', { code, holdingsCount: holdings?.length || 0, holdingsReportDate, holdingsIsLastQuarter });
       })
       .catch(() => resolveH({ holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false }));
   });
-
-  // 2. 发起估值请求（各数据源统一走 fetchFundValuationBySource）
-  const gzPromise = fetchFundValuationBySource(code, dataSource);
-
-  // 3. 编排并合并数据
-  return new Promise(async (resolve, reject) => {
-    let baseData = null;
-    try {
-      baseData = await gzPromise;
-    } catch (e) {
-      try {
-        baseData = await fetchFundDataFallback(code);
-      } catch (fbErr) {
-        reject(fbErr);
-        return;
-      }
-    }
-
-    const [tData, holdingsResult] = await Promise.all([lsjzPromise, holdingsPromise]);
-
-    const {
-      holdings,
-      holdingsReportDate,
-      holdingsIsLastQuarter
-    } = holdingsResult || {};
-
-    if (tData) {
-      if (tData.jzrq && (!baseData.jzrq || tData.jzrq >= baseData.jzrq)) {
-        baseData.dwjz = tData.dwjz;
-        baseData.jzrq = tData.jzrq;
-        baseData.zzl = tData.zzl;
-        baseData.lastNav = tData.lastNav;
-      } else if (!baseData.dwjz && tData.dwjz) {
-        // Fallback for Sina which doesn't provide dwjz/jzrq
-        baseData.dwjz = tData.dwjz;
-        baseData.jzrq = tData.jzrq;
-        baseData.zzl = tData.zzl;
-        baseData.lastNav = tData.lastNav;
-      }
-      if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayZzl')) {
-        baseData.yesterdayZzl = tData.yesterdayZzl;
-      }
-      if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayNavDelta')) {
-        baseData.yesterdayNavDelta = tData.yesterdayNavDelta;
-      }
-    }
-
-    // 针对 supabase_qdii 等仅提供 gszzl 的数据源，使用最新的 dwjz 计算 gsz
-    if (baseData.valuationSource === 'supabase_qdii' || (baseData.gsz == null && baseData.gszzl != null)) {
-      const nav = Number(baseData.dwjz);
-      const gszzl = Number(baseData.gszzl);
-      if (Number.isFinite(nav) && Number.isFinite(gszzl)) {
-        baseData.gsz = nav * (1 + gszzl / 100);
-      }
-    }
-
-    if (!baseData.name) {
-      try {
-        const results = await searchFunds(code);
-        const found = results.find((item) => item.CODE === code);
-        if (found) baseData.name = found.NAME || found.SHORTNAME;
-      } catch (e) {}
-    }
-
-    resolve({
-      ...baseData,
-      holdings,
-      holdingsReportDate,
-      holdingsIsLastQuarter
-    });
-  });
 };
+
+
 
 
 export const searchFunds = async (val) => {
