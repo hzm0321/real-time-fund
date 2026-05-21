@@ -77,7 +77,7 @@ export default function ScanImportConfirmModal({
           </div>
         ) : (
           <>
-            <div className="search-results pending-list" style={{ maxHeight: 360, overflowY: 'auto' }}>
+            <div className="search-results pending-list scrollbar-y-styled" style={{ maxHeight: 360, overflowY: 'auto' }}>
               {scannedFunds.map((item) => {
                 const isSelected = selectedScannedCodes.has(item.code);
                 const isInvalid = item.status === 'invalid';

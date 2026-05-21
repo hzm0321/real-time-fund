@@ -141,6 +141,7 @@ export default function FundDailyEarningsDetailModal({
   const body = (
     <div
       ref={scrollRef}
+      className="scrollbar-y-styled"
       style={{
         maxHeight: '60vh',
         overflowY: 'auto',

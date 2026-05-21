@@ -106,14 +106,41 @@ const COLUMN_HEADERS = {
 const SortableRowContext = createContext({
   setActivatorNodeRef: null,
   listeners: null,
+  activatorProps: null,
 });
 
-function SortableRow({ row, children, isTableDragging, disabled, enableAnimation = true }) {
+/** dnd-kit sortable 会给节点 tabIndex=0，拖拽聚焦时浏览器会把页面滚到该元素 */
+function sortableRowA11yProps(attributes) {
+  if (!attributes) return {};
+  const { tabIndex: _ignored, ...rest } = attributes;
+  return { ...rest, tabIndex: -1 };
+}
+
+function beginDragScrollLock(scrollYRef, rafRef) {
+  scrollYRef.current = window.scrollY;
+  const tick = () => {
+    if (window.scrollY !== scrollYRef.current) {
+      window.scrollTo(0, scrollYRef.current);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  };
+  if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  rafRef.current = requestAnimationFrame(tick);
+}
+
+function endDragScrollLock(scrollYRef, rafRef) {
+  if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  rafRef.current = null;
+  if (window.scrollY !== scrollYRef.current) {
+    window.scrollTo(0, scrollYRef.current);
+  }
+}
+
+function SortableRow({ row, children, disabled, enableAnimation = true }) {
   const {
     attributes,
     listeners,
     transform,
-    transition,
     setNodeRef,
     setActivatorNodeRef,
     isDragging,
@@ -121,13 +148,16 @@ function SortableRow({ row, children, isTableDragging, disabled, enableAnimation
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
     ...(isDragging ? { position: 'relative', zIndex: 9999, opacity: 0.8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}),
   };
 
   const contextValue = useMemo(
-    () => ({ setActivatorNodeRef, listeners }),
-    [setActivatorNodeRef, listeners]
+    () => ({
+      setActivatorNodeRef,
+      listeners,
+      activatorProps: sortableRowA11yProps(attributes),
+    }),
+    [setActivatorNodeRef, listeners, attributes]
   );
 
   return (
@@ -136,13 +166,11 @@ function SortableRow({ row, children, isTableDragging, disabled, enableAnimation
         <motion.div
           ref={setNodeRef}
           className="table-row-wrapper"
-          layout={isTableDragging ? undefined : "position"}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
           style={{ ...style, position: 'relative' }}
-          {...attributes}
         >
           {children}
         </motion.div>
@@ -151,7 +179,6 @@ function SortableRow({ row, children, isTableDragging, disabled, enableAnimation
           ref={setNodeRef}
           className="table-row-wrapper"
           style={{ ...style, position: 'relative' }}
-          {...attributes}
         >
           {children}
         </div>
@@ -235,6 +262,9 @@ export default function PcFundTable({
 
   const [activeId, setActiveId] = useState(null);
   const [cardDialogRow, setCardDialogRow] = useState(null);
+  const dragScrollYRef = useRef(0);
+  const dragScrollRafRef = useRef(null);
+  const isTableDraggingRef = useRef(false);
   const tableContainerRef = useRef(null);
   /** 窗口虚拟列表锚点：用于 scrollMargin（.table-scroll-area 仅横向滚动，纵向为整页滚动） */
   const virtualScrollAnchorRef = useRef(null);
@@ -246,10 +276,14 @@ export default function PcFundTable({
   const enableRowAnimation = data.length <= 40;
 
   const handleDragStart = (event) => {
+    isTableDraggingRef.current = true;
+    beginDragScrollLock(dragScrollYRef, dragScrollRafRef);
     setActiveId(event.active.id);
   };
 
   const handleDragCancel = () => {
+    isTableDraggingRef.current = false;
+    endDragScrollLock(dragScrollYRef, dragScrollRafRef);
     setActiveId(null);
   };
 
@@ -262,8 +296,12 @@ export default function PcFundTable({
         onReorder(oldIndex, newIndex);
       }
     }
+    isTableDraggingRef.current = false;
+    endDragScrollLock(dragScrollYRef, dragScrollRafRef);
     setActiveId(null);
   };
+
+  useEffect(() => () => endDragScrollLock(dragScrollYRef, dragScrollRafRef), []);
   const groupKey = currentTab ?? 'all';
   const currentGroupName = useMemo(() => {
     if (groupKey === 'all') return '全部';
@@ -992,10 +1030,12 @@ export default function PcFundTable({
         )}
         {sortBy === 'default' && (
           <button
+            type="button"
             className="icon-button drag-handle"
             ref={rowContext?.setActivatorNodeRef}
+            {...rowContext?.activatorProps}
             {...rowContext?.listeners}
-            style={{ cursor: 'grab', width: 20, height: 20, padding: 2, margin: '0', flexShrink: 0, color: 'var(--muted)', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ cursor: 'grab', width: 20, height: 20, padding: 2, margin: '0', flexShrink: 0, color: 'var(--muted)', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none' }}
             title="拖拽排序"
             onClick={(e) => e.stopPropagation?.()}
           >
@@ -1943,6 +1983,7 @@ export default function PcFundTable({
     const el = virtualScrollAnchorRef.current;
     if (!el) return;
     const update = () => {
+      if (isTableDraggingRef.current) return;
       setVirtualScrollMargin(el.getBoundingClientRect().top + window.scrollY);
     };
     update();
@@ -2224,6 +2265,8 @@ export default function PcFundTable({
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            dropAnimation={null}
+            autoScroll={false}
           >
             <SortableContext
               items={data.map((item) => item.code)}
@@ -2260,7 +2303,6 @@ export default function PcFundTable({
                     >
                       <SortableRow
                         row={row}
-                        isTableDragging={!!activeId}
                         disabled={sortBy !== 'default'}
                         enableAnimation={false}
                       >
@@ -2309,6 +2351,8 @@ export default function PcFundTable({
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            dropAnimation={null}
+            autoScroll={false}
           >
             <SortableContext
               items={data.map((item) => item.code)}
@@ -2320,9 +2364,8 @@ export default function PcFundTable({
                     <SortableRow
                       key={row.original.code || row.id}
                       row={row}
-                      isTableDragging={!!activeId}
                       disabled={sortBy !== 'default'}
-                      enableAnimation={!activeId}
+                      enableAnimation
                     >
                       <div
                         className={`table-row table-row-scroll ${index % 2 === 1 ? 'row-even' : ''}`}
@@ -2362,7 +2405,6 @@ export default function PcFundTable({
                     <SortableRow
                       key={row.original.code || row.id}
                       row={row}
-                      isTableDragging={!!activeId}
                       disabled={sortBy !== 'default'}
                       enableAnimation={false}
                     >

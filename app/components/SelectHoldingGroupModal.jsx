@@ -58,13 +58,11 @@ export default function SelectHoldingGroupModal({
         </div>
 
         <div
-          className="group-manage-list-container"
+          className="group-manage-list-container scrollbar-y-styled"
           style={{
             maxHeight: '46vh',
             overflowY: 'auto',
             paddingRight: '4px',
-            scrollbarWidth: 'thin',
-            scrollbarColor: 'var(--border) transparent',
           }}
         >
           {availableGroups.length === 0 ? (

@@ -70,7 +70,7 @@ export default function MobileFundCardDrawer({
           </DrawerClose>
         </DrawerHeader>
         <div
-          className="flex-1 min-h-0 overflow-y-auto px-5 pb-8 pt-0"
+          className="flex-1 min-h-0 overflow-y-auto px-5 pb-8 pt-0 scrollbar-y-styled"
           style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
         >
           {cardSheetRow && getFundCardProps ? (

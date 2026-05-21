@@ -84,13 +84,11 @@ export default function SelectFundSingleModal({
         </div>
 
         <div
-          className="group-manage-list-container"
+          className="group-manage-list-container scrollbar-y-styled"
           style={{
             maxHeight: '50vh',
             overflowY: 'auto',
             paddingRight: '4px',
-            scrollbarWidth: 'thin',
-            scrollbarColor: 'var(--border) transparent',
           }}
         >
           {availableFunds.length === 0 ? (

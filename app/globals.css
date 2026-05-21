@@ -1359,30 +1359,36 @@ input[type="number"] {
   display: none;                 /* Chrome / Safari */
 }
 
-/* 纵向滚动条通用样式（与项目整体规范一致，供弹窗、列表等使用） */
+/* 纵向滚动条通用样式（与项目整体规范一致，供根页面、弹窗、列表等使用） */
+html,
 .scrollbar-y-styled {
   scrollbar-width: thin;
   scrollbar-color: var(--border) var(--bg);
 }
 
+html::-webkit-scrollbar,
 .scrollbar-y-styled::-webkit-scrollbar {
   width: 8px;
 }
 
+html::-webkit-scrollbar-track,
 .scrollbar-y-styled::-webkit-scrollbar-track {
   background: var(--bg);
   border-radius: 8px;
 }
 
+html::-webkit-scrollbar-thumb,
 .scrollbar-y-styled::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 8px;
 }
 
+html::-webkit-scrollbar-thumb:hover,
 .scrollbar-y-styled::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
+html::-webkit-scrollbar-thumb:active,
 .scrollbar-y-styled::-webkit-scrollbar-thumb:active {
   background: var(--primary);
 }

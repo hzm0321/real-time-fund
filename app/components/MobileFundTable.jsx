@@ -93,7 +93,37 @@ const MOBILE_COLUMN_HEADERS = {
   tags: '基金标签',
 };
 
-const RowSortableContext = createContext(null);
+const RowSortableContext = createContext({
+  setActivatorNodeRef: null,
+  listeners: null,
+  activatorProps: null,
+});
+
+function sortableRowA11yProps(attributes) {
+  if (!attributes) return {};
+  const { tabIndex: _ignored, ...rest } = attributes;
+  return { ...rest, tabIndex: -1 };
+}
+
+function beginDragScrollLock(scrollYRef, rafRef) {
+  scrollYRef.current = window.scrollY;
+  const tick = () => {
+    if (window.scrollY !== scrollYRef.current) {
+      window.scrollTo(0, scrollYRef.current);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  };
+  if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  rafRef.current = requestAnimationFrame(tick);
+}
+
+function endDragScrollLock(scrollYRef, rafRef) {
+  if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  rafRef.current = null;
+  if (window.scrollY !== scrollYRef.current) {
+    window.scrollTo(0, scrollYRef.current);
+  }
+}
 
 function EditDragHandleCell({ disabled }) {
   const rowSortable = useContext(RowSortableContext);
@@ -109,6 +139,8 @@ function EditDragHandleCell({ disabled }) {
       ref={setActivatorRef}
       className="icon-button fav-button"
       title="拖动排序"
+      role="button"
+      aria-label="拖动排序"
       style={{
         backgroundColor: 'transparent',
         touchAction: 'none',
@@ -119,6 +151,7 @@ function EditDragHandleCell({ disabled }) {
         opacity: disabled ? 0.45 : 1,
       }}
       onClick={(e) => e.stopPropagation()}
+      {...(disabled ? {} : rowSortable.activatorProps)}
       {...(disabled ? {} : rowSortable.listeners)}
     >
       <DragIcon width="18" height="18" />
@@ -272,12 +305,11 @@ function MobileEditBatchHeader({
   );
 }
 
-function SortableRow({ row, children, isTableDragging, disabled }) {
+function SortableRow({ row, children, disabled }) {
   const {
     attributes,
     listeners,
     transform,
-    transition,
     setNodeRef,
     setActivatorNodeRef,
     isDragging,
@@ -285,7 +317,6 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
     ...(isDragging ? { position: 'relative', zIndex: 9999, opacity: 0.8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}),
   };
 
@@ -293,15 +324,19 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
     <motion.div
       ref={setNodeRef}
       className="table-row-wrapper"
-      layout={isTableDragging ? undefined : 'position'}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
       style={{ ...style, position: 'relative' }}
-      {...attributes}
     >
-      <RowSortableContext.Provider value={{ setActivatorNodeRef, listeners }}>
+      <RowSortableContext.Provider
+        value={{
+          setActivatorNodeRef,
+          listeners,
+          activatorProps: sortableRowA11yProps(attributes),
+        }}
+      >
         {typeof children === 'function' ? children(setActivatorNodeRef, listeners) : children}
       </RowSortableContext.Provider>
     </motion.div>
@@ -459,8 +494,9 @@ export default function MobileFundTable({
     useSensor(KeyboardSensor)
   );
 
-  const [activeId, setActiveId] = useState(null);
   const ignoreNextDrawerCloseRef = useRef(false);
+  const dragScrollYRef = useRef(0);
+  const dragScrollRafRef = useRef(null);
 
   const onToggleFavoriteRef = useRef(onToggleFavorite);
   const onRemoveFundRef = useRef(onRemoveFund);
@@ -486,8 +522,14 @@ export default function MobileFundTable({
     onFundTagsClick,
   ]);
 
-  const handleDragStart = (e) => setActiveId(e.active.id);
-  const handleDragCancel = () => setActiveId(null);
+  const handleDragStart = () => {
+    beginDragScrollLock(dragScrollYRef, dragScrollRafRef);
+  };
+
+  const handleDragCancel = () => {
+    endDragScrollLock(dragScrollYRef, dragScrollRafRef);
+  };
+
   const handleDragEnd = (e) => {
     const { active, over } = e;
     if (active && over && active.id !== over.id && onReorder) {
@@ -495,8 +537,10 @@ export default function MobileFundTable({
       const newIndex = data.findIndex((item) => item.code === over.id);
       if (oldIndex !== -1 && newIndex !== -1) onReorder(oldIndex, newIndex);
     }
-    setActiveId(null);
+    endDragScrollLock(dragScrollYRef, dragScrollRafRef);
   };
+
+  useEffect(() => () => endDragScrollLock(dragScrollYRef, dragScrollRafRef), []);
 
   const groupKey = currentTab ?? 'all';
   const currentGroupName = useMemo(() => {
@@ -2394,17 +2438,18 @@ export default function MobileFundTable({
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
               modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              dropAnimation={null}
+              autoScroll={false}
             >
               <SortableContext
                 items={data.map((item) => item.code)}
                 strategy={verticalListSortingStrategy}
               >
-                <AnimatePresence mode="popLayout">
+                <AnimatePresence>
                   {tableRows.map((row, index) => (
                     <SortableRow
                       key={row.original.code || row.id}
                       row={row}
-                      isTableDragging={!!activeId}
                       disabled={sortBy !== 'default' || !isEditMode}
                     >
                       {() => renderMobileRow(row, index)}

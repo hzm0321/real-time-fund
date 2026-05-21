@@ -80,13 +80,11 @@ export default function SyncPersonalSettingsModal({
         </p>
 
         <div
-          className="group-manage-list-container"
+          className="group-manage-list-container scrollbar-y-styled"
           style={{
             maxHeight: '46vh',
             overflowY: 'auto',
-            paddingRight: 4,
-            scrollbarWidth: 'thin',
-            scrollbarColor: 'var(--border) transparent',
+            paddingRight: '4px',
           }}
         >
           {options.length === 0 ? (

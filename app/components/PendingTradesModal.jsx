@@ -45,7 +45,7 @@ export default function PendingTradesModal({
           </button>
         </div>
 
-        <div className="pending-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+        <div className="pending-list scrollbar-y-styled" style={{ maxHeight: '300px', overflowY: 'auto' }}>
           <div className="pending-list-items" style={{ paddingTop: 0 }}>
             {trades.map((trade, idx) => (
               <div key={trade.id || idx} className="trade-pending-item">

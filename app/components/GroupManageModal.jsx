@@ -155,7 +155,7 @@ export default function GroupManageModal({ groups, onClose, onSave }) {
             </div>
           </DialogTitle>
 
-          <div className="group-manage-list-container" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
+          <div className="group-manage-list-container scrollbar-y-styled" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
             {items.length === 0 ? (
               <div className="empty-state muted" style={{ textAlign: 'center', padding: '40px 0' }}>
                 <div style={{ fontSize: '32px', marginBottom: 12, opacity: 0.5 }}>📂</div>

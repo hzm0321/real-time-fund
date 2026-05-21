@@ -123,7 +123,7 @@ export default function TransactionHistoryModal({
           </button>
         </div>
 
-        <div style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
+        <div className="scrollbar-y-styled" style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
           {/* Pending Transactions */}
           {pendingTransactions.length > 0 && (
             <div style={{ marginBottom: 20 }}>
