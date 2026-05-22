@@ -76,6 +76,7 @@ export const DEFAULT_SORT_RULES = [
   { id: 'last3Months', label: '近3月', enabled: false },
   { id: 'last6Months', label: '近6月', enabled: false },
   { id: 'last1Year', label: '近1年', enabled: false },
+  { id: 'sinceAddedChangePercent', label: '自添加来', enabled: false },
   { id: 'tags', label: '基金标签', enabled: false },
   { id: 'name', label: '基金名称', alias: '名称', enabled: true },
 ];

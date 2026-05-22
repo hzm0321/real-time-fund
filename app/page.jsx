@@ -2419,10 +2419,12 @@ export default function HomePage() {
   };
 
   const {
-    setScanConfirmModalOpen,
+    scanModalOpen, setScanModalOpen,
+    scanConfirmModalOpen, setScanConfirmModalOpen,
     scannedFunds, setScannedFunds,
     selectedScannedCodes, setSelectedScannedCodes,
     isScanning,
+    isScanImporting,
     scanImportProgress,
     scanProgress,
     isOcrScan, setIsOcrScan,
@@ -7555,6 +7557,36 @@ export default function HomePage() {
       {isMobile && (
         <MobileBottomNav value={mobileMainTab} onChange={setMobileMainTab} hidden={mobileBottomNavHidden && mobileMainTab === 'home'} />
       )}
+
+
+        {/* 板块资金流向弹窗 */}
+        {sectorModalOpen && (
+            <SectorFlowModal
+                open={sectorModalOpen}
+                onClose={() => setSectorModalOpen(false)}
+                sectors={sectors}
+                onAddSector={handleAddSector}
+                onRemoveSector={handleRemoveSector}
+                onSectorClick={(sector) => {
+                    setSelectedSector(sector);
+                    setSectorDetailModalOpen(true);
+                }}
+            />
+        )}
+
+        {/* 板块资金流向详情弹窗 */}
+        <AnimatePresence>
+            {sectorDetailModalOpen && selectedSector && (
+                <SectorFlowDetailModal
+                    open={sectorDetailModalOpen}
+                    onClose={() => {
+                        setSectorDetailModalOpen(false);
+                        setSelectedSector(null);
+                    }}
+                    sector={selectedSector}
+                />
+            )}
+        </AnimatePresence>
 
       {/* 全局轻提示 Toast */}
       <GlobalToast toast={toast} />

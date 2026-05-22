@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 function formatGszzlEstimate(gszzl) {
   const n = typeof gszzl === 'number' ? gszzl : Number(gszzl);
@@ -25,7 +26,13 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
     2: null,
     3: null,
   });
+  const [valuationSources, setValuationSources] = useState({
+    1: null,
+    2: null,
+    3: null,
+  });
   const [bestSource, setBestSource] = useState(null);
+  const [isYesterdayAccuracy, setIsYesterdayAccuracy] = useState(false);
 
   useEffect(() => {
     if (fund?.dataSource) {
@@ -36,15 +43,18 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
       setEstimates({ 1: '--', 2: '--', 3: '--' });
       setLoading(false);
       setBestSource(null);
+      setIsYesterdayAccuracy(false);
       return undefined;
     }
 
     let isMounted = true;
     setLoading(true);
     setBestSource(null);
+    setIsYesterdayAccuracy(false);
 
     const today = new Date().toISOString().slice(0, 10);
-    const actualZzl = fund.jzrq === today && typeof fund.zzl === 'number' && Number.isFinite(fund.zzl)
+    // 只要有实际涨跌幅，就尝试进行比对
+    const actualZzl = typeof fund.zzl === 'number' && Number.isFinite(fund.zzl)
       ? fund.zzl
       : null;
 
@@ -58,18 +68,29 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
       const e2 = formatGszzlEstimate(v2?.gszzl);
       const e3 = formatGszzlEstimate(v3?.gszzl);
       setEstimates({ 1: e1, 2: e2, 3: e3 });
+      setValuationSources({
+        1: v1?.valuationSource,
+        2: v2?.valuationSource,
+        3: v3?.valuationSource,
+      });
 
       if (actualZzl != null) {
         const diffs = [
-          { id: 1, val: v1?.gszzl },
-          { id: 2, val: v2?.gszzl },
-          { id: 3, val: v3?.gszzl },
+          { id: 1, val: v1?.gszzl, date: v1?.gztime?.slice(0, 10) },
+          { id: 2, val: v2?.gszzl, date: v2?.gztime?.slice(0, 10) },
+          { id: 3, val: v3?.gszzl, date: v3?.gztime?.slice(0, 10) },
         ]
           .filter((s) => typeof s.val === 'number' && Number.isFinite(s.val))
-          .map((s) => ({ id: s.id, diff: Math.abs(s.val - actualZzl) }));
+          // 仅比对日期与基金实际净值日期一致的估值数据
+          .filter((s) => s.date === fund.jzrq)
+          .map((s) => ({ id: s.id, diff: Math.abs(s.val - actualZzl), date: s.date }));
+
         if (diffs.length > 0) {
           diffs.sort((a, b) => a.diff - b.diff);
           setBestSource(diffs[0].id);
+          if (diffs[0].date && diffs[0].date < today) {
+            setIsYesterdayAccuracy(true);
+          }
         }
       }
 
@@ -137,8 +158,13 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                     <Label htmlFor={`source-${item.id}`} style={{ fontSize: '16px', cursor: 'pointer' }}>
                       {item.name}
                     </Label>
+                    {valuationSources[item.id] === 'supabase_qdii' && (
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0 h-4 min-h-0 leading-none border-orange-500 text-orange-500 bg-orange-500/10">限免</Badge>
+                    )}
                     {bestSource === Number(item.id) && (
-                      <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>今日最准</span>
+                      <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0 h-4 min-h-0 leading-none">
+                        {isYesterdayAccuracy ? '昨日最准' : '今日最准'}
+                      </Badge>
                     )}
                   </div>
                   <span 

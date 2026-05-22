@@ -185,6 +185,57 @@ export const fetchFundSecidByRelatedSector = async (relatedSector, { cacheTime =
   }
 };
 
+
+
+/**
+ * 根据关键词模糊搜索 fund_secid 表中的板块
+ * @param {string} keyword - 搜索关键词
+ * @param {number} limit - 返回结果数量限制
+ * @returns {Promise<Array<{related_sector: string, secid: string}>>}
+ */
+export const searchSectorsByRelatedSector = async (keyword, { limit = 10, cacheTime = 60 * 1000 } = {}) => {
+    const normalized = keyword != null ? String(keyword).trim().toUpperCase() : '';
+    if (!normalized) {
+        console.log('[搜索板块] 关键词为空');
+        return [];
+    }
+    if (!isSupabaseConfigured) {
+        console.log('[搜索板块] Supabase 未配置');
+        return [];
+    }
+
+    console.log('[搜索板块] 搜索关键词:', normalized);
+
+    try {
+        const results = await getQueryClient().fetchQuery({
+            queryKey: ['sectorSearchByKeyword', normalized, limit],
+            queryFn: async () => {
+                const { data, error } = await supabase
+                    .from('fund_secid')
+                    .select('related_sector, secid')
+                    .ilike('related_sector', `%${normalized}%`)
+                    .limit(limit);
+
+                if (error) {
+                    console.error('[搜索板块] 查询失败:', error);
+                    return [];
+                }
+                console.log('[搜索板块] 查询结果:', data);
+                return data || [];
+            },
+            staleTime: cacheTime,
+        });
+
+        console.log('[搜索板块] 返回结果数:', results.length);
+        return results;
+    } catch (e) {
+        console.error('[搜索板块] 异常:', e);
+        return [];
+    }
+};
+
+
+
 /**
  * 批量获取板块 secid
  * @param {string[]} labels

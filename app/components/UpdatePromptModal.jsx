@@ -28,17 +28,20 @@ export default function UpdatePromptModal({ updateContent, open, onClose, onRefr
             更新内容如下：
           </p>
           {updateContent && (
-            <div style={{
-              background: 'var(--card)',
-              padding: '12px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              lineHeight: '1.5',
-              maxHeight: '200px',
-              overflowY: 'auto',
-              whiteSpace: 'pre-wrap',
-              border: '1px solid var(--border)'
-            }}>
+            <div
+              className="scrollbar-y-styled"
+              style={{
+                background: 'var(--card)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                lineHeight: '1.5',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                whiteSpace: 'pre-wrap',
+                border: '1px solid var(--border)'
+              }}
+            >
               {updateContent}
             </div>
           )}
