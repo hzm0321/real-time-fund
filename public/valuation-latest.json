@@ -1,11 +1,51 @@
 {
-  "generatedAt": null,
-  "generatedAtBeijing": null,
-  "funds": [],
-  "stocks": [],
+  "generatedAt": "2026-06-02T09:48:04.680Z",
+  "generatedAtBeijing": "2026-06-02 17:48:04",
+  "funds": [
+    {
+      "code": "110022",
+      "name": "易方达消费行业股票",
+      "jzrq": "2026-06-01",
+      "dwjz": "2.8900",
+      "gsz": "2.8882",
+      "gszzl": -0.06,
+      "gztime": "2026-06-02 15:00",
+      "source": "fundgz.1234567.com.cn"
+    },
+    {
+      "code": "161725",
+      "name": "招商中证白酒指数",
+      "jzrq": "2026-06-01",
+      "dwjz": "0.5830",
+      "gsz": "0.5735",
+      "gszzl": -1.63,
+      "gztime": "2026-06-02 15:00",
+      "source": "fundgz.1234567.com.cn"
+    }
+  ],
+  "stocks": [
+    {
+      "code": "sh000001",
+      "name": "上证指数",
+      "price": 4075.1,
+      "change": 17.36,
+      "changePercent": 0.43,
+      "time": "20260602161415",
+      "source": "qt.gtimg.cn"
+    },
+    {
+      "code": "sz399001",
+      "name": "深证成指",
+      "price": 15591.13,
+      "change": 250.77,
+      "changePercent": 1.63,
+      "time": "20260602161424",
+      "source": "qt.gtimg.cn"
+    }
+  ],
   "wecom": {
-    "skipped": true,
-    "sentAt": null,
-    "reason": "waiting for scheduled workflow"
+    "skipped": false,
+    "sentAt": "2026-06-02T09:48:04.680Z",
+    "reason": null
   }
 }
