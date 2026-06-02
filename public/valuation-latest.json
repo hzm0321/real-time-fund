@@ -1,0 +1,11 @@
+{
+  "generatedAt": null,
+  "generatedAtBeijing": null,
+  "funds": [],
+  "stocks": [],
+  "wecom": {
+    "skipped": true,
+    "sentAt": null,
+    "reason": "waiting for scheduled workflow"
+  }
+}

@@ -1,0 +1,79 @@
+name: WeCom Valuation Snapshot
+
+on:
+  schedule:
+    # GitHub Actions 使用 UTC；06:30 UTC 对应北京时间 14:30。
+    - cron: "30 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "wecom-valuation"
+  cancel-in-progress: false
+
+jobs:
+  valuation:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate snapshot and send WeCom message
+        run: node scripts/send-wecom-valuation.mjs
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
+          VALUATION_PAGE_URL: ${{ vars.VALUATION_PAGE_URL }}
+
+      - name: Commit latest valuation snapshot
+        run: |
+          if git diff --quiet -- public/valuation-latest.json; then
+            echo "No valuation snapshot changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/valuation-latest.json
+          git commit -m "chore: update latest valuation snapshot"
+          git push
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          static_site_generator: next
+
+      - name: Build with Next.js
+        run: npx --no-install next build
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: ${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
+          NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+          NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL: ${{ secrets.NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL }}
+          NEXT_PUBLIC_IS_GITHUB_LOGIN: ${{ secrets.NEXT_PUBLIC_IS_GITHUB_LOGIN }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
