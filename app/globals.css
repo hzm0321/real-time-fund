@@ -1645,6 +1645,29 @@ html::-webkit-scrollbar-thumb:active,
   color: #0891b2;
 }
 
+.pending-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  color: #fb923c;
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 6px;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
+
+[data-theme='light'] .pending-indicator {
+  background: rgba(234, 88, 12, 0.1);
+  border-color: rgba(234, 88, 12, 0.25);
+  color: #ea580c;
+}
+
 .code-text {
   font-size: 11px;
 }

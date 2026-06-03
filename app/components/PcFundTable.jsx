@@ -276,6 +276,7 @@ const FundNameCell = memo(
     const code = original.code;
     const isUpdated = original.isUpdated;
     const hasDca = original.hasDca;
+    const hasPending = original.hasPending;
     const isFavorites = favorites?.has?.(code);
     const rowContext = useContext(SortableRowContext);
     const showFavoriteButton = !isGroupTab && (currentTab === 'all' || currentTab === 'fav' || !currentTab);
@@ -447,6 +448,7 @@ const FundNameCell = memo(
           {code ? (
             <span className="muted code-text">
               #{code}
+              {hasPending && <span className="pending-indicator">待</span>}
               {hasDca && <span className="dca-indicator">定</span>}
               {isUpdated && <span className="updated-indicator">✓</span>}
             </span>

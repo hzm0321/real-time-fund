@@ -209,6 +209,7 @@ export default function Index({
   onDataSourceClick,
   groupTotalHoldingAmount = 0,
   fallbackFund,
+  hasPending = false,
   onAddFund
 }) {
   const { funds, refreshMs } = useStorageStore();
@@ -461,6 +462,7 @@ export default function Index({
             </Tooltip>
             <span className="muted">
               #{f.code}
+              {hasPending && <span className="pending-indicator">待</span>}
               {dcaPlans?.[f.code]?.enabled === true && <span className="dca-indicator">定</span>}
               {f.jzrq === todayStr && <span className="updated-indicator">✓</span>}
               {fundTags.length > 0 && (

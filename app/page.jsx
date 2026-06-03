@@ -1114,6 +1114,20 @@ export default function HomePage() {
     return total;
   }, [displayFunds, holdingsForTabWithLinked, getHoldingProfitForTab]);
 
+  // 当前 tab 作用域下有待处理交易的基金代码集合
+  const pendingCodesForTab = useMemo(() => {
+    const set = new Set();
+    for (const t of pendingTrades) {
+      if (!t || !t.fundCode) continue;
+      if (activeGroupId) {
+        if (t.groupId === activeGroupId) set.add(t.fundCode);
+      } else {
+        set.add(t.fundCode);
+      }
+    }
+    return set;
+  }, [pendingTrades, activeGroupId]);
+
   // PC 端表格数据（用于 PcFundTable）
   const pcFundTableData = useMemo(() => {
     return displayFunds.map((f) => {
@@ -1307,6 +1321,7 @@ export default function HomePage() {
         isHoldingLinked: !!isHoldingLinked,
         isUpdated: f.jzrq === todayStr,
         hasDca: dcaPlansForTab[f.code]?.enabled === true,
+        hasPending: pendingCodesForTab.has(f.code),
         latestNav,
         latestNavDate: yesterdayDate,
         estimateNav,
@@ -1355,6 +1370,7 @@ export default function HomePage() {
     todayStr,
     getHoldingProfitForTab,
     dcaPlansForTab,
+    pendingCodesForTab,
     latestDailyByCode,
     currentTab,
     summaryHoldingSourceGroupByCode,
@@ -4184,7 +4200,8 @@ export default function HomePage() {
         fundTags: row?.fundTags || [],
         onFundTagsClick: openFundTagsEdit,
         fundExtraData: fundExtraDataByCode[fund.code] || fund.fundExtraData,
-        groupTotalHoldingAmount
+        groupTotalHoldingAmount,
+        hasPending: pendingCodesForTab.has(fund.code)
       };
     },
     [
@@ -4217,7 +4234,8 @@ export default function HomePage() {
       maskAmounts,
       openFundTagsEdit,
       fundExtraDataByCode,
-      groupTotalHoldingAmount
+      groupTotalHoldingAmount,
+      pendingCodesForTab
     ]
   );
 

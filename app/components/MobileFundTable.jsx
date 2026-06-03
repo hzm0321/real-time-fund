@@ -1375,6 +1375,7 @@ export default function MobileFundTable({
     const code = original.code;
     const isUpdated = original.isUpdated;
     const hasDca = original.hasDca;
+    const hasPending = original.hasPending;
     const hasHoldingAmount = original.holdingAmountValue != null;
     const holdingAmountDisplay = hasHoldingAmount ? (original.holdingAmount ?? '—') : null;
     const isFavorites = favorites?.has?.(code);
@@ -1448,12 +1449,14 @@ export default function MobileFundTable({
             {holdingAmountDisplay ? (
               <span className="muted code-text">
                 {masked ? <span className="mask-text">******</span> : holdingAmountDisplay}
+                {hasPending && <span className="pending-indicator">待</span>}
                 {hasDca && <span className="dca-indicator">定</span>}
                 {isUpdated && <span className="updated-indicator">✓</span>}
               </span>
             ) : code ? (
               <span className="muted code-text">
                 #{code}
+                {hasPending && <span className="pending-indicator">待</span>}
                 {hasDca && <span className="dca-indicator">定</span>}
                 {isUpdated && <span className="updated-indicator">✓</span>}
               </span>
@@ -1506,9 +1509,9 @@ export default function MobileFundTable({
         <div className="title-text">
           <span
             className={`name-text ${showFullFundName ? 'show-full' : ''}`}
+            style={onOpenCardSheet ? { cursor: 'pointer' } : undefined}
             role={onOpenCardSheet ? 'button' : undefined}
             tabIndex={onOpenCardSheet ? 0 : undefined}
-            style={onOpenCardSheet ? { cursor: 'pointer' } : undefined}
             onClick={(e) => {
               if (onOpenCardSheet) {
                 e.stopPropagation?.();
@@ -1560,6 +1563,7 @@ export default function MobileFundTable({
               }}
             >
               {masked ? <span className="mask-text">******</span> : holdingAmountDisplay}
+              {hasPending && <span className="pending-indicator">待</span>}
               {hasDca && <span className="dca-indicator">定</span>}
               {isUpdated && <span className="updated-indicator">✓</span>}
             </span>
@@ -1581,6 +1585,7 @@ export default function MobileFundTable({
               }}
             >
               #{code}
+              {hasPending && <span className="pending-indicator">待</span>}
               {hasDca && <span className="dca-indicator">定</span>}
               {isUpdated && <span className="updated-indicator">✓</span>}
             </span>

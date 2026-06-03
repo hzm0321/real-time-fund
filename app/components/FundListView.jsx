@@ -220,6 +220,7 @@ export default function FundListView({
                     onFundTagsClick={openFundTagsEdit}
                     fundExtraData={fundExtraDataByCode[f.code]}
                     groupTotalHoldingAmount={groupTotalHoldingAmount}
+                    hasPending={f.hasPending}
                   />
                 </motion.div>
               ))}
