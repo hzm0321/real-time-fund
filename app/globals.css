@@ -1649,11 +1649,11 @@ html::-webkit-scrollbar-thumb:active,
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 16px;
   height: 16px;
-  padding: 0 5px;
-  border-radius: 4px;
+  padding: 0 4px;
+  border-radius: 999px;
   background: rgba(249, 115, 22, 0.15);
-  border: 1px solid rgba(249, 115, 22, 0.3);
   color: #fb923c;
   font-size: 10px;
   font-weight: 500;
@@ -1663,8 +1663,7 @@ html::-webkit-scrollbar-thumb:active,
 }
 
 [data-theme='light'] .pending-indicator {
-  background: rgba(234, 88, 12, 0.1);
-  border-color: rgba(234, 88, 12, 0.25);
+  background: rgba(234, 88, 12, 0.15);
   color: #ea580c;
 }
 
