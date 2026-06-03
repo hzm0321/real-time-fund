@@ -31,6 +31,7 @@ import FundCard from './FundCard';
 import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink } from '@/components/ui/pagination';
 
 function FundDetailDialog({ cardDialogRow, getFundCardProps, setCardDialogRow }) {
   return (
@@ -57,6 +58,7 @@ function FundDetailDialog({ cardDialogRow, getFundCardProps, setCardDialogRow })
 export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
   const [detailFund, setDetailFund] = useState(null);
   const [detailFundExtra, setDetailFundExtra] = useState(null);
+  const [pageIndex, setPageIndex] = useState(1);
 
   useEffect(() => {
     if (detailFund) {
@@ -118,7 +120,7 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
 
   // Query for Valuation Ranking
   const { data: rankingData, isLoading: rankingLoading } = useQuery({
-    queryKey: ['valuationRanking', activeTab],
+    queryKey: ['valuationRanking', activeTab, pageIndex],
     queryFn: async () => {
       let sort = 3;
       let order = 'desc';
@@ -134,7 +136,7 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
         order = 'desc';
       }
 
-      const res = await fetchFundValuationRanking(sort, order, 1, 20);
+      const res = await fetchFundValuationRanking(sort, order, pageIndex, 20);
       return res?.Data?.list || [];
     },
     enabled: !!isActive,
@@ -480,7 +482,7 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
           )}
 
           {/* 榜单栏 */}
-          <div className="market-ranking-section glass">
+          <div className="market-ranking-section glass" id="market-ranking-section">
             <div className="market-ranking-tabs" style={{ padding: '8px 12px' }}>
               <div className="tabs-container">
                 <div className="tabs-scroll-area">
@@ -493,7 +495,10 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                         exit={{ opacity: 0, scale: 0.8 }}
                         key="increase"
                         className={cn('tab', activeTab === 'increase' && 'active')}
-                        onClick={() => setActiveTab('increase')}
+                        onClick={() => {
+                          setActiveTab('increase');
+                          setPageIndex(1);
+                        }}
                         transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                       >
                         估值涨幅
@@ -505,7 +510,10 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                         exit={{ opacity: 0, scale: 0.8 }}
                         key="decrease"
                         className={cn('tab', activeTab === 'decrease' && 'active')}
-                        onClick={() => setActiveTab('decrease')}
+                        onClick={() => {
+                          setActiveTab('decrease');
+                          setPageIndex(1);
+                        }}
                         transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                       >
                         估值跌幅
@@ -517,7 +525,10 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                         exit={{ opacity: 0, scale: 0.8 }}
                         key="hot"
                         className={cn('tab', activeTab === 'hot' && 'active')}
-                        onClick={() => setActiveTab('hot')}
+                        onClick={() => {
+                          setActiveTab('hot');
+                          setPageIndex(1);
+                        }}
                         transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                       >
                         成交热度
@@ -529,7 +540,10 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                         exit={{ opacity: 0, scale: 0.8 }}
                         key="actual"
                         className={cn('tab', activeTab === 'actual' && 'active')}
-                        onClick={() => setActiveTab('actual')}
+                        onClick={() => {
+                          setActiveTab('actual');
+                          setPageIndex(1);
+                        }}
                         transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
                       >
                         实际涨幅
@@ -696,6 +710,49 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                 ) : (
                   <div className="py-8 text-center text-sm opacity-50">暂无数据</div>
                 )}
+              </div>
+
+              <div className="py-5 flex justify-end border-t border-[var(--border)] pr-4">
+                <Pagination className="justify-end w-auto mx-0">
+                  <PaginationContent>
+                    {[1, 2, 3].map((p) => (
+                      <PaginationItem key={p}>
+                        <PaginationLink
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (pageIndex !== p) {
+                              setPageIndex(p);
+                              // 延迟一点等待数据请求开始，同时滚动到表头
+                              setTimeout(() => {
+                                const el = document.getElementById('market-ranking-section');
+                                if (el) {
+                                  // 动态获取固定导航栏的高度，如果找不到则降级使用默认值 68px
+                                  const navbar = document.querySelector('.navbar');
+                                  const navHeight = navbar ? navbar.getBoundingClientRect().height : 68;
+
+                                  // 动态获取大盘指数组件的高度
+                                  const indexAccordion = document.querySelector('.market-index-accordion-root');
+                                  const indexHeight = indexAccordion
+                                    ? indexAccordion.getBoundingClientRect().height
+                                    : 0;
+
+                                  // 精准偏移：导航栏高度 + 指数组件高度 + 16px 的视觉留白
+                                  const offset = navHeight + indexHeight + 16;
+
+                                  const y = el.getBoundingClientRect().top + window.scrollY - offset;
+                                  window.scrollTo({ top: y, behavior: 'smooth' });
+                                }
+                              }, 10);
+                            }
+                          }}
+                          isActive={pageIndex === p}
+                        >
+                          {p}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                  </PaginationContent>
+                </Pagination>
               </div>
             </div>
           </div>
