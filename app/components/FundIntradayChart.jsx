@@ -174,9 +174,13 @@ export default function FundIntradayChart({
           position: 'left',
           grid: { color: colors.border, drawBorder: false },
           ticks: {
-            color: colors.muted,
+            color: (context) => {
+              if (context.tick.value > 0) return colors.danger;
+              if (context.tick.value < 0) return colors.success;
+              return colors.muted;
+            },
             font: { size: 10 },
-            callback: (v) => (isNumber(v) ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : v)
+            callback: (v) => (isNumber(v) ? `${v > 0 ? '+' : ''}${v.toFixed(2)}%` : v)
           }
         }
       },

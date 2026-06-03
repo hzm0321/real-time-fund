@@ -1342,34 +1342,39 @@ export default function PcFundTable({
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>基金名称</span>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={(e) => {
-                  e.stopPropagation?.();
-                  setIsEditMode(true);
-                }}
-                aria-label="编辑"
-                style={{
-                  border: 'none',
-                  width: '28px',
-                  height: '28px',
-                  minWidth: '28px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--text)',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  opacity: 0.6,
-                  transition: 'opacity 0.2s'
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.6)}
-              >
-                <PencilIcon width="14" height="14" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={(e) => {
+                      e.stopPropagation?.();
+                      setIsEditMode(true);
+                    }}
+                    aria-label="编辑"
+                    style={{
+                      border: 'none',
+                      width: '28px',
+                      height: '28px',
+                      minWidth: '28px',
+                      backgroundColor: 'transparent',
+                      color: 'var(--text)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      opacity: 0.6,
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.6)}
+                  >
+                    <PencilIcon width="14" height="14" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>编辑模式</TooltipContent>
+              </Tooltip>
             </div>
           );
         },
