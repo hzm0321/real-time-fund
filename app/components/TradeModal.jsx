@@ -494,7 +494,7 @@ export default function TradeModal({ type, fund, holding, onClose, onConfirm, pe
                             borderRadius: 12
                           }}
                         >
-                          <NumericInput value={feeRate} onChange={setFeeRate} step={0.01} min={0} placeholder="0.12" />
+                          <NumericInput value={feeRate} onChange={setFeeRate} step={0.1} min={0} placeholder="0.12" />
                         </div>
                       </div>
                       <div className="form-group" style={{ flex: 1 }}>
@@ -643,7 +643,7 @@ export default function TradeModal({ type, fund, holding, onClose, onConfirm, pe
                       <NumericInput
                         value={feeValue}
                         onChange={setFeeValue}
-                        step={feeMode === 'rate' ? 0.01 : 1}
+                        step={feeMode === 'rate' ? 0.1 : 1}
                         min={0}
                         placeholder={feeMode === 'rate' ? '0.00' : '0.00'}
                       />

@@ -338,7 +338,7 @@ export default function DcaModal({ fund, plan, onClose, onConfirm, onReset }) {
                       borderRadius: 12
                     }}
                   >
-                    <NumericInput value={feeRate} onChange={setFeeRate} step={0.01} min={0} placeholder="0.12" />
+                    <NumericInput value={feeRate} onChange={setFeeRate} step={0.1} min={0} placeholder="0.12" />
                   </div>
                 </div>
                 <div className="form-group" style={{ flex: 1 }}>
