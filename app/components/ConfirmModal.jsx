@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TrashIcon } from './Icons';
 
 export default function ConfirmModal({
@@ -17,18 +11,14 @@ export default function ConfirmModal({
   onCancel,
   confirmText = '确定删除',
   icon,
-  confirmVariant = 'danger',
+  confirmVariant = 'danger'
 }) {
   const handleOpenChange = (open) => {
     if (!open) onCancel();
   };
 
   const confirmButtonToneClass =
-    confirmVariant === 'primary'
-      ? 'button'
-      : confirmVariant === 'secondary'
-        ? 'button secondary'
-        : 'button danger';
+    confirmVariant === 'primary' ? 'button' : confirmVariant === 'secondary' ? 'button secondary' : 'button danger';
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
@@ -38,9 +28,7 @@ export default function ConfirmModal({
         className="!z-[12010] max-w-[400px] flex flex-col gap-5 p-6"
       >
         <DialogHeader className="flex flex-row items-center gap-3 text-left">
-          {icon || (
-            <TrashIcon width="20" height="20" className="shrink-0 text-[var(--danger)]" />
-          )}
+          {icon || <TrashIcon width="20" height="20" className="shrink-0 text-[var(--danger)]" />}
           <DialogTitle className="flex-1 text-base font-semibold">{title}</DialogTitle>
         </DialogHeader>
         {/* asChild + div：避免 Description 默认 <p> 与 messageContent 内块级元素嵌套导致 hydration 报错 */}

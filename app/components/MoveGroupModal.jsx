@@ -1,20 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ConfirmModal from './ConfirmModal';
 import { AlertTriangleIcon } from './Icons';
 
@@ -33,7 +21,7 @@ export default function MoveGroupModal({
   groups = [],
   selectedCodes = [],
   onMoveFunds,
-  disabled = false,
+  disabled = false
 }) {
   const [targetId, setTargetId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -71,7 +59,7 @@ export default function MoveGroupModal({
         fromTab,
         targetId,
         dryRun: true,
-        overwrite: false,
+        overwrite: false
       });
       const nextConflicts = Array.isArray(res?.conflicts) ? res.conflicts : [];
       if (nextConflicts.length > 0) {
@@ -84,7 +72,7 @@ export default function MoveGroupModal({
         fromTab,
         targetId,
         dryRun: false,
-        overwrite: false,
+        overwrite: false
       });
       onClose?.();
     } finally {
@@ -101,7 +89,7 @@ export default function MoveGroupModal({
         fromTab,
         targetId,
         dryRun: false,
-        overwrite: true,
+        overwrite: true
       });
       setConfirmOverwriteOpen(false);
       onClose?.();
@@ -112,7 +100,12 @@ export default function MoveGroupModal({
 
   return (
     <>
-      <Dialog open={!!open} onOpenChange={(next) => { if (!next) onClose?.(); }}>
+      <Dialog
+        open={!!open}
+        onOpenChange={(next) => {
+          if (!next) onClose?.();
+        }}
+      >
         <DialogContent
           className="sm:max-w-md max-h-[88vh] flex flex-col p-0 overflow-hidden"
           onPointerDownOutside={(event) => {
@@ -123,9 +116,7 @@ export default function MoveGroupModal({
           }}
         >
           <DialogHeader className="flex-shrink-0 px-6 pb-4 pt-6 text-left border-b border-[var(--border)]">
-            <DialogTitle className="text-base font-semibold text-[var(--text)]">
-              迁移到分组
-            </DialogTitle>
+            <DialogTitle className="text-base font-semibold text-[var(--text)]">迁移到分组</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 flex flex-col gap-4">
             <DialogDescription className="text-left text-sm leading-relaxed text-[var(--muted-foreground)]">
@@ -155,20 +146,10 @@ export default function MoveGroupModal({
             </div>
           </div>
           <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--border)] flex gap-3">
-            <button
-              type="button"
-              className="button secondary flex-1"
-              onClick={onClose}
-              disabled={submitting}
-            >
+            <button type="button" className="button secondary flex-1" onClick={onClose} disabled={submitting}>
               取消
             </button>
-            <button
-              type="button"
-              className="button flex-1"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-            >
+            <button type="button" className="button flex-1" onClick={handleSubmit} disabled={!canSubmit}>
               {submitting ? '处理中...' : '确认迁移'}
             </button>
           </div>
@@ -189,4 +170,3 @@ export default function MoveGroupModal({
     </>
   );
 }
-

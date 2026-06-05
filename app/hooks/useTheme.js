@@ -9,7 +9,7 @@ import { storageStore } from '../stores';
  */
 export function useTheme() {
   // 初始固定为 dark，避免 SSR 与客户端首屏不一致导致 hydration 报错
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState('dark');
   const [showThemeTransition, setShowThemeTransition] = useState(false);
 
   const handleThemeToggle = useCallback(() => {
@@ -30,7 +30,7 @@ export function useTheme() {
         setTheme(fromStorage);
         document.documentElement.setAttribute('data-theme', fromStorage);
       }
-    } catch { }
+    } catch {}
   }, []);
 
   // 主题变化时同步到 document 并持久化
@@ -38,7 +38,7 @@ export function useTheme() {
     document.documentElement.setAttribute('data-theme', theme);
     try {
       storageStore.setItem('theme', theme);
-    } catch { }
+    } catch {}
   }, [theme]);
 
   return { theme, showThemeTransition, setShowThemeTransition, handleThemeToggle };

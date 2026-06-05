@@ -1,86 +1,71 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Drawer as DrawerPrimitive } from "vaul"
+import * as React from 'react';
+import { Drawer as DrawerPrimitive } from 'vaul';
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
-const DrawerScrollLockContext = React.createContext(null)
+const DrawerScrollLockContext = React.createContext(null);
 
 /**
  * 移动端滚动锁定：不再对 body 设置任何属性，
  * 仅在 Context 中提供 open 状态，然后在 DrawerOverlay 中处理禁止遮罩层的滚动。
  */
 function useScrollLock(open) {
-  return React.useMemo(
-    () => (open ? { open } : null),
-    [open]
-  )
+  return React.useMemo(() => (open ? { open } : null), [open]);
 }
 
 function parseVhToPx(vhStr) {
-  if (typeof vhStr === "number") return vhStr
-  const match = String(vhStr).match(/^([\d.]+)\s*vh$/)
-  if (!match) return null
-  if (typeof window === "undefined") return null
-  return (window.innerHeight * Number(match[1])) / 100
+  if (typeof vhStr === 'number') return vhStr;
+  const match = String(vhStr).match(/^([\d.]+)\s*vh$/);
+  if (!match) return null;
+  if (typeof window === 'undefined') return null;
+  return (window.innerHeight * Number(match[1])) / 100;
 }
 
 function Drawer({ open, ...props }) {
-  const scrollLock = useScrollLock(open)
-  const contextValue = React.useMemo(
-    () => ({ ...scrollLock, open: !!open }),
-    [scrollLock, open]
-  )
+  const scrollLock = useScrollLock(open);
+  const contextValue = React.useMemo(() => ({ ...scrollLock, open: !!open }), [scrollLock, open]);
   return (
     <DrawerScrollLockContext.Provider value={contextValue}>
       <DrawerPrimitive.Root modal={false} data-slot="drawer" open={open} {...props} />
     </DrawerScrollLockContext.Provider>
-  )
+  );
 }
 
-function DrawerTrigger({
-  ...props
-}) {
+function DrawerTrigger({ ...props }) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
 }
 
-function DrawerPortal({
-  ...props
-}) {
+function DrawerPortal({ ...props }) {
   return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />;
 }
 
-function DrawerClose({
-  ...props
-}) {
+function DrawerClose({ ...props }) {
   return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />;
 }
 
-function DrawerOverlay({
-  className,
-  ...props
-}) {
-  const ctx = React.useContext(DrawerScrollLockContext)
-  const { open = false, ...scrollLockProps } = ctx || {}
-  
+function DrawerOverlay({ className, ...props }) {
+  const ctx = React.useContext(DrawerScrollLockContext);
+  const { open = false, ...scrollLockProps } = ctx || {};
+
   const overlayRef = React.useRef(null);
-  
+
   React.useEffect(() => {
     const el = overlayRef.current;
     if (!el || !open) return;
-    
+
     const preventScroll = (e) => {
       e.preventDefault();
       e.stopPropagation();
     };
-    
-    el.addEventListener("touchmove", preventScroll, { passive: false });
-    el.addEventListener("wheel", preventScroll, { passive: false });
-    
+
+    el.addEventListener('touchmove', preventScroll, { passive: false });
+    el.addEventListener('wheel', preventScroll, { passive: false });
+
     return () => {
-      el.removeEventListener("touchmove", preventScroll);
-      el.removeEventListener("wheel", preventScroll);
+      el.removeEventListener('touchmove', preventScroll);
+      el.removeEventListener('wheel', preventScroll);
     };
   }, [open]);
 
@@ -90,16 +75,16 @@ function DrawerOverlay({
       <div
         ref={overlayRef}
         data-slot="drawer-overlay"
-        data-state={open ? "open" : "closed"}
+        data-state={open ? 'open' : 'closed'}
         role="button"
         tabIndex={-1}
         aria-label="关闭"
         className={cn(
-          "fixed inset-0 z-50 cursor-default bg-[var(--drawer-overlay,rgba(0,0,0,0.45))] backdrop-blur-[6px]",
-          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+          'fixed inset-0 z-50 cursor-default bg-[var(--drawer-overlay,rgba(0,0,0,0.45))] backdrop-blur-[6px]',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
           className
         )}
-        style={{ touchAction: "none" }}
+        style={{ touchAction: 'none' }}
         {...scrollLockProps}
         {...props}
       />
@@ -110,13 +95,13 @@ function DrawerOverlay({
 function DrawerContent({
   className,
   children,
-  defaultHeight = "77vh",
-  minHeight = "20vh",
-  maxHeight = "90vh",
+  defaultHeight = '77vh',
+  minHeight = '20vh',
+  maxHeight = '90vh',
   ...props
 }) {
   const [heightPx, setHeightPx] = React.useState(() =>
-    typeof window !== "undefined" ? parseVhToPx(defaultHeight) : null
+    typeof window !== 'undefined' ? parseVhToPx(defaultHeight) : null
   );
   const [isDragging, setIsDragging] = React.useState(false);
   const dragRef = React.useRef({ startY: 0, startHeight: 0 });
@@ -139,15 +124,18 @@ function DrawerContent({
         return Math.max(clamped, min ?? clamped);
       });
     };
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
   }, [defaultHeight, minHeight, maxHeight]);
 
   const handlePointerDown = React.useCallback(
     (e) => {
       e.preventDefault();
       setIsDragging(true);
-      dragRef.current = { startY: e.clientY ?? e.touches?.[0]?.clientY, startHeight: heightPx ?? parseVhToPx(defaultHeight) ?? 0 };
+      dragRef.current = {
+        startY: e.clientY ?? e.touches?.[0]?.clientY,
+        startHeight: heightPx ?? parseVhToPx(defaultHeight) ?? 0
+      };
     },
     [heightPx, defaultHeight]
   );
@@ -162,15 +150,15 @@ function DrawerContent({
       setHeightPx(next);
     };
     const up = () => setIsDragging(false);
-    document.addEventListener("mousemove", move, { passive: true });
-    document.addEventListener("mouseup", up);
-    document.addEventListener("touchmove", move, { passive: true });
-    document.addEventListener("touchend", up);
+    document.addEventListener('mousemove', move, { passive: true });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', up);
     return () => {
-      document.removeEventListener("mousemove", move);
-      document.removeEventListener("mouseup", up);
-      document.removeEventListener("touchmove", move);
-      document.removeEventListener("touchend", up);
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend', up);
     };
   }, [isDragging, minPx, maxPx]);
 
@@ -188,24 +176,25 @@ function DrawerContent({
         onPointerDownOutside={(e) => e.preventDefault()}
         style={contentStyle}
         className={cn(
-          "group/drawer-content fixed z-50 flex h-auto flex-col bg-[var(--card)] text-[var(--text)] border-[var(--border)]",
-          "data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-[var(--radius)] data-[vaul-drawer-direction=top]:border-b drawer-shadow-top",
-          "data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[88vh] data-[vaul-drawer-direction=bottom]:rounded-t-[20px] data-[vaul-drawer-direction=bottom]:border-t drawer-shadow-bottom",
-          "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=right]:sm:max-w-sm",
-          "data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=left]:sm:max-w-sm",
-          "drawer-content-theme",
+          'group/drawer-content fixed z-50 flex h-auto flex-col bg-[var(--card)] text-[var(--text)] border-[var(--border)]',
+          'data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-[var(--radius)] data-[vaul-drawer-direction=top]:border-b drawer-shadow-top',
+          'data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[88vh] data-[vaul-drawer-direction=bottom]:rounded-t-[20px] data-[vaul-drawer-direction=bottom]:border-t drawer-shadow-bottom',
+          'data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=right]:sm:max-w-sm',
+          'data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=left]:sm:max-w-sm',
+          'drawer-content-theme',
           className
         )}
-        {...props}>
+        {...props}
+      >
         <div
           role="separator"
           aria-label="拖动调整高度"
           onMouseDown={handlePointerDown}
           onTouchStart={handlePointerDown}
           className={cn(
-            "mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full bg-[var(--muted)] cursor-n-resize touch-none select-none",
-            "group-data-[vaul-drawer-direction=bottom]/drawer-content:block",
-            "hover:bg-[var(--muted-foreground)/0.4] active:bg-[var(--muted-foreground)/0.6]"
+            'mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full bg-[var(--muted)] cursor-n-resize touch-none select-none',
+            'group-data-[vaul-drawer-direction=bottom]/drawer-content:block',
+            'hover:bg-[var(--muted-foreground)/0.4] active:bg-[var(--muted-foreground)/0.6]'
           )}
         />
         {children}
@@ -214,55 +203,41 @@ function DrawerContent({
   );
 }
 
-function DrawerHeader({
-  className,
-  ...props
-}) {
+function DrawerHeader({ className, ...props }) {
   return (
     <div
       data-slot="drawer-header"
       className={cn(
-        "flex flex-col gap-0.5 p-4 border-b border-[var(--border)] group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-1.5 md:text-left",
-        "drawer-header-theme",
+        'flex flex-col gap-0.5 p-4 border-b border-[var(--border)] group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-1.5 md:text-left',
+        'drawer-header-theme',
         className
       )}
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function DrawerFooter({
-  className,
-  ...props
-}) {
-  return (
-    <div
-      data-slot="drawer-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-      {...props} />
-  );
+function DrawerFooter({ className, ...props }) {
+  return <div data-slot="drawer-footer" className={cn('mt-auto flex flex-col gap-2 p-4', className)} {...props} />;
 }
 
-function DrawerTitle({
-  className,
-  ...props
-}) {
+function DrawerTitle({ className, ...props }) {
   return (
     <DrawerPrimitive.Title
       data-slot="drawer-title"
-      className={cn("font-semibold text-[var(--text)]", className)}
-      {...props} />
+      className={cn('font-semibold text-[var(--text)]', className)}
+      {...props}
+    />
   );
 }
 
-function DrawerDescription({
-  className,
-  ...props
-}) {
+function DrawerDescription({ className, ...props }) {
   return (
     <DrawerPrimitive.Description
       data-slot="drawer-description"
-      className={cn("text-sm text-[var(--muted)]", className)}
-      {...props} />
+      className={cn('text-sm text-[var(--muted)]', className)}
+      {...props}
+    />
   );
 }
 
@@ -276,5 +251,5 @@ export {
   DrawerHeader,
   DrawerFooter,
   DrawerTitle,
-  DrawerDescription,
-}
+  DrawerDescription
+};

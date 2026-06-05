@@ -1,5 +1,6 @@
 'use client';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 /**
  * 分组账户汇总卡片（只读展示，不包含任何持仓编辑/交易入口）
@@ -26,7 +27,7 @@ function formatAmountPlain(value, decimals = 2) {
   if (value == null || !Number.isFinite(value)) return '—';
   return Math.abs(value).toLocaleString('zh-CN', {
     minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    maximumFractionDigits: decimals
   });
 }
 
@@ -62,14 +63,7 @@ function tonePercent(pct, decimals = 2) {
 /** 分组汇总卡片标题左侧：账本轮廓 + 迷你走势，颜色跟随主题 --primary */
 function GroupCardTitleIcon({ size = 22 }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
       <path
         d="M5 6.5C5 5.67157 5.67157 5 6.5 5H9.17157C9.70201 5 10.2107 5.21071 10.5858 5.58579L11.4142 6.41421C11.7893 6.78929 12.298 7 12.8284 7H17.5C18.3284 7 19 7.67157 19 8.5V17.5C19 18.3284 18.3284 19 17.5 19H6.5C5.67157 19 5 18.3284 5 17.5V6.5Z"
         stroke="var(--primary)"
@@ -125,7 +119,8 @@ function Sparkline({ series, className = '' }) {
   );
 }
 
-export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 为移动布局，false 为 PC */
+export default function GroupAccountSummaryCard({
+  /** 与首页 `` 一致：true 为移动布局，false 为 PC */
   /** 点击整张卡片时回调（如切换到对应分组 / 「全部」） */
   onActivate,
   groupName,
@@ -138,12 +133,17 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
   upCount = 0,
   downCount = 0,
   sparkSeries = [],
-  masked = false}) {
+  masked = false
+}) {
   const isMobile = useIsMobile();
   const holdingTone = toneSignedAmount(holdingReturn, 2);
   const holdingPctTone = tonePercent(holdingReturnPercent, 2);
-  const accountTone = hasAnyTodayData ? toneSignedAmount(accountReturn, 2) : { className: 'muted', color: 'var(--muted)' };
-  const accountPctTone = hasAnyTodayData ? tonePercent(accountReturnPercent, 2) : { className: 'muted', color: 'var(--muted)' };
+  const accountTone = hasAnyTodayData
+    ? toneSignedAmount(accountReturn, 2)
+    : { className: 'muted', color: 'var(--muted)' };
+  const accountPctTone = hasAnyTodayData
+    ? tonePercent(accountReturnPercent, 2)
+    : { className: 'muted', color: 'var(--muted)' };
 
   const interactive = typeof onActivate === 'function';
 
@@ -170,7 +170,7 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
         background: 'rgba(255, 255, 255, 0.04)',
         borderRadius: 12,
         cursor: interactive ? 'pointer' : undefined,
-        outlineOffset: interactive ? 2 : undefined,
+        outlineOffset: interactive ? 2 : undefined
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -178,19 +178,50 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
           <span style={{ display: 'flex', flexShrink: 0, lineHeight: 0 }} aria-hidden>
             <GroupCardTitleIcon size={isMobile ? 20 : 22} />
           </span>
-          <span style={{ fontWeight: 500, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span
+            style={{
+              fontWeight: 700,
+              fontSize: 15,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
             {groupName}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
-          <span className="up" title="估算上涨">
-            {upCount}
-            <span style={{ marginLeft: 2 }}>▲</span>
-          </span>
-          <span className="down" title="估算下跌">
-            {downCount}
-            <span style={{ marginLeft: 2 }}>▼</span>
-          </span>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexShrink: 0,
+            fontSize: 13,
+            fontVariantNumeric: 'tabular-nums'
+          }}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="up">
+                {upCount}
+                <span style={{ marginLeft: 2 }}>▲</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>估算上涨</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="down">
+                {downCount}
+                <span style={{ marginLeft: 2 }}>▼</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>估算下跌</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -199,12 +230,8 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
           <div className="muted" style={{ fontSize: 12, marginBottom: 2 }}>
             账户资产
           </div>
-          <div style={{ fontSize: 22, fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
-            {masked ? (
-              <span className="mask-text">******</span>
-            ) : (
-              formatAmountPlain(totalAsset ?? 0, 2)
-            )}
+          <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+            {masked ? <span className="mask-text">******</span> : formatAmountPlain(totalAsset ?? 0, 2)}
           </div>
         </div>
         <Sparkline series={sparkSeries} />
@@ -218,13 +245,9 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span
               className={holdingTone.className}
-              style={{ fontSize: 16, fontWeight: 500, fontFamily: 'var(--font-mono)', color: holdingTone.color }}
+              style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: holdingTone.color }}
             >
-              {masked ? (
-                <span className="mask-text">******</span>
-              ) : (
-                formatSignedAmount(holdingReturn ?? 0, 2)
-              )}
+              {masked ? <span className="mask-text">******</span> : formatSignedAmount(holdingReturn ?? 0, 2)}
             </span>
             {!masked && (
               <span
@@ -234,7 +257,7 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
                   padding: '2px 6px',
                   borderRadius: 6,
                   background: 'rgba(255,255,255,0.06)',
-                  color: holdingPctTone.color,
+                  color: holdingPctTone.color
                 }}
               >
                 {formatSignedPercent(holdingReturnPercent, 2)}
@@ -249,7 +272,7 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <span
               className={accountTone.className}
-              style={{ fontSize: 16, fontWeight: 500, fontFamily: 'var(--font-mono)', color: accountTone.color }}
+              style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: accountTone.color }}
             >
               {masked ? (
                 <span className="mask-text">******</span>
@@ -267,7 +290,7 @@ export default function GroupAccountSummaryCard({/** 与首页 `` 一致：true 
                   padding: '2px 6px',
                   borderRadius: 6,
                   background: 'rgba(255,255,255,0.06)',
-                  color: accountPctTone.color,
+                  color: accountPctTone.color
                 }}
               >
                 {formatSignedPercent(accountReturnPercent, 2)}

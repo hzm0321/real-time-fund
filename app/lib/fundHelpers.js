@@ -4,13 +4,19 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString, isPlainObject } from 'lodash';
-import { TAG_THEME_OPTIONS } from '../components/AddTagDialog';
+import {
+  DEFAULT_TZ,
+  TAG_THEME_OPTIONS,
+  DCA_SCOPE_GLOBAL,
+  SUMMARY_TAB_ID,
+  SUMMARY_SOURCE_GLOBAL,
+  DEFAULT_FUND_TAG_THEME
+} from '@/app/constants';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(isSameOrAfter);
 
-const DEFAULT_TZ = 'Asia/Shanghai';
 export const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -25,16 +31,8 @@ export const nowInTz = () => dayjs().tz(TZ);
 export const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 export const formatDate = (input) => toTz(input).format('YYYY-MM-DD');
 
-/** 定投计划分桶：全局与其它自定义分组 */
-export const DCA_SCOPE_GLOBAL = '__global__';
-/** 虚拟 Tab：多分组有持仓时的汇总视图（非真实分组 id） */
-export const SUMMARY_TAB_ID = '__portfolio_groups_summary__';
-/** 汇总合并持仓映射中：表示该笔展示来自「全部」全局持仓（非真实分组 id） */
-export const SUMMARY_SOURCE_GLOBAL = '__portfolio_summary_global__';
+export { DCA_SCOPE_GLOBAL, SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL, DEFAULT_FUND_TAG_THEME };
 export const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-
-/** 独立存储的基金标签默认主题（localStorage `tags`） */
-export const DEFAULT_FUND_TAG_THEME = 'default';
 
 /** 与 AddTagDialog TAG_THEME_OPTIONS 的 key 一致（单一数据源，避免漏改） */
 const ALLOWED_FUND_TAG_THEMES = new Set(TAG_THEME_OPTIONS.map((o) => o.key));
@@ -61,7 +59,7 @@ export function normalizeFundTagInstanceListFromInput(rows) {
     out.push({
       id,
       name,
-      theme: normalizeFundTagTheme(r.theme),
+      theme: normalizeFundTagTheme(r.theme)
     });
     if (out.length >= 30) break;
   }
@@ -91,7 +89,7 @@ export function sanitizeTagRowForStorage(r) {
     id: String(r.id ?? '').trim() || uuidv4(),
     name,
     theme: String(r.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-    fundCodes: codes.sort(),
+    fundCodes: codes.sort()
   };
 }
 
@@ -103,9 +101,9 @@ export function serializeTagRecordsForCompare(rows) {
         id: String(r?.id ?? ''),
         name: String(r?.name ?? '').trim(),
         theme: String(r?.theme ?? '').trim(),
-        fundCodes: getFundCodesFromTagRecord(r).slice().sort(),
+        fundCodes: getFundCodesFromTagRecord(r).slice().sort()
       }))
-      .sort((a, b) => a.id.localeCompare(b.id)),
+      .sort((a, b) => a.id.localeCompare(b.id))
   );
 }
 
@@ -125,7 +123,7 @@ export function mergeTagRowsByName(rows) {
         id: String(row.id ?? '').trim(),
         name: nm,
         theme: String(row.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-        fundCodes: [...codes].sort(),
+        fundCodes: [...codes].sort()
       });
     }
   }
@@ -144,16 +142,8 @@ export function cloneHoldingDeep(src) {
 /** 规范化单条持仓（与 collectLocalPayload 清洗逻辑对齐） */
 export function normalizeHoldingEntryForSeed(value) {
   if (!isPlainObject(value)) return null;
-  const parsedShare = isNumber(value.share)
-    ? value.share
-    : isString(value.share)
-      ? Number(value.share)
-      : NaN;
-  const parsedCost = isNumber(value.cost)
-    ? value.cost
-    : isString(value.cost)
-      ? Number(value.cost)
-      : NaN;
+  const parsedShare = isNumber(value.share) ? value.share : isString(value.share) ? Number(value.share) : NaN;
+  const parsedCost = isNumber(value.cost) ? value.cost : isString(value.cost) ? Number(value.cost) : NaN;
   const nextShare = Number.isFinite(parsedShare) ? parsedShare : null;
   const nextCost = Number.isFinite(parsedCost) ? parsedCost : null;
   if (nextShare === null && nextCost === null) return null;

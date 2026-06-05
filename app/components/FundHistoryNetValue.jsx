@@ -2,11 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { fetchFundHistory } from '../api/fund';
 import * as qk from '../lib/query-keys';
 import FundHistoryNetValueModal from './FundHistoryNetValueModal';
@@ -26,7 +22,7 @@ function buildRows(history) {
     return {
       date: item.date,
       netValue: item.value,
-      dailyChange,
+      dailyChange
     };
   });
 }
@@ -36,7 +32,7 @@ const columns = [
     accessorKey: 'date',
     header: '日期',
     cell: (info) => info.getValue(),
-    meta: { align: 'left' },
+    meta: { align: 'left' }
   },
   {
     accessorKey: 'netValue',
@@ -45,7 +41,7 @@ const columns = [
       const v = info.getValue();
       return v != null && Number.isFinite(v) ? Number(v).toFixed(4) : '—';
     },
-    meta: { align: 'center' },
+    meta: { align: 'center' }
   },
   {
     accessorKey: 'dailyChange',
@@ -55,10 +51,15 @@ const columns = [
       if (v == null || !Number.isFinite(v)) return '—';
       const sign = v > 0 ? '+' : '';
       const cls = v > 0 ? 'up' : v < 0 ? 'down' : '';
-      return <span className={cls}>{sign}{v.toFixed(2)}%</span>;
+      return (
+        <span className={cls}>
+          {sign}
+          {v.toFixed(2)}%
+        </span>
+      );
     },
-    meta: { align: 'right' },
-  },
+    meta: { align: 'right' }
+  }
 ];
 
 export default function FundHistoryNetValue({ code, range = '1m', theme }) {
@@ -67,12 +68,12 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
   const {
     data: historyRaw,
     isPending: loading,
-    isError,
+    isError
   } = useQuery({
     queryKey: qk.fundHistory(code, range),
     queryFn: () => fetchFundHistory(code, range),
     enabled: Boolean(code),
-    staleTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000
   });
 
   const data = useMemo(() => buildRows(historyRaw || []), [historyRaw]);
@@ -80,7 +81,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
   const table = useReactTable({
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: getCoreRowModel()
   });
 
   const visibleRows = table.getRowModel().rows.slice(0, 5);
@@ -89,7 +90,9 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
   if (loading) {
     return (
       <div className="fund-history-net-value" style={{ padding: '12px 0' }}>
-        <span className="muted" style={{ fontSize: '13px' }}>加载历史净值...</span>
+        <span className="muted" style={{ fontSize: '13px' }}>
+          加载历史净值...
+        </span>
       </div>
     );
   }
@@ -112,7 +115,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius)',
           overflow: 'hidden',
-          background: 'var(--card)',
+          background: 'var(--card)'
         }}
       >
         <table
@@ -121,7 +124,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
             width: '100%',
             borderCollapse: 'collapse',
             fontSize: '13px',
-            color: 'var(--text)',
+            color: 'var(--text)'
           }}
         >
           <thead>
@@ -130,7 +133,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
                 key={hg.id}
                 style={{
                   borderBottom: '1px solid var(--border)',
-                  background: 'var(--table-row-alt-bg)',
+                  background: 'var(--table-row-alt-bg)'
                 }}
               >
                 {hg.headers.map((h) => (
@@ -140,7 +143,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
                       padding: '8px 12px',
                       fontWeight: 600,
                       color: 'var(--muted)',
-                      textAlign: h.column.columnDef.meta?.align || 'left',
+                      textAlign: h.column.columnDef.meta?.align || 'left'
                     }}
                   >
                     {flexRender(h.column.columnDef.header, h.getContext())}
@@ -154,7 +157,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
               <tr
                 key={row.id}
                 style={{
-                  borderBottom: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--border)'
                 }}
               >
                 {row.getVisibleCells().map((cell) => (
@@ -163,7 +166,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
                     style={{
                       padding: '8px 12px',
                       color: 'var(--text)',
-                      textAlign: cell.column.columnDef.meta?.align || 'left',
+                      textAlign: cell.column.columnDef.meta?.align || 'left'
                     }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -184,7 +187,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
             padding: 0,
             border: 'none',
             background: 'none',
-            cursor: 'pointer',
+            cursor: 'pointer'
           }}
           onClick={() => setModalOpen(true)}
         >
@@ -192,14 +195,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
         </button>
       </div>
 
-      {modalOpen && (
-        <FundHistoryNetValueModal
-          open={modalOpen}
-          onOpenChange={setModalOpen}
-          code={code}
-          theme={theme}
-        />
-      )}
+      {modalOpen && <FundHistoryNetValueModal open={modalOpen} onOpenChange={setModalOpen} code={code} theme={theme} />}
     </div>
   );
 }

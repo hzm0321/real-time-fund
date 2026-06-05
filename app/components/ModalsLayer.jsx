@@ -21,6 +21,8 @@ const ScanImportProgressModal = dynamic(() => import('./ScanImportProgressModal'
 const ScanPickModal = dynamic(() => import('./ScanPickModal'), { ssr: false });
 const ScanProgressModal = dynamic(() => import('./ScanProgressModal'), { ssr: false });
 const AddHistoryModal = dynamic(() => import('./AddHistoryModal'), { ssr: false });
+const AllSectorsModal = dynamic(() => import('./AllSectorsModal'), { ssr: false });
+const DividendMethodModal = dynamic(() => import('./DividendMethodModal'), { ssr: false });
 
 // 高频组件：同步加载
 import ConfirmModal from './ConfirmModal';
@@ -40,11 +42,9 @@ import AddFundToGroupModal from './AddFundToGroupModal';
 import FundDataSourceSelector from './FundDataSourceSelector';
 import FundTagsEditDialog from './FundTagsEditDialog';
 import MyEarningsCalendarPage from './MyEarningsCalendarPage';
-import {
-  DEFAULT_FUND_TAG_THEME,
-  DCA_SCOPE_GLOBAL,
-  migrateDcaPlansToScoped
-} from '../lib/fundHelpers';
+import { DEFAULT_FUND_TAG_THEME, DCA_SCOPE_GLOBAL } from '@/app/constants';
+import { migrateDcaPlansToScoped } from '../lib/fundHelpers';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 /**
  * ModalsLayer — 将所有弹框渲染从 page.jsx 抽离到独立组件。
@@ -73,6 +73,7 @@ export default function ModalsLayer({ callbacksRef }) {
   const mobileFundDrawerOpen = useModalStore((s) => s.mobileFundDrawerOpen);
   const mobileTableSettingModalOpen = useModalStore((s) => s.mobileTableSettingModalOpen);
   const sortSettingOpen = useModalStore((s) => s.sortSettingOpen);
+  const allSectorsModalOpen = useModalStore((s) => s.allSectorsModalOpen);
   const groupModalOpen = useModalStore((s) => s.groupModalOpen);
   const groupManageOpen = useModalStore((s) => s.groupManageOpen);
   const addFundToGroupOpen = useModalStore((s) => s.addFundToGroupOpen);
@@ -85,6 +86,7 @@ export default function ModalsLayer({ callbacksRef }) {
   const actionModal = useModalStore((s) => s.actionModal);
   const tradeModal = useModalStore((s) => s.tradeModal);
   const convertModal = useModalStore((s) => s.convertModal);
+  const dividendMethodModal = useModalStore((s) => s.dividendMethodModal);
   const selectFundSingleModal = useModalStore((s) => s.selectFundSingleModal);
   const selectHoldingGroupModal = useModalStore((s) => s.selectHoldingGroupModal);
   const dataSourceModal = useModalStore((s) => s.dataSourceModal);
@@ -115,36 +117,53 @@ export default function ModalsLayer({ callbacksRef }) {
   const setWeChatOpen = (v) => _ms({ weChatOpen: typeof v === 'function' ? v(_gs().weChatOpen) : v });
   const setDonateOpen = (v) => _ms({ donateOpen: typeof v === 'function' ? v(_gs().donateOpen) : v });
   const setLoginModalOpen = (v) => _ms({ loginModalOpen: typeof v === 'function' ? v(_gs().loginModalOpen) : v });
-  const setLoginInitialError = (v) => _ms({ loginInitialError: typeof v === 'function' ? v(_gs().loginInitialError) : v });
-  const setTutorialDrawerOpen = (v) => _ms({ tutorialDrawerOpen: typeof v === 'function' ? v(_gs().tutorialDrawerOpen) : v });
+  const setLoginInitialError = (v) =>
+    _ms({ loginInitialError: typeof v === 'function' ? v(_gs().loginInitialError) : v });
+  const setTutorialDrawerOpen = (v) =>
+    _ms({ tutorialDrawerOpen: typeof v === 'function' ? v(_gs().tutorialDrawerOpen) : v });
   const setUpdateLogOpen = (v) => _ms({ updateLogOpen: typeof v === 'function' ? v(_gs().updateLogOpen) : v });
   const setSortSettingOpen = (v) => _ms({ sortSettingOpen: typeof v === 'function' ? v(_gs().sortSettingOpen) : v });
+  const setAllSectorsModalOpen = (v) =>
+    _ms({ allSectorsModalOpen: typeof v === 'function' ? v(_gs().allSectorsModalOpen) : v });
   const setGroupModalOpen = (v) => _ms({ groupModalOpen: typeof v === 'function' ? v(_gs().groupModalOpen) : v });
   const setGroupManageOpen = (v) => _ms({ groupManageOpen: typeof v === 'function' ? v(_gs().groupManageOpen) : v });
-  const setAddFundToGroupOpen = (v) => _ms({ addFundToGroupOpen: typeof v === 'function' ? v(_gs().addFundToGroupOpen) : v });
-  const setPortfolioEarningsOpen = (v) => _ms({ portfolioEarningsOpen: typeof v === 'function' ? v(_gs().portfolioEarningsOpen) : v });
+  const setAddFundToGroupOpen = (v) =>
+    _ms({ addFundToGroupOpen: typeof v === 'function' ? v(_gs().addFundToGroupOpen) : v });
+  const setPortfolioEarningsOpen = (v) =>
+    _ms({ portfolioEarningsOpen: typeof v === 'function' ? v(_gs().portfolioEarningsOpen) : v });
   const setSuccessModal = (v) => _ms({ successModal: typeof v === 'function' ? v(_gs().successModal) : v });
   const setCloudConfigModal = (v) => _ms({ cloudConfigModal: typeof v === 'function' ? v(_gs().cloudConfigModal) : v });
-  const setDeviceConflictModal = (v) => _ms({ deviceConflictModal: typeof v === 'function' ? v(_gs().deviceConflictModal) : v });
-  const setFundDeleteConfirm = (v) => _ms({ fundDeleteConfirm: typeof v === 'function' ? v(_gs().fundDeleteConfirm) : v });
-  const setFundDeleteBulkConfirm = (v) => _ms({ fundDeleteBulkConfirm: typeof v === 'function' ? v(_gs().fundDeleteBulkConfirm) : v });
+  const setDeviceConflictModal = (v) =>
+    _ms({ deviceConflictModal: typeof v === 'function' ? v(_gs().deviceConflictModal) : v });
+  const setFundDeleteConfirm = (v) =>
+    _ms({ fundDeleteConfirm: typeof v === 'function' ? v(_gs().fundDeleteConfirm) : v });
+  const setFundDeleteBulkConfirm = (v) =>
+    _ms({ fundDeleteBulkConfirm: typeof v === 'function' ? v(_gs().fundDeleteBulkConfirm) : v });
   const setHoldingModal = (v) => _ms({ holdingModal: typeof v === 'function' ? v(_gs().holdingModal) : v });
   const setActionModal = (v) => _ms({ actionModal: typeof v === 'function' ? v(_gs().actionModal) : v });
   const setTradeModal = (v) => _ms({ tradeModal: typeof v === 'function' ? v(_gs().tradeModal) : v });
   const setConvertModal = (v) => _ms({ convertModal: typeof v === 'function' ? v(_gs().convertModal) : v });
-  const setSelectFundSingleModal = (v) => _ms({ selectFundSingleModal: typeof v === 'function' ? v(_gs().selectFundSingleModal) : v });
-  const setSelectHoldingGroupModal = (v) => _ms({ selectHoldingGroupModal: typeof v === 'function' ? v(_gs().selectHoldingGroupModal) : v });
+  const setDividendMethodModal = (v) =>
+    _ms({ dividendMethodModal: typeof v === 'function' ? v(_gs().dividendMethodModal) : v });
+  const setSelectFundSingleModal = (v) =>
+    _ms({ selectFundSingleModal: typeof v === 'function' ? v(_gs().selectFundSingleModal) : v });
+  const setSelectHoldingGroupModal = (v) =>
+    _ms({ selectHoldingGroupModal: typeof v === 'function' ? v(_gs().selectHoldingGroupModal) : v });
   const setDataSourceModal = (v) => _ms({ dataSourceModal: typeof v === 'function' ? v(_gs().dataSourceModal) : v });
   const setDcaModal = (v) => _ms({ dcaModal: typeof v === 'function' ? v(_gs().dcaModal) : v });
   const setClearConfirm = (v) => _ms({ clearConfirm: typeof v === 'function' ? v(_gs().clearConfirm) : v });
-  const setHoldingMigrateDialog = (v) => _ms({ holdingMigrateDialog: typeof v === 'function' ? v(_gs().holdingMigrateDialog) : v });
+  const setHoldingMigrateDialog = (v) =>
+    _ms({ holdingMigrateDialog: typeof v === 'function' ? v(_gs().holdingMigrateDialog) : v });
   const setHistoryModal = (v) => _ms({ historyModal: typeof v === 'function' ? v(_gs().historyModal) : v });
   const setAddHistoryModal = (v) => _ms({ addHistoryModal: typeof v === 'function' ? v(_gs().addHistoryModal) : v });
   const setFundTagsEdit = (v) => _ms({ fundTagsEdit: typeof v === 'function' ? v(_gs().fundTagsEdit) : v });
-  const setMobileTableSettingModalOpen = (v) => _ms({ mobileTableSettingModalOpen: typeof v === 'function' ? v(_gs().mobileTableSettingModalOpen) : v });
-  const setMobileFundDrawerOpen = (v) => _ms({ mobileFundDrawerOpen: typeof v === 'function' ? v(_gs().mobileFundDrawerOpen) : v });
+  const setMobileTableSettingModalOpen = (v) =>
+    _ms({ mobileTableSettingModalOpen: typeof v === 'function' ? v(_gs().mobileTableSettingModalOpen) : v });
+  const setMobileFundDrawerOpen = (v) =>
+    _ms({ mobileFundDrawerOpen: typeof v === 'function' ? v(_gs().mobileFundDrawerOpen) : v });
   const setScanModalOpen = (v) => _ms({ scanModalOpen: typeof v === 'function' ? v(_gs().scanModalOpen) : v });
-  const setScanConfirmModalOpen = (v) => _ms({ scanConfirmModalOpen: typeof v === 'function' ? v(_gs().scanConfirmModalOpen) : v });
+  const setScanConfirmModalOpen = (v) =>
+    _ms({ scanConfirmModalOpen: typeof v === 'function' ? v(_gs().scanConfirmModalOpen) : v });
 
   return (
     <>
@@ -159,17 +178,18 @@ export default function ModalsLayer({ callbacksRef }) {
                 : null
             }
             messageContent={
-              fundDeleteConfirm.scope === 'group'
-                ? null
-                : (fundDeleteConfirm.otherGroups && fundDeleteConfirm.otherGroups.length > 0
-                  ? <>
-                      基金 &#34;{fundDeleteConfirm.name}&#34; 还存在于以下分组：
-                      <span className="text-[var(--primary)] font-semibold">
-                        {fundDeleteConfirm.otherGroups.join('、')}
-                      </span>
-                      。删除后将同时从这些分组中移除。确定要彻底删除吗？
-                    </>
-                  : `基金 "${fundDeleteConfirm.name}" 存在持仓记录。删除后将从列表中移除该基金及其全部持仓与相关数据（含各分组内副本），是否继续？`)
+              fundDeleteConfirm.scope === 'group' ? null : fundDeleteConfirm.otherGroups &&
+                fundDeleteConfirm.otherGroups.length > 0 ? (
+                <>
+                  基金 &#34;{fundDeleteConfirm.name}&#34; 还存在于以下分组：
+                  <span className="text-[var(--primary)] font-semibold">
+                    {fundDeleteConfirm.otherGroups.join('、')}
+                  </span>
+                  。删除后将同时从这些分组中移除。确定要彻底删除吗？
+                </>
+              ) : (
+                `基金 "${fundDeleteConfirm.name}" 存在持仓记录。删除后将从列表中移除该基金及其全部持仓与相关数据（含各分组内副本），是否继续？`
+              )
             }
             confirmText="确定删除"
             onConfirm={() => {
@@ -194,28 +214,28 @@ export default function ModalsLayer({ callbacksRef }) {
             title="批量删除确认"
             message={
               fundDeleteBulkConfirm.scope === 'global'
-                ? (fundDeleteBulkConfirm.fundsWithOtherGroups && fundDeleteBulkConfirm.fundsWithOtherGroups.length > 0
+                ? fundDeleteBulkConfirm.fundsWithOtherGroups && fundDeleteBulkConfirm.fundsWithOtherGroups.length > 0
                   ? null
-                  : `确定删除已选的 ${fundDeleteBulkConfirm.count} 支基金吗？将从列表中移除这些基金及其全部持仓与相关数据。`)
+                  : `确定删除已选的 ${fundDeleteBulkConfirm.count} 支基金吗？将从列表中移除这些基金及其全部持仓与相关数据。`
                 : `确定从当前分组中移除已选的 ${fundDeleteBulkConfirm.count} 支基金吗？将清除这些基金在该分组内的持仓、待定交易、定投计划与分组内交易记录；不会在「全部」中删除这些基金。`
             }
             messageContent={
-              fundDeleteBulkConfirm.scope === 'global' && fundDeleteBulkConfirm.fundsWithOtherGroups && fundDeleteBulkConfirm.fundsWithOtherGroups.length > 0
-                ? (
-                    <div className="flex flex-col gap-3 text-left">
-                      {fundDeleteBulkConfirm.fundsWithOtherGroups.map((f) => (
-                        <p key={f.code} className="m-0 leading-relaxed">
-                          基金 &#34;{f.name}&#34; 还存在于以下分组：
-                          <span className="text-[var(--primary)] font-semibold">{f.otherGroups.join('、')}</span>
-                          。删除后将同时从这些分组中移除。
-                        </p>
-                      ))}
-                      <p className="m-0 leading-relaxed">
-                        确定要彻底删除已选的全部 {fundDeleteBulkConfirm.count} 支基金吗？
-                      </p>
-                    </div>
-                  )
-                : null
+              fundDeleteBulkConfirm.scope === 'global' &&
+              fundDeleteBulkConfirm.fundsWithOtherGroups &&
+              fundDeleteBulkConfirm.fundsWithOtherGroups.length > 0 ? (
+                <div className="flex flex-col gap-3 text-left">
+                  {fundDeleteBulkConfirm.fundsWithOtherGroups.map((f) => (
+                    <p key={f.code} className="m-0 leading-relaxed">
+                      基金 &#34;{f.name}&#34; 还存在于以下分组：
+                      <span className="text-[var(--primary)] font-semibold">{f.otherGroups.join('、')}</span>
+                      。删除后将同时从这些分组中移除。
+                    </p>
+                  ))}
+                  <p className="m-0 leading-relaxed">
+                    确定要彻底删除已选的全部 {fundDeleteBulkConfirm.count} 支基金吗？
+                  </p>
+                </div>
+              ) : null
             }
             confirmText="确定删除"
             onConfirm={() => {
@@ -261,24 +281,19 @@ export default function ModalsLayer({ callbacksRef }) {
       />
 
       {/* ===== Modal: 微信 ===== */}
-      <AnimatePresence>
-        {weChatOpen && (
-          <WeChatModal onClose={() => setWeChatOpen(false)} />
-        )}
-      </AnimatePresence>
+      <AnimatePresence>{weChatOpen && <WeChatModal onClose={() => setWeChatOpen(false)} />}</AnimatePresence>
 
       {/* ===== Drawer: 使用教程 ===== */}
       <AnimatePresence>
-        {tutorialDrawerOpen && (
-          <TutorialDrawer open onOpenChange={setTutorialDrawerOpen} />
-        )}
+        {tutorialDrawerOpen && <TutorialDrawer open onOpenChange={setTutorialDrawerOpen} />}
       </AnimatePresence>
 
       {/* ===== Modal: 更新日志 ===== */}
+      <AnimatePresence>{updateLogOpen && <UpdateLogModal open onOpenChange={setUpdateLogOpen} />}</AnimatePresence>
+
+      {/* ===== Modal: 全部板块 ===== */}
       <AnimatePresence>
-        {updateLogOpen && (
-          <UpdateLogModal open onOpenChange={setUpdateLogOpen} />
-        )}
+        {allSectorsModalOpen && <AllSectorsModal onClose={() => setAllSectorsModalOpen(false)} />}
       </AnimatePresence>
 
       {/* ===== Modal: 添加基金到分组 ===== */}
@@ -286,7 +301,7 @@ export default function ModalsLayer({ callbacksRef }) {
         {addFundToGroupOpen && (
           <AddFundToGroupModal
             allFunds={cb.current.funds}
-            currentGroupCodes={(cb.current.groups || []).find(g => g.id === cb.current.currentTab)?.codes || []}
+            currentGroupCodes={(cb.current.groups || []).find((g) => g.id === cb.current.currentTab)?.codes || []}
             holdings={cb.current.holdings}
             fundTagListsByCode={cb.current.fundTagListsByCode}
             fundTagRecords={cb.current.fundTagRecords}
@@ -331,14 +346,25 @@ export default function ModalsLayer({ callbacksRef }) {
             fund={actionModal.fund}
             onClose={() => setActionModal({ open: false, fund: null })}
             onAction={(type) => cb.current.handleAction(type, actionModal.fund, actionModal.groupId)}
-            groupName={actionModal.groupId ? (cb.current.groups || []).find(g => g.id === actionModal.groupId)?.name : ''}
-            hasHistory={!!(cb.current.transactions?.[actionModal.fund?.code] || []).some((t) =>
-              !cb.current.getScopedGroupId?.(actionModal.groupId) ? !t.groupId : t.groupId === cb.current.getScopedGroupId?.(actionModal.groupId)
-            )}
-            pendingCount={(cb.current.pendingTrades || []).filter((t) =>
-              t.fundCode === actionModal.fund?.code &&
-              (!cb.current.getScopedGroupId?.(actionModal.groupId) ? !t.groupId : t.groupId === cb.current.getScopedGroupId?.(actionModal.groupId))
-            ).length}
+            groupName={
+              actionModal.groupId ? (cb.current.groups || []).find((g) => g.id === actionModal.groupId)?.name : ''
+            }
+            hasHistory={
+              !!(cb.current.transactions?.[actionModal.fund?.code] || []).some((t) =>
+                !cb.current.getScopedGroupId?.(actionModal.groupId)
+                  ? !t.groupId
+                  : t.groupId === cb.current.getScopedGroupId?.(actionModal.groupId)
+              )
+            }
+            pendingCount={
+              (cb.current.pendingTrades || []).filter(
+                (t) =>
+                  t.fundCode === actionModal.fund?.code &&
+                  (!cb.current.getScopedGroupId?.(actionModal.groupId)
+                    ? !t.groupId
+                    : t.groupId === cb.current.getScopedGroupId?.(actionModal.groupId))
+              ).length
+            }
           />
         )}
       </AnimatePresence>
@@ -352,13 +378,16 @@ export default function ModalsLayer({ callbacksRef }) {
             holding={cb.current.getScopedHolding?.(tradeModal.fund?.code, tradeModal.groupId)}
             onClose={() => setTradeModal({ open: false, fund: null, type: 'buy' })}
             onConfirm={(data) => cb.current.handleTrade(tradeModal.fund, data)}
-            pendingTrades={(cb.current.pendingTrades || []).filter((t) =>
-              t.fundCode === tradeModal.fund?.code &&
-              (!cb.current.getScopedGroupId?.(tradeModal.groupId) ? !t.groupId : t.groupId === cb.current.getScopedGroupId?.(tradeModal.groupId))
+            pendingTrades={(cb.current.pendingTrades || []).filter(
+              (t) =>
+                t.fundCode === tradeModal.fund?.code &&
+                (!cb.current.getScopedGroupId?.(tradeModal.groupId)
+                  ? !t.groupId
+                  : t.groupId === cb.current.getScopedGroupId?.(tradeModal.groupId))
             )}
             onDeletePending={(id) => {
-              cb.current.setPendingTrades?.(prev => {
-                const next = prev.filter(t => t.id !== id);
+              cb.current.setPendingTrades?.((prev) => {
+                const next = prev.filter((t) => t.id !== id);
                 return next;
               });
               cb.current.showToast?.('已撤销待处理交易', 'success');
@@ -445,7 +474,7 @@ export default function ModalsLayer({ callbacksRef }) {
                   open: true,
                   excludeCodes: excludeCodes || [],
                   initialSelectedCode: initialSelectedCode || '',
-                  _resolve: resolve,
+                  _resolve: resolve
                 });
               });
             }}
@@ -469,7 +498,7 @@ export default function ModalsLayer({ callbacksRef }) {
                 isAfter3pm: false,
                 isDca: false,
                 timestamp: nowTs,
-                ...(tradeGid ? { groupId: tradeGid } : {}),
+                ...(tradeGid ? { groupId: tradeGid } : {})
               };
 
               const inPending = {
@@ -488,7 +517,7 @@ export default function ModalsLayer({ callbacksRef }) {
                 isAfter3pm: false,
                 isDca: false,
                 timestamp: nowTs + 1,
-                ...(tradeGid ? { groupId: tradeGid } : {}),
+                ...(tradeGid ? { groupId: tradeGid } : {})
               };
 
               cb.current.setPendingTrades?.((prev) => [...prev, outPending, inPending]);
@@ -513,6 +542,21 @@ export default function ModalsLayer({ callbacksRef }) {
               };
               ensureHolding(payload.inFundCode);
 
+              // 方案一：确保转换到的新基金如果不在当前分组的显示列表 (codes) 中，将其主动追加进去
+              if (tradeGid) {
+                const groupsList = cb.current.groups || [];
+                const targetGroup = groupsList.find((g) => g.id === tradeGid);
+                if (targetGroup && !(targetGroup.codes || []).includes(payload.inFundCode)) {
+                  const nextGroups = groupsList.map((g) => {
+                    if (g.id === tradeGid) {
+                      return { ...g, codes: [...(g.codes || []), payload.inFundCode] };
+                    }
+                    return g;
+                  });
+                  cb.current.handleUpdateGroups?.(nextGroups);
+                }
+              }
+
               setConvertModal({ open: false, fund: null });
               cb.current.showToast?.('已加入待处理队列（转换）', 'info');
             }}
@@ -520,27 +564,45 @@ export default function ModalsLayer({ callbacksRef }) {
         )}
       </AnimatePresence>
 
+      {/* ===== Modal: 分红方式 ===== */}
+      <AnimatePresence>
+        {dividendMethodModal.open && (
+          <DividendMethodModal
+            fund={dividendMethodModal.fund}
+            groupId={dividendMethodModal.groupId}
+            onClose={() => setDividendMethodModal({ open: false, fund: null })}
+            showToast={cb.current.showToast}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ===== Modal: 单选选基 ===== */}
       <AnimatePresence>
         {selectFundSingleModal.open && (
-          <SelectFundSingleModal
-            title="选择转入基金"
-            allFunds={(cb.current.funds || []).filter((f) => f?.code && f.code !== convertModal.fund?.code)}
-            excludeCodes={selectFundSingleModal.excludeCodes}
-            initialSelectedCode={selectFundSingleModal.initialSelectedCode}
-            onClose={() => {
-              if (typeof selectFundSingleModal._resolve === 'function') {
-                selectFundSingleModal._resolve(null);
-              }
-              setSelectFundSingleModal({ open: false, excludeCodes: [], initialSelectedCode: '' });
-            }}
-            onConfirm={(picked) => {
-              if (typeof selectFundSingleModal._resolve === 'function') {
-                selectFundSingleModal._resolve(picked);
-              }
-              setSelectFundSingleModal({ open: false, excludeCodes: [], initialSelectedCode: '' });
-            }}
-          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SelectFundSingleModal
+                allFunds={(cb.current.funds || []).filter((f) => f?.code && f.code !== convertModal.fund?.code)}
+                excludeCodes={selectFundSingleModal.excludeCodes}
+                initialSelectedCode={selectFundSingleModal.initialSelectedCode}
+                onClose={() => {
+                  if (typeof selectFundSingleModal._resolve === 'function') {
+                    selectFundSingleModal._resolve(null);
+                  }
+                  setSelectFundSingleModal({ open: false, excludeCodes: [], initialSelectedCode: '' });
+                }}
+                onConfirm={(picked) => {
+                  if (typeof selectFundSingleModal._resolve === 'function') {
+                    selectFundSingleModal._resolve(picked);
+                  }
+                  setSelectFundSingleModal({ open: false, excludeCodes: [], initialSelectedCode: '' });
+                }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>选择转入基金</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </AnimatePresence>
 
@@ -561,20 +623,35 @@ export default function ModalsLayer({ callbacksRef }) {
           <TransactionHistoryModal
             fund={historyModal.fund}
             transactions={(cb.current.transactions?.[historyModal.fund?.code] || []).filter((t) =>
-              !cb.current.getScopedGroupId?.(historyModal.groupId) ? !t.groupId : t.groupId === cb.current.getScopedGroupId?.(historyModal.groupId)
+              !cb.current.getScopedGroupId?.(historyModal.groupId)
+                ? !t.groupId
+                : t.groupId === cb.current.getScopedGroupId?.(historyModal.groupId)
             )}
-            pendingTransactions={(cb.current.pendingTrades || []).filter((t) =>
-              t.fundCode === historyModal.fund?.code &&
-              (!cb.current.getScopedGroupId?.(historyModal.groupId) ? !t.groupId : t.groupId === cb.current.getScopedGroupId?.(historyModal.groupId))
+            pendingTransactions={(cb.current.pendingTrades || []).filter(
+              (t) =>
+                t.fundCode === historyModal.fund?.code &&
+                (!cb.current.getScopedGroupId?.(historyModal.groupId)
+                  ? !t.groupId
+                  : t.groupId === cb.current.getScopedGroupId?.(historyModal.groupId))
             )}
             onClose={() => setHistoryModal({ open: false, fund: null })}
-            onDeleteTransaction={(id) => cb.current.handleDeleteTransaction?.(historyModal.fund?.code, id, historyModal.groupId)}
-            onAddHistory={() => setAddHistoryModal({ open: true, fund: historyModal.fund, groupId: cb.current.getScopedGroupId?.(historyModal.groupId) })}
+            onDeleteTransaction={(id) =>
+              cb.current.handleDeleteTransaction?.(historyModal.fund?.code, id, historyModal.groupId)
+            }
+            onAddHistory={() =>
+              setAddHistoryModal({
+                open: true,
+                fund: historyModal.fund,
+                groupId: cb.current.getScopedGroupId?.(historyModal.groupId)
+              })
+            }
             canMergeAllGroups={!!cb.current.getScopedGroupId?.(historyModal.groupId)}
-            onMergeAllGroups={() => cb.current.handleMergeAllGroupTransactionsToCurrent?.(historyModal.fund?.code, historyModal.groupId)}
+            onMergeAllGroups={() =>
+              cb.current.handleMergeAllGroupTransactionsToCurrent?.(historyModal.fund?.code, historyModal.groupId)
+            }
             onDeletePending={(id) => {
               cb.current.setPendingTrades?.((prev) => {
-                const next = prev.filter(t => t.id !== id);
+                const next = prev.filter((t) => t.id !== id);
                 return next;
               });
               cb.current.showToast?.('已撤销待处理交易', 'success');
@@ -598,25 +675,31 @@ export default function ModalsLayer({ callbacksRef }) {
 
       {/* ===== Modal: 编辑持仓 ===== */}
       <AnimatePresence>
-        {holdingModal.open && (() => {
-          const f = holdingModal.fund;
-          const h = cb.current.getScopedHolding?.(f?.code, holdingModal.groupId);
-          const p = cb.current.getHoldingProfit?.(f, h, holdingModal.groupId);
-          return (
-            <HoldingEditModal
-              fund={f}
-              holding={h}
-              nav={p?.nav}
-              onClose={() => setHoldingModal({ open: false, fund: null })}
-              onSave={(data) => cb.current.handleSaveHolding?.(f?.code, data, holdingModal.groupId)}
-              onOpenTrade={() => {
-                if (!f) return;
-                setHoldingModal({ open: false, fund: null });
-                setTradeModal({ open: true, fund: f, type: 'buy', groupId: cb.current.getScopedGroupId?.(holdingModal.groupId) });
-              }}
-            />
-          );
-        })()}
+        {holdingModal.open &&
+          (() => {
+            const f = holdingModal.fund;
+            const h = cb.current.getScopedHolding?.(f?.code, holdingModal.groupId);
+            const p = cb.current.getHoldingProfit?.(f, h, holdingModal.groupId);
+            return (
+              <HoldingEditModal
+                fund={f}
+                holding={h}
+                nav={p?.nav}
+                onClose={() => setHoldingModal({ open: false, fund: null })}
+                onSave={(data) => cb.current.handleSaveHolding?.(f?.code, data, holdingModal.groupId)}
+                onOpenTrade={() => {
+                  if (!f) return;
+                  setHoldingModal({ open: false, fund: null });
+                  setTradeModal({
+                    open: true,
+                    fund: f,
+                    type: 'buy',
+                    groupId: cb.current.getScopedGroupId?.(holdingModal.groupId)
+                  });
+                }}
+              />
+            );
+          })()}
       </AnimatePresence>
 
       {/* ===== Modal: 编辑标签 ===== */}
@@ -629,11 +712,13 @@ export default function ModalsLayer({ callbacksRef }) {
             fundName={fundTagsEdit.name}
             tags={fundTagsEdit.tags}
             onSave={cb.current.handleSaveFundTags}
-            recommendedTagItems={(cb.current.fundTagRecords || []).map((r) => ({
-              id: String(r?.id ?? '').trim(),
-              name: String(r?.name ?? '').trim(),
-              theme: String(r?.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-            })).filter((x) => x.name)}
+            recommendedTagItems={(cb.current.fundTagRecords || [])
+              .map((r) => ({
+                id: String(r?.id ?? '').trim(),
+                name: String(r?.name ?? '').trim(),
+                theme: String(r?.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME
+              }))
+              .filter((x) => x.name)}
             onAddPoolTag={cb.current.handleAddPoolTag}
             onDeleteGlobalTag={cb.current.handleDeleteGlobalTag}
             getTagUsageLabels={cb.current.getTagUsageLabels}
@@ -668,7 +753,7 @@ export default function ModalsLayer({ callbacksRef }) {
                   codes: [code],
                   fromTab: 'all',
                   targetId: gid,
-                  overwrite: true,
+                  overwrite: true
                 });
                 cb.current.showToast?.('已迁移持仓数据到本分组', 'success');
               } catch (e) {
@@ -683,11 +768,7 @@ export default function ModalsLayer({ callbacksRef }) {
       </AnimatePresence>
 
       {/* ===== Modal: 打赏 ===== */}
-      <AnimatePresence>
-        {donateOpen && (
-          <DonateModal onClose={() => setDonateOpen(false)} />
-        )}
-      </AnimatePresence>
+      <AnimatePresence>{donateOpen && <DonateModal onClose={() => setDonateOpen(false)} />}</AnimatePresence>
 
       {/* ===== Modal: 分组管理 ===== */}
       <AnimatePresence>
@@ -703,20 +784,14 @@ export default function ModalsLayer({ callbacksRef }) {
       {/* ===== Modal: 新建分组 ===== */}
       <AnimatePresence>
         {groupModalOpen && (
-          <GroupModal
-            onClose={() => setGroupModalOpen(false)}
-            onConfirm={cb.current.handleAddGroup}
-          />
+          <GroupModal onClose={() => setGroupModalOpen(false)} onConfirm={cb.current.handleAddGroup} />
         )}
       </AnimatePresence>
 
       {/* ===== Modal: 成功提示 ===== */}
       <AnimatePresence>
         {successModal.open && (
-          <SuccessModal
-            message={successModal.message}
-            onClose={() => setSuccessModal({ open: false, message: '' })}
-          />
+          <SuccessModal message={successModal.message} onClose={() => setSuccessModal({ open: false, message: '' })} />
         )}
       </AnimatePresence>
 
@@ -724,6 +799,7 @@ export default function ModalsLayer({ callbacksRef }) {
       <AnimatePresence>
         {deviceConflictModal.open && (
           <ConfirmModal
+            title="其它设备登录提示"
             onCancel={() => {
               setDeviceConflictModal({ ...deviceConflictModal, open: false });
               if (cb.current.skipSyncRef) cb.current.skipSyncRef.current = false;
@@ -735,7 +811,6 @@ export default function ModalsLayer({ callbacksRef }) {
               if (cb.current.refreshCycleStartRef) cb.current.refreshCycleStartRef.current = Date.now();
               await cb.current.fetchCloudConfig?.(userId, false, { forceTakeover: true });
             }}
-            title="其它设备登录提示"
             message={deviceConflictModal.message}
             confirmText="确认接管"
             icon={<RefreshCw width="20" height="20" className="shrink-0 text-[var(--primary)]" />}
@@ -752,7 +827,9 @@ export default function ModalsLayer({ callbacksRef }) {
             onCancel={() => {
               if (cloudConfigModal.type === 'conflict' && cloudConfigModal.cloudData) {
                 cb.current.applyCloudConfig?.(cloudConfigModal.cloudData);
-                cb.current.syncUserConfig?.(cloudConfigModal.userId, false, cloudConfigModal.cloudData, false, { forceTakeover: true });
+                cb.current.syncUserConfig?.(cloudConfigModal.userId, false, cloudConfigModal.cloudData, false, {
+                  forceTakeover: true
+                });
               } else {
                 if (cb.current.skipSyncRef) cb.current.skipSyncRef.current = false;
               }
@@ -783,6 +860,7 @@ export default function ModalsLayer({ callbacksRef }) {
             onClose={() => setScanConfirmModalOpen(false)}
             onToggle={cb.current.toggleScannedCode}
             onConfirm={cb.current.confirmScanImport}
+            onRetryOcr={cb.current.handleRetryOcr}
             refreshing={cb.current.refreshing}
             groups={cb.current.groups}
             existingAllCodes={(cb.current.funds || []).map((f) => f?.code).filter(Boolean)}
@@ -812,22 +890,20 @@ export default function ModalsLayer({ callbacksRef }) {
             showMarketIndexMobile={cb.current.showMarketIndexMobile}
             showGroupFundSearchPc={cb.current.showGroupFundSearchPc}
             showGroupFundSearchMobile={cb.current.showGroupFundSearchMobile}
+            dynamicStylePc={cb.current.dynamicStylePc}
+            dynamicStyleMobile={cb.current.dynamicStyleMobile}
           />
         )}
       </AnimatePresence>
 
       {/* ===== Modal: 扫描进度 ===== */}
       <AnimatePresence>
-        {isScanning && (
-          <ScanProgressModal scanProgress={cb.current.scanProgress} onCancel={cb.current.cancelScan} />
-        )}
+        {isScanning && <ScanProgressModal scanProgress={cb.current.scanProgress} onCancel={cb.current.cancelScan} />}
       </AnimatePresence>
 
       {/* ===== Modal: 扫描导入进度 ===== */}
       <AnimatePresence>
-        {isScanImporting && (
-          <ScanImportProgressModal scanImportProgress={cb.current.scanImportProgress} />
-        )}
+        {isScanImporting && <ScanImportProgressModal scanImportProgress={cb.current.scanImportProgress} />}
       </AnimatePresence>
 
       {/* ===== Modal: 登录 ===== */}
@@ -847,12 +923,7 @@ export default function ModalsLayer({ callbacksRef }) {
 
       {/* ===== Modal: 排序个性化设置 ===== */}
       <AnimatePresence>
-        {sortSettingOpen && (
-          <SortSettingModal
-            open={sortSettingOpen}
-            onClose={() => setSortSettingOpen(false)}
-          />
-        )}
+        {sortSettingOpen && <SortSettingModal open={sortSettingOpen} onClose={() => setSortSettingOpen(false)} />}
       </AnimatePresence>
     </>
   );

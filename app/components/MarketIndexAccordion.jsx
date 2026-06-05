@@ -2,12 +2,7 @@
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useState, useRef } from 'react';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { fetchMarketIndices } from '@/app/api/fund';
 import { ChevronRightIcon } from 'lucide-react';
 import { SettingsIcon } from './Icons';
@@ -73,11 +68,7 @@ function MiniTrendLine({ changePercent, code, className }) {
       try {
         const raw = window[varName];
         const series =
-          raw &&
-          raw.data &&
-          raw.data[code] &&
-          raw.data[code].data &&
-          Array.isArray(raw.data[code].data.data)
+          raw && raw.data && raw.data[code] && raw.data[code].data && Array.isArray(raw.data[code].data.data)
             ? raw.data[code].data.data
             : null;
         if (!series || !series.length) {
@@ -113,9 +104,7 @@ function MiniTrendLine({ changePercent, code, className }) {
           return [x, Math.max(pad, Math.min(height - pad, y))];
         });
 
-        const d = pathPoints
-          .map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x} ${y}`)
-          .join(' ');
+        const d = pathPoints.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x} ${y}`).join(' ');
         setRealPath(d);
       } finally {
         cleanup();
@@ -138,22 +127,10 @@ function MiniTrendLine({ changePercent, code, className }) {
   }, [code, height, innerH, innerW, pad]);
 
   if (!realPath) {
-    return (
-      <svg
-        width={width}
-        height={height}
-        className={cn('overflow-visible', className)}
-        aria-hidden
-      />
-    );
+    return <svg width={width} height={height} className={cn('overflow-visible', className)} aria-hidden />;
   }
   return (
-    <svg
-      width={width}
-      height={height}
-      className={cn('overflow-visible', className)}
-      aria-hidden
-    >
+    <svg width={width} height={height} className={cn('overflow-visible', className)} aria-hidden>
       <path
         d={realPath}
         fill="none"
@@ -171,13 +148,9 @@ function IndexCard({ item }) {
   const isUp = item.change >= 0;
   const colorClass = isUp ? 'text-[var(--danger)]' : 'text-[var(--success)]';
   return (
-    <div
-      className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 flex flex-col gap-0.5 w-full"
-    >
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 flex flex-col gap-0.5 w-full">
       <div className="text-xs font-medium text-[var(--foreground)] truncate">{item.name}</div>
-      <div className={cn('text-sm font-semibold tabular-nums', colorClass)}>
-        {item.price.toFixed(2)}
-      </div>
+      <div className={cn('text-sm font-semibold tabular-nums', colorClass)}>{item.price.toFixed(2)}</div>
       <div className={cn('text-xs tabular-nums', colorClass)}>
         {(item.change >= 0 ? '+' : '') + item.change.toFixed(2)}{' '}
         {(item.changePercent >= 0 ? '+' : '') + item.changePercent.toFixed(2)}%
@@ -192,9 +165,7 @@ function IndexCard({ item }) {
 // 默认展示：上证指数、深证成指、创业板指
 const DEFAULT_SELECTED_CODES = ['sh000001', 'sz399001', 'sz399006'];
 
-export default function MarketIndexAccordion({navbarHeight = 0,
-  onCustomSettingsChange,
-  refreshing = false}) {
+export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSettingsChange, refreshing = false }) {
   const isMobile = useIsMobile();
   const [indices, setIndices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -294,7 +265,16 @@ export default function MarketIndexAccordion({navbarHeight = 0,
 
       // 同步到 customSettings，便于云端同步
       const parsed = storageStore.getItem('customSettings') || {};
-      const next = parsed && typeof parsed === 'object' ? { ...parsed, marketIndexSelected: selectedCodes } : { marketIndexSelected: selectedCodes };
+
+      // Check if it actually changed to avoid unnecessary syncs on mount
+      if (JSON.stringify(parsed.marketIndexSelected) === JSON.stringify(selectedCodes)) {
+        return;
+      }
+
+      const next =
+        parsed && typeof parsed === 'object'
+          ? { ...parsed, marketIndexSelected: selectedCodes }
+          : { marketIndexSelected: selectedCodes };
       storageStore.setItem('customSettings', JSON.stringify(next));
       onCustomSettingsChange?.();
     } catch {
@@ -303,9 +283,7 @@ export default function MarketIndexAccordion({navbarHeight = 0,
   }, [selectedCodes]);
   // 用户已选择的指数列表（按 selectedCodes 顺序）
   const visibleIndices = selectedCodes.length
-    ? selectedCodes
-        .map((code) => indices.find((it) => it.code === code))
-        .filter(Boolean)
+    ? selectedCodes.map((code) => indices.find((it) => it.code === code)).filter(Boolean)
     : indices;
 
   // 重置 tickerIndex 确保索引合法
@@ -326,10 +304,7 @@ export default function MarketIndexAccordion({navbarHeight = 0,
     return () => clearInterval(timer);
   }, [visibleIndices.length, openValue]);
 
-  const current =
-    visibleIndices.length === 0
-      ? null
-      : visibleIndices[openValue === 'indices' ? 0 : tickerIndex];
+  const current = visibleIndices.length === 0 ? null : visibleIndices[openValue === 'indices' ? 0 : tickerIndex];
 
   const isUp = current ? current.change >= 0 : false;
   const colorClass = isUp ? 'text-[var(--danger)]' : 'text-[var(--success)]';
@@ -341,7 +316,7 @@ export default function MarketIndexAccordion({navbarHeight = 0,
     top: topMargin,
     zIndex: 10,
     width: isMobile ? 'calc(100% + 24px)' : '100%',
-    marginLeft: isMobile ? -12 : 0,
+    marginLeft: isMobile ? -12 : 0
   };
 
   if (loading && indices.length === 0) {
@@ -363,7 +338,7 @@ export default function MarketIndexAccordion({navbarHeight = 0,
       style={stickyStyle}
     >
       <style jsx>{`
-        .market-index-accordion :global([data-slot="accordion-trigger"] > svg:last-of-type) {
+        .market-index-accordion :global([data-slot='accordion-trigger'] > svg:last-of-type) {
           display: none;
         }
         :global([data-theme='dark'] .market-index-accordion-root) {
@@ -389,12 +364,7 @@ export default function MarketIndexAccordion({navbarHeight = 0,
           }
         }
       `}</style>
-      <Accordion
-        type="single"
-        collapsible
-        value={openValue}
-        onValueChange={setOpenValue}
-      >
+      <Accordion type="single" collapsible value={openValue} onValueChange={setOpenValue}>
         <AccordionItem value="indices" className="border-b-0">
           <AccordionTrigger
             className="py-2 px-4 hover:no-underline hover:bg-[var(--card)] [&[data-state=open]>svg]:rotate-90"
@@ -403,16 +373,9 @@ export default function MarketIndexAccordion({navbarHeight = 0,
             <div className="flex flex-1 items-center gap-3 min-w-0">
               {current ? (
                 <div className="market-index-ticker">
-                  <div
-                    key={current.code || current.name}
-                    className="market-index-ticker-item"
-                  >
-                    <span className="text-sm font-medium text-[var(--foreground)] shrink-0">
-                      {current.name}
-                    </span>
-                    <span className={cn('tabular-nums font-medium', colorClass)}>
-                      {current.price.toFixed(2)}
-                    </span>
+                  <div key={current.code || current.name} className="market-index-ticker-item">
+                    <span className="text-sm font-medium text-[var(--foreground)] shrink-0">{current.name}</span>
+                    <span className={cn('tabular-nums font-medium', colorClass)}>{current.price.toFixed(2)}</span>
                     <span className={cn('tabular-nums text-sm', colorClass)}>
                       {(current.change >= 0 ? '+' : '') + current.change.toFixed(2)}
                     </span>
@@ -443,7 +406,7 @@ export default function MarketIndexAccordion({navbarHeight = 0,
                   justifyContent: 'center',
                   opacity: openValue === 'indices' ? 1 : 0,
                   pointerEvents: openValue === 'indices' ? 'auto' : 'none',
-                  transition: 'opacity 0.2s ease',
+                  transition: 'opacity 0.2s ease'
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -470,17 +433,12 @@ export default function MarketIndexAccordion({navbarHeight = 0,
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-3 pb-4 pt-0">
-            <div
-              className="flex flex-wrap w-full min-w-0"
-              style={{ gap: 12 }}
-            >
+            <div className="flex flex-wrap w-full min-w-0" style={{ gap: 12 }}>
               {visibleIndices.map((item, i) => (
                 <div
                   key={item.code || i}
                   style={{
-                    flex: isMobile
-                      ? '0 0 calc((100% - 24px) / 3)'
-                      : '0 0 calc((100% - 48px) / 5)',
+                    flex: isMobile ? '0 0 calc((100% - 24px) / 3)' : '0 0 calc((100% - 48px) / 5)'
                   }}
                 >
                   <IndexCard item={item} />

@@ -3,26 +3,13 @@ import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { fetchFundHistory } from '../api/fund';
 import * as qk from '../lib/query-keys';
 import { CloseIcon } from './Icons';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 function buildRows(history) {
   if (!Array.isArray(history) || history.length === 0) return [];
@@ -36,7 +23,7 @@ function buildRows(history) {
     return {
       date: item.date,
       netValue: item.value,
-      dailyChange,
+      dailyChange
     };
   });
 }
@@ -46,7 +33,7 @@ const columns = [
     accessorKey: 'date',
     header: '日期',
     cell: (info) => info.getValue(),
-    meta: { align: 'left' },
+    meta: { align: 'left' }
   },
   {
     accessorKey: 'netValue',
@@ -55,7 +42,7 @@ const columns = [
       const v = info.getValue();
       return v != null && Number.isFinite(v) ? Number(v).toFixed(4) : '—';
     },
-    meta: { align: 'center' },
+    meta: { align: 'center' }
   },
   {
     accessorKey: 'dailyChange',
@@ -65,10 +52,15 @@ const columns = [
       if (v == null || !Number.isFinite(v)) return '—';
       const sign = v > 0 ? '+' : '';
       const cls = v > 0 ? 'up' : v < 0 ? 'down' : '';
-      return <span className={cls}>{sign}{v.toFixed(2)}%</span>;
+      return (
+        <span className={cls}>
+          {sign}
+          {v.toFixed(2)}%
+        </span>
+      );
     },
-    meta: { align: 'right' },
-  },
+    meta: { align: 'right' }
+  }
 ];
 
 export default function FundHistoryNetValueModal({ open, onOpenChange, code, theme }) {
@@ -84,12 +76,12 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
   const {
     data: historyRaw,
     isPending: loading,
-    isError,
+    isError
   } = useQuery({
     queryKey: qk.fundHistory(code, 'all'),
     queryFn: () => fetchFundHistory(code, 'all'),
     enabled: open && Boolean(code),
-    staleTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000
   });
 
   const data = useMemo(() => buildRows(historyRaw || []), [historyRaw]);
@@ -97,7 +89,7 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
   const table = useReactTable({
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: getCoreRowModel()
   });
 
   const rows = table.getRowModel().rows.slice(0, visibleCount);
@@ -145,13 +137,15 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
       style={{
         maxHeight: '60vh',
         overflowY: 'auto',
-        paddingRight: 4,
+        paddingRight: 4
       }}
       onScroll={handleScroll}
     >
       {loading && (
         <div style={{ padding: '16px 0', textAlign: 'center' }}>
-          <span className="muted" style={{ fontSize: 12 }}>加载历史净值...</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            加载历史净值...
+          </span>
         </div>
       )}
       {!loading && (isError || data.length === 0) && (
@@ -167,8 +161,7 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
           style={{
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
-            overflow: 'hidden',
-            background: 'var(--card)',
+            background: 'var(--card)'
           }}
         >
           <table
@@ -177,7 +170,7 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
               width: '100%',
               borderCollapse: 'collapse',
               fontSize: '13px',
-              color: 'var(--text)',
+              color: 'var(--text)'
             }}
           >
             <thead>
@@ -187,10 +180,10 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
                   style={{
                     borderBottom: '1px solid var(--border)',
                     background: 'var(--table-row-alt-bg)',
-                    boxShadow: '0 1px 0 0 var(--border)',
+                    boxShadow: '0 1px 0 0 var(--border)'
                   }}
                 >
-                  {hg.headers.map((h) => (
+                  {hg.headers.map((h, index) => (
                     <th
                       key={h.id}
                       style={{
@@ -202,6 +195,8 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
                         position: 'sticky',
                         top: 0,
                         zIndex: 1,
+                        borderTopLeftRadius: index === 0 ? 'var(--radius)' : undefined,
+                        borderTopRightRadius: index === hg.headers.length - 1 ? 'var(--radius)' : undefined
                       }}
                     >
                       {flexRender(h.column.columnDef.header, h.getContext())}
@@ -215,7 +210,7 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
                 <tr
                   key={row.id}
                   style={{
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: '1px solid var(--border)'
                   }}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -224,7 +219,7 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
                       style={{
                         padding: '8px 12px',
                         color: 'var(--text)',
-                        textAlign: cell.column.columnDef.meta?.align || 'left',
+                        textAlign: cell.column.columnDef.meta?.align || 'left'
                       }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -238,7 +233,9 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
       )}
       {!loading && hasMore && (
         <div style={{ padding: '12px 0', textAlign: 'center' }}>
-          <span className="muted" style={{ fontSize: 12 }}>向下滚动以加载更多...</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            向下滚动以加载更多...
+          </span>
         </div>
       )}
     </div>
@@ -249,30 +246,29 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={handleOpenChange} direction="bottom">
-        <DrawerContent
-          className="glass"
-          defaultHeight="70vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
+        <DrawerContent className="glass" defaultHeight="70vh" minHeight="40vh" maxHeight="90vh">
           <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-3">
             <DrawerTitle className="flex items-center gap-2.5 text-left">
               <span>历史净值</span>
             </DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{
-                borderColor: 'transparent',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DrawerClose
+                  className="icon-button border-none bg-transparent p-1"
+                  style={{
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent'
+                  }}
+                >
+                  <CloseIcon width="20" height="20" />
+                </DrawerClose>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>关闭</p>
+              </TooltipContent>
+            </Tooltip>
           </DrawerHeader>
-          <div className="flex-1 px-4 pb-4">
-            {body}
-          </div>
+          <div className="flex-1 px-4 pb-4">{body}</div>
         </DrawerContent>
       </Drawer>
     );
@@ -291,7 +287,7 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
           maxHeight: '80vh',
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 9999,
+          zIndex: 9999
         }}
       >
         <DialogTitle className="sr-only">历史净值</DialogTitle>
@@ -301,4 +297,3 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
     </Dialog>
   );
 }
-

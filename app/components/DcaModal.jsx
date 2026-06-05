@@ -9,16 +9,13 @@ import { DatePicker, NumericInput } from './Common';
 import { isNumber } from 'lodash';
 import { CloseIcon } from './Icons';
 import ConfirmModal from './ConfirmModal';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const DEFAULT_TZ = 'Asia/Shanghai';
+import { DEFAULT_TZ } from '@/app/constants';
 const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -68,10 +65,7 @@ const computeFirstDate = (cycle, weeklyDay, monthlyDay) => {
 
   if (cycle === 'monthly') {
     const baseDay = today.date();
-    const day =
-      isNumber(monthlyDay) && monthlyDay >= 1 && monthlyDay <= 28
-        ? monthlyDay
-        : Math.min(28, baseDay);
+    const day = isNumber(monthlyDay) && monthlyDay >= 1 && monthlyDay <= 28 ? monthlyDay : Math.min(28, baseDay);
 
     let candidate = today.date(day);
     if (candidate.isBefore(today)) {
@@ -87,9 +81,7 @@ const resolveDailyFirstDate = (savedFirstDate) => {
   const autoFirstDate = computeFirstDate('daily');
   if (!savedFirstDate) return autoFirstDate;
 
-  return dayjs.tz(savedFirstDate, TZ).isAfter(dayjs.tz(autoFirstDate, TZ))
-    ? savedFirstDate
-    : autoFirstDate;
+  return dayjs.tz(savedFirstDate, TZ).isAfter(dayjs.tz(autoFirstDate, TZ)) ? savedFirstDate : autoFirstDate;
 };
 
 export default function DcaModal({ fund, plan, onClose, onConfirm, onReset }) {
@@ -132,12 +124,12 @@ export default function DcaModal({ fund, plan, onClose, onConfirm, onReset }) {
     if (isNumber(plan.monthlyDay)) {
       setMonthlyDay(plan.monthlyDay);
     }
-    if (plan.cycle && CYCLES.some(c => c.value === plan.cycle)) {
+    if (plan.cycle && CYCLES.some((c) => c.value === plan.cycle)) {
       setCycle(plan.cycle);
       setFirstDate(
         plan.cycle === 'daily'
           ? resolveDailyFirstDate(plan.firstDate)
-          : (plan.firstDate || computeFirstDate(plan.cycle, plan.weeklyDay, plan.monthlyDay))
+          : plan.firstDate || computeFirstDate(plan.cycle, plan.weeklyDay, plan.monthlyDay)
       );
     } else {
       setFirstDate(plan.firstDate || computeFirstDate('monthly', null, null));
@@ -231,7 +223,7 @@ export default function DcaModal({ fund, plan, onClose, onConfirm, onReset }) {
             display: 'flex',
             flexDirection: 'column',
             zIndex: 999,
-            width: '90vw',
+            width: '90vw'
           }}
         >
           <DialogTitle className="sr-only">定投设置</DialogTitle>
@@ -240,7 +232,7 @@ export default function DcaModal({ fund, plan, onClose, onConfirm, onReset }) {
             style={{
               overflowY: 'auto',
               paddingRight: 4,
-              flex: 1,
+              flex: 1
             }}
           >
             <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
@@ -249,201 +241,210 @@ export default function DcaModal({ fund, plan, onClose, onConfirm, onReset }) {
                 <span>定投</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  type="button"
-                  className="icon-button"
-                  onClick={() => setResetConfirmOpen(true)}
-                  disabled={!plan}
-                  title={plan ? '重置当前分组定投数据' : '暂无定投数据可重置'}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--primary)',
-                    opacity: plan ? 1 : 0.4,
-                    cursor: plan ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <RotateCcw width="18" height="18" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => setResetConfirmOpen(true)}
+                      disabled={!plan}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--primary)',
+                        opacity: plan ? 1 : 0.4,
+                        cursor: plan ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      <RotateCcw width="18" height="18" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{plan ? '重置当前分组定投数据' : '暂无定投数据可重置'}</p>
+                  </TooltipContent>
+                </Tooltip>
                 <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
                   <CloseIcon width="20" height="20" />
                 </button>
               </div>
             </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>{fund?.name}</div>
-            <div className="muted" style={{ fontSize: '12px' }}>#{fund?.code}</div>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className="form-group" style={{ marginBottom: 8 }}>
-              <label className="muted" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span>是否启用定投</span>
-                <button
-                  type="button"
-                  onClick={() => setEnabled(v => !v)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6
-                  }}
-                >
-                  <span className={`dca-toggle-track ${enabled ? 'enabled' : ''}`}>
-                    <span className="dca-toggle-thumb" style={{ left: enabled ? 16 : 2 }} />
-                  </span>
-                  <span style={{ fontSize: 12, color: enabled ? 'var(--primary)' : 'var(--muted)' }}>
-                    {enabled ? '已启用' : '未启用'}
-                  </span>
-                </button>
-              </label>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-                定投金额 <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <div style={{ border: (!amount || parseFloat(amount) <= 0) ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius: 12 }}>
-                <NumericInput
-                  value={amount}
-                  onChange={setAmount}
-                  step={100}
-                  min={0}
-                  placeholder="请输入每次定投金额"
-                />
+            <div style={{ marginBottom: 16 }}>
+              <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>
+                {fund?.name}
+              </div>
+              <div className="muted" style={{ fontSize: '12px' }}>
+                #{fund?.code}
               </div>
             </div>
 
-            <div className="row" style={{ gap: 12, marginBottom: 16 }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-                  买入费率 (%) <span style={{ color: 'var(--danger)' }}>*</span>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group" style={{ marginBottom: 8 }}>
+                <label
+                  className="muted"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px' }}
+                >
+                  <span>是否启用定投</span>
+                  <button
+                    type="button"
+                    onClick={() => setEnabled((v) => !v)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <span className={`dca-toggle-track ${enabled ? 'enabled' : ''}`}>
+                      <span className="dca-toggle-thumb" style={{ left: enabled ? 16 : 2 }} />
+                    </span>
+                    <span style={{ fontSize: 12, color: enabled ? 'var(--primary)' : 'var(--muted)' }}>
+                      {enabled ? '已启用' : '未启用'}
+                    </span>
+                  </button>
                 </label>
-                <div style={{ border: feeRate === '' ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius: 12 }}>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+                  定投金额 <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div
+                  style={{
+                    border: !amount || parseFloat(amount) <= 0 ? '1px solid var(--danger)' : '1px solid var(--border)',
+                    borderRadius: 12
+                  }}
+                >
                   <NumericInput
-                    value={feeRate}
-                    onChange={setFeeRate}
-                    step={0.01}
+                    value={amount}
+                    onChange={setAmount}
+                    step={100}
                     min={0}
-                    placeholder="0.12"
+                    placeholder="请输入每次定投金额"
                   />
                 </div>
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-                  定投周期 <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
-                <div className="dca-option-group row" style={{ gap: 4 }}>
-                  {CYCLES.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`dca-option-btn ${cycle === opt.value ? 'active' : ''}`}
-                      onClick={() => setCycle(opt.value)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
 
-            {(cycle === 'weekly' || cycle === 'biweekly') && (
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-                  扣款星期 <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
-                <div className="dca-option-group row" style={{ gap: 4 }}>
-                  {WEEKDAY_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`dca-option-btn dca-weekday-btn ${weeklyDay === opt.value ? 'active' : ''}`}
-                      onClick={() => setWeeklyDay(opt.value)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+              <div className="row" style={{ gap: 12, marginBottom: 16 }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+                    买入费率 (%) <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div
+                    style={{
+                      border: feeRate === '' ? '1px solid var(--danger)' : '1px solid var(--border)',
+                      borderRadius: 12
+                    }}
+                  >
+                    <NumericInput value={feeRate} onChange={setFeeRate} step={0.01} min={0} placeholder="0.12" />
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {cycle === 'monthly' && (
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-                  扣款日 <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
-                <div className="dca-monthly-day-group scrollbar-y-styled">
-                  {Array.from({ length: 28 }).map((_, idx) => {
-                    const day = idx + 1;
-                    const active = monthlyDay === day;
-                    return (
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+                    定投周期 <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div className="dca-option-group row" style={{ gap: 4 }}>
+                    {CYCLES.map((opt) => (
                       <button
-                        key={day}
-                        ref={active ? monthlyDayRef : null}
+                        key={opt.value}
                         type="button"
-                        className={`dca-option-btn dca-monthly-btn ${active ? 'active' : ''}`}
-                        onClick={() => setMonthlyDay(day)}
+                        className={`dca-option-btn ${cycle === opt.value ? 'active' : ''}`}
+                        onClick={() => setCycle(opt.value)}
                       >
-                        {day}日
+                        {opt.label}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label className="muted" style={{ display: 'block', marginBottom: 4, fontSize: '14px' }}>
-                首次扣款日期
-              </label>
-              {cycle === 'daily' ? (
-                <DatePicker value={firstDate} onChange={setFirstDate} minDate={nowInTz().format('YYYY-MM-DD')} />
-              ) : (
-                <div className="dca-first-date-display">
-                  {firstDate}
+              {(cycle === 'weekly' || cycle === 'biweekly') && (
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+                    扣款星期 <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div className="dca-option-group row" style={{ gap: 4 }}>
+                    {WEEKDAY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`dca-option-btn dca-weekday-btn ${weeklyDay === opt.value ? 'active' : ''}`}
+                        onClick={() => setWeeklyDay(opt.value)}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-              <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                {cycle === 'daily'
-                  ? '* 选择首次扣款日期（不能晚于今天）'
-                  : '* 基于当前日期和所选周期/扣款日自动计算：每日=当天；每周/每两周=从今天起最近的所选工作日；每月=从今天起最近的所选日期（1-28日）。'}
+
+              {cycle === 'monthly' && (
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+                    扣款日 <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <div className="dca-monthly-day-group scrollbar-y-styled">
+                    {Array.from({ length: 28 }).map((_, idx) => {
+                      const day = idx + 1;
+                      const active = monthlyDay === day;
+                      return (
+                        <button
+                          key={day}
+                          ref={active ? monthlyDayRef : null}
+                          type="button"
+                          className={`dca-option-btn dca-monthly-btn ${active ? 'active' : ''}`}
+                          onClick={() => setMonthlyDay(day)}
+                        >
+                          {day}日
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="muted" style={{ display: 'block', marginBottom: 4, fontSize: '14px' }}>
+                  首次扣款日期
+                </label>
+                {cycle === 'daily' ? (
+                  <DatePicker value={firstDate} onChange={setFirstDate} minDate={nowInTz().format('YYYY-MM-DD')} />
+                ) : (
+                  <div className="dca-first-date-display">{firstDate}</div>
+                )}
+                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                  {cycle === 'daily'
+                    ? '* 选择首次扣款日期（不能晚于今天）'
+                    : '* 基于当前日期和所选周期/扣款日自动计算：每日=当天；每周/每两周=从今天起最近的所选工作日；每月=从今天起最近的所选日期（1-28日）。'}
+                </div>
               </div>
-            </div>
-          </form>
-        </div>
-        <div
-          style={{
-            paddingTop: 12,
-            marginTop: 4,
-          }}
-        >
-          <div className="row" style={{ gap: 12 }}>
-            <button
-              type="button"
-              className="button secondary dca-cancel-btn"
-              onClick={onClose}
-              style={{ flex: 1 }}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              className="button"
-              disabled={!isValid()}
-              onClick={handleSubmit}
-              style={{ flex: 1, opacity: isValid() ? 1 : 0.6 }}
-            >
-              保存定投
-            </button>
+            </form>
           </div>
-        </div>
+          <div
+            style={{
+              paddingTop: 12,
+              marginTop: 4
+            }}
+          >
+            <div className="row" style={{ gap: 12 }}>
+              <button type="button" className="button secondary dca-cancel-btn" onClick={onClose} style={{ flex: 1 }}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="button"
+                disabled={!isValid()}
+                onClick={handleSubmit}
+                style={{ flex: 1, opacity: isValid() ? 1 : 0.6 }}
+              >
+                保存定投
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
   );
 }
-

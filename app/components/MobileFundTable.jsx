@@ -1,39 +1,49 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  memo
+} from 'react';
 
 import ReactDOM from 'react-dom';
+import { toast as sonnerToast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useModalStore } from '../stores';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from '@dnd-kit/core';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { throttle } from 'lodash';
-import FitText from './FitText';
 import MobileFundCardDrawer from './MobileFundCardDrawer';
 import MobileSettingModal from './MobileSettingModal';
 import MoveGroupModal from './MoveGroupModal';
 import SuccessModal from './SuccessModal';
-import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, LinkIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+import {
+  ArrowUpToLineIcon,
+  CloseIcon,
+  DragIcon,
+  FolderPlusIcon,
+  LinkIcon,
+  PencilIcon,
+  SettingsIcon,
+  StarIcon,
+  TrashIcon
+} from './Icons';
 import { ConsecutiveTrendBadge } from './Common';
-import { fetchFundPeriodReturns, fetchRelatedSectorsBatch, fetchFundSecidsBatch, fetchEastmoneySectorQuotesBatch } from '@/app/api/fund';
+import {
+  fetchFundPeriodReturns,
+  fetchRelatedSectorsBatch,
+  fetchFundSecidsBatch,
+  fetchEastmoneySectorQuotesBatch
+} from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
 import { Badge } from '@/components/ui/badge';
@@ -65,10 +75,16 @@ const MOBILE_NON_FROZEN_COLUMN_IDS = [
   'holdingRatio',
   'holdingCost',
   'costNav',
-  'estimateNav',
+  'estimateNav'
 ];
 
-const MOBILE_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set(['tags', 'holdingCost', 'costNav', 'sinceAddedChangePercent', 'holdingRatio']);
+const MOBILE_COLUMNS_DEFAULT_HIDDEN_IF_PERSONALIZED = new Set([
+  'tags',
+  'holdingCost',
+  'costNav',
+  'sinceAddedChangePercent',
+  'holdingRatio'
+]);
 
 const MOBILE_COLUMN_HEADERS = {
   relatedSector: '关联板块',
@@ -90,13 +106,13 @@ const MOBILE_COLUMN_HEADERS = {
   todayProfit: '当日收益',
   yesterdayProfit: '昨日收益',
   holdingProfit: '持有收益',
-  tags: '基金标签',
+  tags: '基金标签'
 };
 
 const RowSortableContext = createContext({
   setActivatorNodeRef: null,
   listeners: null,
-  activatorProps: null,
+  activatorProps: null
 });
 
 function sortableRowA11yProps(attributes) {
@@ -131,14 +147,13 @@ function EditDragHandleCell({ disabled }) {
     (node) => {
       rowSortable?.setActivatorNodeRef?.(node);
     },
-    [rowSortable],
+    [rowSortable]
   );
   if (!rowSortable) return null;
   return (
     <span
       ref={setActivatorRef}
       className="icon-button fav-button"
-      title="拖动排序"
       role="button"
       aria-label="拖动排序"
       style={{
@@ -148,9 +163,17 @@ function EditDragHandleCell({ disabled }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: disabled ? 0.45 : 1,
+        opacity: disabled ? 0.45 : 1
       }}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => {
+        if (disabled) {
+          e.stopPropagation();
+          sonnerToast.warning('拖拽基金顺序需要在默认排序下操作');
+        }
+      }}
       {...(disabled ? {} : rowSortable.activatorProps)}
       {...(disabled ? {} : rowSortable.listeners)}
     >
@@ -169,7 +192,7 @@ function MobileEditBatchHeader({
   onMove,
   onRemove,
   onClose,
-  hasMoveFunds,
+  hasMoveFunds
 }) {
   const checkboxRef = useRef(null);
   useEffect(() => {
@@ -186,7 +209,7 @@ function MobileEditBatchHeader({
         justifyContent: 'space-between',
         width: '100%',
         gap: 8,
-        minWidth: 0,
+        minWidth: 0
       }}
     >
       <div
@@ -201,7 +224,6 @@ function MobileEditBatchHeader({
         }}
       >
         <label
-          title={checked ? '取消全选' : '全选'}
           onClick={(e) => e.stopPropagation?.()}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexShrink: 0 }}
         >
@@ -229,7 +251,6 @@ function MobileEditBatchHeader({
               e.stopPropagation?.();
               onMove?.();
             }}
-            title="移动分组"
             disabled={!!actionsDisabled}
             style={{
               display: 'inline-flex',
@@ -243,7 +264,7 @@ function MobileEditBatchHeader({
               cursor: actionsDisabled ? 'not-allowed' : 'pointer',
               backgroundColor: 'transparent',
               border: 'none',
-              color: 'var(--primary)',
+              color: 'var(--primary)'
             }}
           >
             <FolderPlusIcon width="17" height="17" />
@@ -256,7 +277,6 @@ function MobileEditBatchHeader({
             e.stopPropagation?.();
             onRemove?.();
           }}
-          title="批量删除"
           disabled={!!actionsDisabled}
           style={{
             display: 'inline-flex',
@@ -270,7 +290,7 @@ function MobileEditBatchHeader({
             cursor: actionsDisabled ? 'not-allowed' : 'pointer',
             backgroundColor: 'transparent',
             border: 'none',
-            color: 'var(--danger)',
+            color: 'var(--danger)'
           }}
         >
           <TrashIcon width="17" height="17" />
@@ -282,7 +302,6 @@ function MobileEditBatchHeader({
             e.stopPropagation?.();
             onClose?.();
           }}
-          title="完成"
           aria-label="退出编辑"
           style={{
             border: 'none',
@@ -295,7 +314,7 @@ function MobileEditBatchHeader({
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: 'transparent',
-            color: 'var(--text)',
+            color: 'var(--text)'
           }}
         >
           <CloseIcon width="18" height="18" />
@@ -306,18 +325,16 @@ function MobileEditBatchHeader({
 }
 
 function SortableRow({ row, children, disabled }) {
-  const {
-    attributes,
-    listeners,
-    transform,
-    setNodeRef,
-    setActivatorNodeRef,
-    isDragging,
-  } = useSortable({ id: row.original.code, disabled });
+  const { attributes, listeners, transform, setNodeRef, setActivatorNodeRef, isDragging } = useSortable({
+    id: row.original.code,
+    disabled
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    ...(isDragging ? { position: 'relative', zIndex: 9999, opacity: 0.8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}),
+    ...(isDragging
+      ? { position: 'relative', zIndex: 9999, opacity: 0.8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }
+      : {})
   };
 
   return (
@@ -334,7 +351,7 @@ function SortableRow({ row, children, disabled }) {
         value={{
           setActivatorNodeRef,
           listeners,
-          activatorProps: sortableRowA11yProps(attributes),
+          activatorProps: sortableRowA11yProps(attributes)
         }}
       >
         {typeof children === 'function' ? children(setActivatorNodeRef, listeners) : children}
@@ -342,6 +359,132 @@ function SortableRow({ row, children, disabled }) {
     </motion.div>
   );
 }
+
+const MemoizedMobileTableRow = memo(
+  ({
+    row,
+    index,
+    sortBy,
+    isEditMode,
+    mobileGridLayout,
+    isFavorites,
+    isSelected,
+    masked,
+    periodReturns,
+    relatedSector,
+    sectorQuote,
+    fundExtraData,
+    tableColumnOrder,
+    tableColumnVisibility,
+    getPinClass,
+    getAlignClass,
+    LAST_COLUMN_EXTRA,
+    editLongPressRef,
+    clearEditLongPressTimer,
+    setIsEditMode,
+    setEditSelectedCodes
+  }) => {
+    return (
+      <SortableRow row={row} disabled={sortBy !== 'default' || !isEditMode}>
+        {() => (
+          <div
+            className="table-row"
+            data-masked={masked}
+            style={{
+              background: index % 2 === 0 ? 'var(--bg)' : 'var(--table-row-alt-bg)',
+              position: 'relative',
+              zIndex: 1,
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+              WebkitTouchCallout: 'none',
+              touchAction: isEditMode ? 'auto' : 'pan-x pan-y',
+              ...(mobileGridLayout.gridTemplateColumns
+                ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns }
+                : {})
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+            onPointerDown={(e) => {
+              if (isEditMode) return;
+              if (e.button !== 0 && e.pointerType === 'mouse') return;
+              const c = row.original?.code;
+              if (!c) return;
+              editLongPressRef.current.startX = e.clientX;
+              editLongPressRef.current.startY = e.clientY;
+              clearEditLongPressTimer();
+              editLongPressRef.current.timer = setTimeout(() => {
+                editLongPressRef.current.timer = null;
+                try {
+                  const sel = typeof window !== 'undefined' && window.getSelection?.();
+                  if (sel?.removeAllRanges) sel.removeAllRanges();
+                } catch {
+                  /* empty */
+                }
+                setIsEditMode(true);
+                const linked = !!row.original?.isHoldingLinked;
+                setEditSelectedCodes(linked ? new Set() : new Set([c]));
+              }, 550);
+            }}
+            onPointerMove={(e) => {
+              if (!editLongPressRef.current.timer) return;
+              const dx = Math.abs(e.clientX - editLongPressRef.current.startX);
+              const dy = Math.abs(e.clientY - editLongPressRef.current.startY);
+              if (dx > 12 || dy > 12) clearEditLongPressTimer();
+            }}
+            onPointerUp={clearEditLongPressTimer}
+            onPointerCancel={clearEditLongPressTimer}
+          >
+            {row.getVisibleCells().map((cell, cellIndex) => {
+              const columnId = cell.column.id;
+              const pinClass = getPinClass(columnId, false);
+              const alignClass = getAlignClass(columnId);
+              const cellClassName = cell.column.columnDef.meta?.cellClassName || '';
+              const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
+              const style = isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : {};
+              if (cellIndex === 0) {
+                if (index % 2 !== 0) {
+                  style.background = 'var(--table-row-alt-bg)';
+                } else {
+                  style.background = 'var(--bg)';
+                }
+              }
+              return (
+                <div
+                  key={cell.id}
+                  data-masked={masked}
+                  className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`}
+                  style={style}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SortableRow>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.index === nextProps.index &&
+      prevProps.sortBy === nextProps.sortBy &&
+      prevProps.isEditMode === nextProps.isEditMode &&
+      prevProps.mobileGridLayout === nextProps.mobileGridLayout &&
+      prevProps.isFavorites === nextProps.isFavorites &&
+      prevProps.isSelected === nextProps.isSelected &&
+      prevProps.masked === nextProps.masked &&
+      prevProps.periodReturns === nextProps.periodReturns &&
+      prevProps.relatedSector === nextProps.relatedSector &&
+      prevProps.sectorQuote === nextProps.sectorQuote &&
+      prevProps.fundExtraData === nextProps.fundExtraData &&
+      prevProps.tableColumnOrder === nextProps.tableColumnOrder &&
+      prevProps.tableColumnVisibility === nextProps.tableColumnVisibility &&
+      prevProps.row.original === nextProps.row.original
+    );
+  }
+);
+
+MemoizedMobileTableRow.displayName = 'MemoizedMobileTableRow';
 
 /**
  * 移动端基金列表表格组件（基于 @tanstack/react-table，与 PcFundTable 相同数据结构）
@@ -392,7 +535,7 @@ export default function MobileFundTable({
   onFundCardDrawerOpenChange,
   onMobileSettingModalOpenChange,
   onFundTagsClick,
-  fundExtraDataByCode = {},
+  fundExtraDataByCode = {}
 }) {
   // 从 Zustand 读取删除确认弹框状态，避免 page.jsx 订阅导致全量重渲染
   const fundDeleteConfirm = useModalStore((s) => s.fundDeleteConfirm);
@@ -405,15 +548,18 @@ export default function MobileFundTable({
 
   const editLongPressRef = useRef({ timer: null, startX: 0, startY: 0 });
 
-  const selectableCodes = useMemo(
-    () => (Array.isArray(data) ? data.map((d) => d?.code).filter(Boolean) : []),
-    [data],
-  );
+  const selectableCodes = useMemo(() => (Array.isArray(data) ? data.map((d) => d?.code).filter(Boolean) : []), [data]);
 
   /** 全部/自选下「关联汇总持仓」行不参与编辑模式批量选择 */
   const batchSelectableCodes = useMemo(
-    () => (Array.isArray(data) ? data.filter((d) => !d?.isHoldingLinked).map((d) => d?.code).filter(Boolean) : []),
-    [data],
+    () =>
+      Array.isArray(data)
+        ? data
+            .filter((d) => !d?.isHoldingLinked)
+            .map((d) => d?.code)
+            .filter(Boolean)
+        : [],
+    [data]
   );
   const batchSelectableCount = batchSelectableCodes.length;
 
@@ -461,9 +607,7 @@ export default function MobileFundTable({
 
   useEffect(() => {
     const linkedCodes = new Set(
-      (Array.isArray(data) ? data : [])
-        .filter((d) => d && d.isHoldingLinked && d.code)
-        .map((d) => d.code),
+      (Array.isArray(data) ? data : []).filter((d) => d && d.isHoldingLinked && d.code).map((d) => d.code)
     );
     if (!linkedCodes.size) return;
     setEditSelectedCodes((prev) => {
@@ -477,19 +621,22 @@ export default function MobileFundTable({
     });
   }, [data]);
 
-  const setAllEditSelected = useCallback((nextChecked) => {
-    setEditSelectedCodes(() => {
-      if (!nextChecked) return new Set();
-      return new Set(batchSelectableCodes);
-    });
-  }, [batchSelectableCodes]);
+  const setAllEditSelected = useCallback(
+    (nextChecked) => {
+      setEditSelectedCodes(() => {
+        if (!nextChecked) return new Set();
+        return new Set(batchSelectableCodes);
+      });
+    },
+    [batchSelectableCodes]
+  );
 
   useEffect(() => () => clearEditLongPressTimer(), [clearEditLongPressTimer]);
 
   // 编辑模式下「拖动」列无需长按即可拖动；非编辑模式长按整行进入编辑
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: isEditMode ? { delay: 0, tolerance: 5 } : { delay: 400, tolerance: 5 },
+      activationConstraint: isEditMode ? { delay: 0, tolerance: 5 } : { delay: 400, tolerance: 5 }
     }),
     useSensor(KeyboardSensor)
   );
@@ -506,7 +653,9 @@ export default function MobileFundTable({
   useEffect(() => {
     if (closeDrawerRef) {
       closeDrawerRef.current = () => setCardSheetRow(null);
-      return () => { closeDrawerRef.current = null; };
+      return () => {
+        closeDrawerRef.current = null;
+      };
     }
   }, [closeDrawerRef]);
 
@@ -515,12 +664,7 @@ export default function MobileFundTable({
     onRemoveFundRef.current = onRemoveFund;
     onHoldingAmountClickRef.current = onHoldingAmountClick;
     onFundTagsClickRef.current = onFundTagsClick;
-  }, [
-    onToggleFavorite,
-    onRemoveFund,
-    onHoldingAmountClick,
-    onFundTagsClick,
-  ]);
+  }, [onToggleFavorite, onRemoveFund, onHoldingAmountClick, onFundTagsClick]);
 
   const handleDragStart = () => {
     beginDragScrollLock(dragScrollYRef, dragScrollRafRef);
@@ -555,8 +699,8 @@ export default function MobileFundTable({
       ...(Array.isArray(groups) ? groups : []).map((group) => ({
         id: group?.id,
         name: group?.name || '未命名',
-        description: '自定义分组',
-      })),
+        description: '自定义分组'
+      }))
     ];
     const seen = new Set();
     return baseOptions.filter((item) => {
@@ -572,14 +716,20 @@ export default function MobileFundTable({
     try {
       const parsed = storageStore.getItem('customSettings') || {};
       if (!parsed || typeof parsed !== 'object') return {};
-      if (parsed.pcTableColumnOrder != null || parsed.pcTableColumnVisibility != null || parsed.pcTableColumns != null || parsed.mobileTableColumnOrder != null || parsed.mobileTableColumnVisibility != null) {
+      if (
+        parsed.pcTableColumnOrder != null ||
+        parsed.pcTableColumnVisibility != null ||
+        parsed.pcTableColumns != null ||
+        parsed.mobileTableColumnOrder != null ||
+        parsed.mobileTableColumnVisibility != null
+      ) {
         const all = {
           ...(parsed.all && typeof parsed.all === 'object' ? parsed.all : {}),
           pcTableColumnOrder: parsed.pcTableColumnOrder,
           pcTableColumnVisibility: parsed.pcTableColumnVisibility,
           pcTableColumns: parsed.pcTableColumns,
           mobileTableColumnOrder: parsed.mobileTableColumnOrder,
-          mobileTableColumnVisibility: parsed.mobileTableColumnVisibility,
+          mobileTableColumnVisibility: parsed.mobileTableColumnVisibility
         };
         delete parsed.pcTableColumnOrder;
         delete parsed.pcTableColumnVisibility;
@@ -602,20 +752,24 @@ export default function MobileFundTable({
       if (k === 'pcContainerWidth') return;
       const group = parsed[k];
       if (!group || typeof group !== 'object') return;
-      const order = Array.isArray(group.mobileTableColumnOrder) && group.mobileTableColumnOrder.length > 0
-        ? group.mobileTableColumnOrder
-        : null;
-      const visibility = group.mobileTableColumnVisibility && typeof group.mobileTableColumnVisibility === 'object'
-        ? group.mobileTableColumnVisibility
-        : null;
+      const order =
+        Array.isArray(group.mobileTableColumnOrder) && group.mobileTableColumnOrder.length > 0
+          ? group.mobileTableColumnOrder
+          : null;
+      const visibility =
+        group.mobileTableColumnVisibility && typeof group.mobileTableColumnVisibility === 'object'
+          ? group.mobileTableColumnVisibility
+          : null;
       byGroup[k] = {
-        mobileTableColumnOrder: order ? (() => {
-          const valid = order.filter((id) => MOBILE_NON_FROZEN_COLUMN_IDS.includes(id));
-          const missing = MOBILE_NON_FROZEN_COLUMN_IDS.filter((id) => !valid.includes(id));
-          return [...valid, ...missing];
-        })() : null,
+        mobileTableColumnOrder: order
+          ? (() => {
+              const valid = order.filter((id) => MOBILE_NON_FROZEN_COLUMN_IDS.includes(id));
+              const missing = MOBILE_NON_FROZEN_COLUMN_IDS.filter((id) => !valid.includes(id));
+              return [...valid, ...missing];
+            })()
+          : null,
         mobileTableColumnVisibility: visibility,
-        mobileShowFullFundName: group.mobileShowFullFundName === true,
+        mobileShowFullFundName: group.mobileShowFullFundName === true
       };
     });
     return byGroup;
@@ -628,7 +782,9 @@ export default function MobileFundTable({
   const defaultOrder = [...MOBILE_NON_FROZEN_COLUMN_IDS];
   const defaultVisibility = (() => {
     const o = {};
-    MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => { o[id] = true; });
+    MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => {
+      o[id] = true;
+    });
     return o;
   })();
 
@@ -659,7 +815,8 @@ export default function MobileFundTable({
       const parsed = storageStore.getItem('customSettings') || {};
       const group = parsed[groupKey] && typeof parsed[groupKey] === 'object' ? { ...parsed[groupKey] } : {};
       if (updates.mobileTableColumnOrder !== undefined) group.mobileTableColumnOrder = updates.mobileTableColumnOrder;
-      if (updates.mobileTableColumnVisibility !== undefined) group.mobileTableColumnVisibility = updates.mobileTableColumnVisibility;
+      if (updates.mobileTableColumnVisibility !== undefined)
+        group.mobileTableColumnVisibility = updates.mobileTableColumnVisibility;
       parsed[groupKey] = group;
       storageStore.setItem('customSettings', JSON.stringify(parsed));
       setConfigByGroup((prev) => ({ ...prev, [groupKey]: { ...prev[groupKey], ...updates } }));
@@ -668,15 +825,11 @@ export default function MobileFundTable({
   };
 
   const setMobileColumnOrder = (nextOrderOrUpdater) => {
-    const next = typeof nextOrderOrUpdater === 'function'
-      ? nextOrderOrUpdater(mobileColumnOrder)
-      : nextOrderOrUpdater;
+    const next = typeof nextOrderOrUpdater === 'function' ? nextOrderOrUpdater(mobileColumnOrder) : nextOrderOrUpdater;
     persistMobileGroupConfig({ mobileTableColumnOrder: next });
   };
   const setMobileColumnVisibility = (nextOrUpdater) => {
-    const next = typeof nextOrUpdater === 'function'
-      ? nextOrUpdater(mobileColumnVisibility)
-      : nextOrUpdater;
+    const next = typeof nextOrUpdater === 'function' ? nextOrUpdater(mobileColumnVisibility) : nextOrUpdater;
     persistMobileGroupConfig({ mobileTableColumnVisibility: next });
   };
 
@@ -707,7 +860,7 @@ export default function MobileFundTable({
       const payload = {
         mobileTableColumnOrder: [...mobileColumnOrder],
         mobileTableColumnVisibility: { ...mobileColumnVisibility },
-        mobileShowFullFundName: !!showFullFundName,
+        mobileShowFullFundName: !!showFullFundName
       };
       const targetUpdates = {};
       targetIds.forEach((targetId) => {
@@ -740,11 +893,14 @@ export default function MobileFundTable({
     onMobileSettingModalOpenChange?.(settingModalOpen);
   }, [settingModalOpen, onMobileSettingModalOpenChange]);
 
-  useEffect(() => {
-    if (sortBy !== 'default') exitEditMode();
-  }, [sortBy, exitEditMode]);
+  // useEffect(() => {
+  //   if (sortBy !== 'default') exitEditMode();
+  // }, [sortBy, exitEditMode]);
 
   const [cardSheetRow, setCardSheetRow] = useState(null);
+  const handleOpenCardSheet = useCallback((row) => {
+    setCardSheetRow(row);
+  }, []);
 
   const fundCardDrawerOpen = !!(cardSheetRow && getFundCardProps);
   useEffect(() => {
@@ -816,27 +972,36 @@ export default function MobileFundTable({
 
       const tableEl = tableContainerRef.current;
       const tableRect = tableEl?.getBoundingClientRect();
-      if (!tableRect) {
-        setShowPortalHeader(window.scrollY >= nextStickyTop);
+      if (!tableRect || (tableRect.width === 0 && tableRect.height === 0)) {
+        setShowPortalHeader((prev) => (prev === false ? prev : false));
         return;
       }
 
       const headerEl = tableEl?.querySelector('.table-header-row');
       const headerHeight = headerEl?.getBoundingClientRect?.().height ?? 0;
-      const hasPassedHeader = (tableRect.top + headerHeight) <= nextStickyTop;
+      const hasPassedHeader = tableRect.top + headerHeight <= nextStickyTop;
       const hasTableInView = tableRect.bottom > nextStickyTop;
 
-      setShowPortalHeader(hasPassedHeader && hasTableInView);
+      const nextPortalVisible = hasPassedHeader && hasTableInView;
+      setShowPortalHeader((prev) => (prev === nextPortalVisible ? prev : nextPortalVisible));
     };
 
-    const throttledVerticalUpdate = throttle(updateVerticalState, 1000/60, { leading: true, trailing: true });
+    const throttledVerticalUpdate = throttle(updateVerticalState, 1000 / 60, { leading: true, trailing: true });
 
     updateVerticalState();
     window.addEventListener('scroll', throttledVerticalUpdate, { passive: true });
     window.addEventListener('resize', throttledVerticalUpdate, { passive: true });
+
+    let ro = null;
+    if (tableContainerRef.current) {
+      ro = new ResizeObserver(() => throttledVerticalUpdate());
+      ro.observe(tableContainerRef.current);
+    }
+
     return () => {
       window.removeEventListener('scroll', throttledVerticalUpdate);
       window.removeEventListener('resize', throttledVerticalUpdate);
+      if (ro) ro.disconnect();
       throttledVerticalUpdate.cancel();
     };
   }, [stickyTop]);
@@ -907,7 +1072,7 @@ export default function MobileFundTable({
     yesterdayProfit: 80,
     holdingProfit: 80,
     holdingCost: 80,
-    costNav: 64,
+    costNav: 64
   };
 
   const relatedSectorEnabled = mobileColumnVisibility?.relatedSector !== false;
@@ -956,7 +1121,9 @@ export default function MobileFundTable({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [relatedSectorEnabled, data, sectorAuthSegment]);
 
   useEffect(() => {
@@ -981,7 +1148,7 @@ export default function MobileFundTable({
         if (cancelled) return;
 
         // 2. 批量获取行情
-        const secids = labelList.map(label => secidResults[label]).filter(Boolean);
+        const secids = labelList.map((label) => secidResults[label]).filter(Boolean);
         const quotes = await fetchEastmoneySectorQuotesBatch(secids);
         if (cancelled) return;
         const batch = {};
@@ -997,13 +1164,7 @@ export default function MobileFundTable({
           for (const [label, quote] of Object.entries(batch)) {
             const prevQ = next[label];
             if (prevQ === quote) continue;
-            if (
-              prevQ &&
-              quote &&
-              prevQ.pct === quote.pct &&
-              prevQ.name === quote.name &&
-              prevQ.code === quote.code
-            ) {
+            if (prevQ && quote && prevQ.pct === quote.pct && prevQ.name === quote.name && prevQ.code === quote.code) {
               continue;
             }
             next[label] = quote;
@@ -1016,7 +1177,9 @@ export default function MobileFundTable({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [relatedSectorEnabled, data, relatedSectorByCode]);
 
   const withRelatedSectorFund = useCallback(
@@ -1035,11 +1198,11 @@ export default function MobileFundTable({
           ...(row.rawFund || { code: row.code, name: row.fundName }),
           relatedSector,
           relatedSectorQuoteName: quoteName,
-          relatedSectorQuotePct: hasQuotePct ? quotePct : null,
-        },
+          relatedSectorQuotePct: hasQuotePct ? quotePct : null
+        }
       };
     },
-    [relatedSectorByCode, sectorQuoteByLabel],
+    [relatedSectorByCode, sectorQuoteByLabel]
   );
 
   const getFundCardPropsWithRelatedSector = useCallback(
@@ -1047,15 +1210,15 @@ export default function MobileFundTable({
       if (!getFundCardProps) return {};
       return getFundCardProps(withRelatedSectorFund(row));
     },
-    [getFundCardProps, withRelatedSectorFund],
+    [getFundCardProps, withRelatedSectorFund]
   );
 
   const periodReturnsEnabled =
-    mobileColumnVisibility?.period1w !== false
-    || mobileColumnVisibility?.period1m !== false
-    || mobileColumnVisibility?.period3m !== false
-    || mobileColumnVisibility?.period6m !== false
-    || mobileColumnVisibility?.period1y !== false;
+    mobileColumnVisibility?.period1w !== false ||
+    mobileColumnVisibility?.period1m !== false ||
+    mobileColumnVisibility?.period3m !== false ||
+    mobileColumnVisibility?.period6m !== false ||
+    mobileColumnVisibility?.period1y !== false;
   const periodReturnsCacheRef = useRef(new Map());
   const [periodReturnsByCode, setPeriodReturnsByCode] = useState({});
 
@@ -1076,12 +1239,12 @@ export default function MobileFundTable({
         for (const [code, value] of Object.entries(cachedBatch)) {
           const prevVal = next[code];
           if (
-            prevVal
-            && prevVal.week === value.week
-            && prevVal.month === value.month
-            && prevVal.month3 === value.month3
-            && prevVal.month6 === value.month6
-            && prevVal.year1 === value.year1
+            prevVal &&
+            prevVal.week === value.week &&
+            prevVal.month === value.month &&
+            prevVal.month3 === value.month3 &&
+            prevVal.month6 === value.month6 &&
+            prevVal.year1 === value.year1
           ) {
             continue;
           }
@@ -1097,28 +1260,53 @@ export default function MobileFundTable({
 
     let cancelled = false;
     (async () => {
+      const batchResults = {};
+      let updateTimeout = null;
+
+      const triggerBatchUpdate = () => {
+        if (cancelled || Object.keys(batchResults).length === 0) return;
+        setPeriodReturnsByCode((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [c, val] of Object.entries(batchResults)) {
+            const prevVal = next[c];
+            if (
+              prevVal &&
+              prevVal.week === val.week &&
+              prevVal.month === val.month &&
+              prevVal.month3 === val.month3 &&
+              prevVal.month6 === val.month6 &&
+              prevVal.year1 === val.year1
+            ) {
+              continue;
+            }
+            next[c] = val;
+            changed = true;
+          }
+          return changed ? next : prev;
+        });
+        for (const key of Object.keys(batchResults)) {
+          delete batchResults[key];
+        }
+      };
+
       await asyncPool(4, missing, async (code) => {
         const value = await fetchFundPeriodReturns(code);
         periodReturnsCacheRef.current.set(code, value);
         if (cancelled) return;
-        setPeriodReturnsByCode((prev) => {
-          const prevVal = prev[code];
-          if (
-            prevVal
-            && prevVal.week === value.week
-            && prevVal.month === value.month
-            && prevVal.month3 === value.month3
-            && prevVal.month6 === value.month6
-            && prevVal.year1 === value.year1
-          ) {
-            return prev;
-          }
-          return { ...prev, [code]: value };
-        });
+
+        batchResults[code] = value;
+
+        if (updateTimeout) clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(triggerBatchUpdate, 100);
       });
+
+      triggerBatchUpdate();
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [periodReturnsEnabled, data]);
 
   const columnWidthMap = useMemo(() => {
@@ -1129,7 +1317,7 @@ export default function MobileFundTable({
       const map = {
         fundName: fundNameWidth,
         [EDIT_MOVE_TO_FRONT_COL]: w,
-        [EDIT_DRAG_COL]: w,
+        [EDIT_DRAG_COL]: w
       };
       MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => {
         map[id] = w;
@@ -1194,16 +1382,12 @@ export default function MobileFundTable({
     // 需求：移动端「表格模式」下，自定义分组的正常模式隐藏删除按钮（删除入口统一收敛到编辑模式的批量删除）
     const showGroupDeleteButton = false;
     const editSelected = code ? editSelectedCodes.has(code) : false;
-    const holdingLocked =
-      (currentTab === 'all' || currentTab === 'fav') &&
-      !!original.isHoldingLinked;
-    const holdingLinkedTitle = '持仓来自自定义分组汇总，点击选择分组后操作';
+    const holdingLocked = (currentTab === 'all' || currentTab === 'fav') && !!original.isHoldingLinked;
 
     if (isEditMode) {
       return (
         <div className="name-cell-content" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label
-            title={holdingLocked ? '关联持仓不可批量选择' : '选择用于批量操作'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1213,7 +1397,7 @@ export default function MobileFundTable({
               height: 26,
               marginRight: 4,
               cursor: holdingLocked ? 'not-allowed' : 'pointer',
-              opacity: holdingLocked ? 0.45 : 1,
+              opacity: holdingLocked ? 0.45 : 1
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -1235,18 +1419,14 @@ export default function MobileFundTable({
                 width: 18,
                 height: 18,
                 accentColor: 'var(--primary)',
-                cursor: holdingLocked ? 'not-allowed' : 'pointer',
+                cursor: holdingLocked ? 'not-allowed' : 'pointer'
               }}
             />
           </label>
           <div className="title-text">
-            <span
-              className={`name-text ${showFullFundName ? 'show-full' : ''}`}
-              title={isUpdated ? '今日净值已更新' : undefined}
-            >
+            <span className={`name-text ${showFullFundName ? 'show-full' : ''}`}>
               {holdingLocked ? (
                 <span
-                  title="持仓来自自定义分组汇总"
                   aria-label="已关联持仓"
                   style={{
                     display: 'inline-flex',
@@ -1256,6 +1436,7 @@ export default function MobileFundTable({
                     verticalAlign: 'middle',
                     marginBottom: 2,
                     position: 'relative',
+                    cursor: 'default'
                   }}
                 >
                   <LinkIcon width="14" height="14" />
@@ -1283,7 +1464,10 @@ export default function MobileFundTable({
     }
 
     return (
-      <div className="name-cell-content" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: isCustomGroupTab? 0 : -4 }}>
+      <div
+        className="name-cell-content"
+        style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: isCustomGroupTab ? 0 : -4 }}
+      >
         {isGroupTab ? (
           showGroupDeleteButton ? (
             <button
@@ -1293,7 +1477,6 @@ export default function MobileFundTable({
                 e.stopPropagation?.();
                 onRemoveFundRef.current?.(original);
               }}
-              title="删除"
               style={{
                 backgroundColor: 'transparent',
                 flexShrink: 0,
@@ -1315,8 +1498,7 @@ export default function MobileFundTable({
               e.stopPropagation?.();
               onToggleFavoriteRef.current?.(original);
             }}
-            title={isFavorites ? '取消自选' : '添加自选'}
-            style={{ backgroundColor: 'transparent'}}
+            style={{ backgroundColor: 'transparent' }}
           >
             <StarIcon width="18" height="18" filled={isFavorites} />
           </button>
@@ -1324,7 +1506,6 @@ export default function MobileFundTable({
         <div className="title-text">
           <span
             className={`name-text ${showFullFundName ? 'show-full' : ''}`}
-            title={isUpdated ? '今日净值已更新' : onOpenCardSheet ? '点击查看卡片' : ''}
             role={onOpenCardSheet ? 'button' : undefined}
             tabIndex={onOpenCardSheet ? 0 : undefined}
             style={onOpenCardSheet ? { cursor: 'pointer' } : undefined}
@@ -1343,7 +1524,6 @@ export default function MobileFundTable({
           >
             {holdingLocked ? (
               <span
-                title="持仓来自自定义分组汇总"
                 aria-label="已关联持仓"
                 style={{
                   display: 'inline-flex',
@@ -1353,6 +1533,7 @@ export default function MobileFundTable({
                   verticalAlign: 'middle',
                   bottom: 2,
                   position: 'relative',
+                  cursor: 'default'
                 }}
               >
                 <LinkIcon width="14" height="14" />
@@ -1366,7 +1547,6 @@ export default function MobileFundTable({
               className="muted code-text"
               role="button"
               tabIndex={0}
-              title={holdingLocked ? holdingLinkedTitle : '点击设置持仓'}
               style={{ cursor: 'pointer' }}
               onClick={(e) => {
                 e.stopPropagation?.();
@@ -1388,7 +1568,6 @@ export default function MobileFundTable({
               className="muted code-text"
               role="button"
               tabIndex={0}
-              title={holdingLocked ? holdingLinkedTitle : '设置持仓'}
               style={{ cursor: 'pointer' }}
               onClick={(e) => {
                 e.stopPropagation?.();
@@ -1452,7 +1631,6 @@ export default function MobileFundTable({
                   e.stopPropagation?.();
                   setSettingModalOpen(true);
                 }}
-                title="个性化设置"
                 style={{
                   border: 'none',
                   width: '28px',
@@ -1463,12 +1641,12 @@ export default function MobileFundTable({
                   flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 <SettingsIcon width="18" height="18" />
               </button>
-              {sortBy === 'default' && (
+              {true && (
                 <button
                   type="button"
                   className="icon-button"
@@ -1478,7 +1656,6 @@ export default function MobileFundTable({
                     setIsEditMode(true);
                     setEditSelectedCodes(new Set());
                   }}
-                  title="编辑"
                   aria-label="编辑"
                   style={{
                     border: 'none',
@@ -1492,7 +1669,7 @@ export default function MobileFundTable({
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: 1,
-                    cursor: 'pointer',
+                    cursor: 'pointer'
                   }}
                 >
                   <PencilIcon width="18" height="18" />
@@ -1505,10 +1682,10 @@ export default function MobileFundTable({
           <MobileFundNameCell
             info={info}
             showFullFundName={showFullFundName}
-            onOpenCardSheet={getFundCardProps ? (row) => setCardSheetRow(row) : undefined}
+            onOpenCardSheet={getFundCardProps ? handleOpenCardSheet : undefined}
           />
         ),
-        meta: { align: 'left', cellClassName: 'name-cell', width: columnWidthMap.fundName },
+        meta: { align: 'left', cellClassName: 'name-cell', width: columnWidthMap.fundName }
       },
       {
         id: EDIT_MOVE_TO_FRONT_COL,
@@ -1522,8 +1699,7 @@ export default function MobileFundTable({
               <button
                 type="button"
                 className="link-button"
-                disabled={!canMove}
-                title={idx <= 0 ? '已在最前' : '移到最前'}
+                disabled={idx <= 0}
                 aria-label={idx <= 0 ? '已在最前' : '移到最前'}
                 style={{
                   fontSize: 12,
@@ -1535,11 +1711,15 @@ export default function MobileFundTable({
                   cursor: !canMove ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  justifyContent: 'center'
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!canMove) return;
+                  if (sortBy !== 'default') {
+                    sonnerToast.warning('拖拽基金顺序需要在默认排序下操作');
+                    return;
+                  }
+                  if (idx <= 0 || !onReorder) return;
                   onReorder(idx, 0);
                 }}
               >
@@ -1548,7 +1728,11 @@ export default function MobileFundTable({
             </div>
           );
         },
-        meta: { align: 'center', cellClassName: 'mobile-edit-action-cell', width: columnWidthMap[EDIT_MOVE_TO_FRONT_COL] },
+        meta: {
+          align: 'center',
+          cellClassName: 'mobile-edit-action-cell',
+          width: columnWidthMap[EDIT_MOVE_TO_FRONT_COL]
+        }
       },
       {
         id: EDIT_DRAG_COL,
@@ -1558,7 +1742,7 @@ export default function MobileFundTable({
             <EditDragHandleCell disabled={sortBy !== 'default'} />
           </div>
         ),
-        meta: { align: 'center', cellClassName: 'mobile-edit-action-cell', width: columnWidthMap[EDIT_DRAG_COL] },
+        meta: { align: 'center', cellClassName: 'mobile-edit-action-cell', width: columnWidthMap[EDIT_DRAG_COL] }
       },
       {
         id: 'tags',
@@ -1581,10 +1765,9 @@ export default function MobileFundTable({
                 background: 'transparent',
                 padding: '2px 0',
                 cursor: onFundTagsClick ? 'pointer' : 'default',
-                textAlign: 'left',
+                textAlign: 'left'
               }}
               disabled={!onFundTagsClick}
-              title={onFundTagsClick ? '编辑标签' : undefined}
             >
               {hasTags ? (
                 <div
@@ -1592,7 +1775,7 @@ export default function MobileFundTable({
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: 4,
-                    justifyContent: 'flex-end',
+                    justifyContent: 'flex-end'
                   }}
                 >
                   {list.map((raw, idx) => {
@@ -1600,7 +1783,7 @@ export default function MobileFundTable({
                       raw && typeof raw === 'object' && raw.name != null
                         ? {
                             name: String(raw.name).trim(),
-                            theme: String(raw.theme ?? 'default').trim() || 'default',
+                            theme: String(raw.theme ?? 'default').trim() || 'default'
                           }
                         : { name: String(raw).trim(), theme: 'default' };
                     if (!item.name) return null;
@@ -1617,12 +1800,14 @@ export default function MobileFundTable({
                   })}
                 </div>
               ) : (
-                 <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>
-        )}
+                <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>
+                  —
+                </div>
+              )}
             </button>
           );
         },
-        meta: { align: 'right', cellClassName: 'tags-cell', width: columnWidthMap.tags ?? 120 },
+        meta: { align: 'right', cellClassName: 'tags-cell', width: columnWidthMap.tags ?? 120 }
       },
       {
         id: 'relatedSector',
@@ -1647,22 +1832,25 @@ export default function MobileFundTable({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'stretch',
-                gap: 2,
+                gap: 2
               }}
             >
               {pctText != null ? (
-                <FitText
+                <div
                   className={pctCls}
-                  style={{ fontWeight: 500, textAlign: 'right' }}
-                  maxFontSize={12}
-                  minFontSize={9}
-                  as="div"
+                  style={{
+                    fontWeight: 700,
+                    textAlign: 'right',
+                    fontSize: 'clamp(9px, 2.5vw, 12px)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
                 >
                   {pctText}
-                </FitText>
+                </div>
               ) : null}
               <span
-                title={firstLine !== '—' ? firstLine : undefined}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -1671,7 +1859,7 @@ export default function MobileFundTable({
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                   textAlign: 'right',
-                  fontSize: pctText != null ? '10px' : '12px',
+                  fontSize: pctText != null ? '10px' : '12px'
                 }}
               >
                 {firstLine}
@@ -1679,7 +1867,7 @@ export default function MobileFundTable({
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'related-sector-cell', width: columnWidthMap.relatedSector ?? 120 },
+        meta: { align: 'right', cellClassName: 'related-sector-cell', width: columnWidthMap.relatedSector ?? 120 }
       },
       {
         id: 'period1w',
@@ -1689,16 +1877,24 @@ export default function MobileFundTable({
           const code = original.code;
           const value = code ? periodReturnsByCode[code]?.week : null;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
-          const text = value != null && Number.isFinite(value)
-            ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+          const text = value != null && Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%` : '—';
           return (
-              <FitText className={cls} style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10} as="div">
-                {text}
-              </FitText>
+            <div
+              className={cls}
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {text}
+            </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1w ?? 72 },
+        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1w ?? 72 }
       },
       {
         id: 'period1m',
@@ -1708,16 +1904,24 @@ export default function MobileFundTable({
           const code = original.code;
           const value = code ? periodReturnsByCode[code]?.month : null;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
-          const text = value != null && Number.isFinite(value)
-            ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+          const text = value != null && Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%` : '—';
           return (
-              <FitText className={cls} style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10} as="div">
-                {text}
-              </FitText>
+            <div
+              className={cls}
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {text}
+            </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1m ?? 72 },
+        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1m ?? 72 }
       },
       {
         id: 'period3m',
@@ -1727,16 +1931,24 @@ export default function MobileFundTable({
           const code = original.code;
           const value = code ? periodReturnsByCode[code]?.month3 : null;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
-          const text = value != null && Number.isFinite(value)
-            ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+          const text = value != null && Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%` : '—';
           return (
-              <FitText className={cls} style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10} as="div">
-                {text}
-              </FitText>
+            <div
+              className={cls}
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {text}
+            </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period3m ?? 72 },
+        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period3m ?? 72 }
       },
       {
         id: 'period6m',
@@ -1746,16 +1958,24 @@ export default function MobileFundTable({
           const code = original.code;
           const value = code ? periodReturnsByCode[code]?.month6 : null;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
-          const text = value != null && Number.isFinite(value)
-            ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+          const text = value != null && Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%` : '—';
           return (
-              <FitText className={cls} style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10} as="div">
-                {text}
-              </FitText>
+            <div
+              className={cls}
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {text}
+            </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period6m ?? 72 },
+        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period6m ?? 72 }
       },
       {
         id: 'period1y',
@@ -1765,16 +1985,24 @@ export default function MobileFundTable({
           const code = original.code;
           const value = code ? periodReturnsByCode[code]?.year1 : null;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
-          const text = value != null && Number.isFinite(value)
-            ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+          const text = value != null && Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%` : '—';
           return (
-              <FitText className={cls} style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10} as="div">
-                {text}
-              </FitText>
+            <div
+              className={cls}
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {text}
+            </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1y ?? 72 },
+        meta: { align: 'right', cellClassName: 'period-return-cell', width: columnWidthMap.period1y ?? 72 }
       },
       {
         id: 'holdingRatio',
@@ -1783,16 +2011,30 @@ export default function MobileFundTable({
           const original = info.row.original || {};
           const value = original.holdingRatioValue;
           if (value == null) {
-            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+            return (
+              <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>
+                —
+              </div>
+            );
           }
           const text = `${(value * 100).toFixed(2)}%`;
           return (
-            <FitText style={{ fontWeight: 700, textAlign: 'right' }} maxFontSize={14} minFontSize={10}>
+            <span
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
               {masked ? <span className="mask-text">******</span> : text}
-            </FitText>
+            </span>
           );
         },
-        meta: { align: 'right', cellClassName: 'holding-ratio-cell', width: columnWidthMap.holdingRatio ?? 72 },
+        meta: { align: 'right', cellClassName: 'holding-ratio-cell', width: columnWidthMap.holdingRatio ?? 72 }
       },
       {
         accessorKey: 'holdingCost',
@@ -1800,15 +2042,29 @@ export default function MobileFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           if (original.holdingCostValue == null) {
-            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+            return (
+              <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>
+                —
+              </div>
+            );
           }
           return (
-              <FitText style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10}>
-                {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '—')}
-              </FitText>
+            <span
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '—')}
+            </span>
           );
         },
-        meta: { align: 'right', cellClassName: 'holding-cost-cell', width: columnWidthMap.holdingCost ?? 80 },
+        meta: { align: 'right', cellClassName: 'holding-cost-cell', width: columnWidthMap.holdingCost ?? 80 }
       },
       {
         accessorKey: 'costNav',
@@ -1816,15 +2072,29 @@ export default function MobileFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           if (original.costNavValue == null) {
-            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+            return (
+              <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>
+                —
+              </div>
+            );
           }
           return (
-              <FitText style={{ fontWeight: 500, textAlign: 'right' }} maxFontSize={14} minFontSize={10}>
-                {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '—')}
-              </FitText>
+            <span
+              style={{
+                fontWeight: 700,
+                textAlign: 'right',
+                fontSize: 'clamp(10px, 3vw, 14px)',
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '—')}
+            </span>
           );
         },
-        meta: { align: 'right', cellClassName: 'cost-nav-cell', width: columnWidthMap.costNav ?? 64 },
+        meta: { align: 'right', cellClassName: 'cost-nav-cell', width: columnWidthMap.costNav ?? 64 }
       },
       {
         accessorKey: 'latestNav',
@@ -1835,16 +2105,26 @@ export default function MobileFundTable({
           const displayDate = typeof date === 'string' && date.length > 5 ? date.slice(5) : date;
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {info.getValue() ?? '—'}
-                </FitText>
+                </span>
               </span>
-              <span className="muted" style={{ fontSize: '10px' }}>{displayDate}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>
+                {displayDate}
+              </span>
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'value-cell', width: columnWidthMap.latestNav },
+        meta: { align: 'right', cellClassName: 'value-cell', width: columnWidthMap.latestNav }
       },
       {
         accessorKey: 'estimateNav',
@@ -1858,18 +2138,28 @@ export default function MobileFundTable({
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {estimateNav ?? '—'}
-                </FitText>
+                </span>
               </span>
               {hasEstimateNav && displayDate && displayDate !== '-' ? (
-                <span className="muted" style={{ fontSize: '10px' }}>{displayDate}</span>
+                <span className="muted" style={{ fontSize: '10px' }}>
+                  {displayDate}
+                </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'value-cell', width: columnWidthMap.estimateNav },
+        meta: { align: 'right', cellClassName: 'value-cell', width: columnWidthMap.estimateNav }
       },
       {
         accessorKey: 'yesterdayChangePercent',
@@ -1882,16 +2172,26 @@ export default function MobileFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {info.getValue() ?? '—'}
-                </FitText>
+                </span>
               </span>
-              <span className="muted" style={{ fontSize: '10px' }}>{displayDate}</span>
+              <span className="muted" style={{ fontSize: '10px' }}>
+                {displayDate}
+              </span>
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'change-cell', width: columnWidthMap.yesterdayChangePercent },
+        meta: { align: 'right', cellClassName: 'change-cell', width: columnWidthMap.yesterdayChangePercent }
       },
       {
         accessorKey: 'estimateChangePercent',
@@ -1907,18 +2207,28 @@ export default function MobileFundTable({
           const hasText = text != null && text !== '—';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {text ?? '—'}
-                </FitText>
+                </span>
               </span>
               {hasText && displayTime && displayTime !== '-' ? (
-                <span className="muted" style={{ fontSize: '10px' }}>{displayTime}</span>
+                <span className="muted" style={{ fontSize: '10px' }}>
+                  {displayTime}
+                </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'est-change-cell', width: columnWidthMap.estimateChangePercent },
+        meta: { align: 'right', cellClassName: 'est-change-cell', width: columnWidthMap.estimateChangePercent }
       },
       {
         accessorKey: 'sinceAddedChangePercent',
@@ -1933,20 +2243,32 @@ export default function MobileFundTable({
           const hasText = text != null && text !== '—';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {text ?? '—'}
-                </FitText>
+                </span>
               </span>
               {hasText && displayDate ? (
-                <span className="muted" title={rawDate && rawDate !== displayDate ? rawDate : undefined} style={{ fontSize: '10px' }}>
+                <span
+                  className="muted"
+                  style={{ fontSize: '10px' }}
+                  title={rawDate && rawDate !== displayDate ? rawDate : undefined}
+                >
                   {displayDate}
                 </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'since-added-cell', width: columnWidthMap.sinceAddedChangePercent },
+        meta: { align: 'right', cellClassName: 'since-added-cell', width: columnWidthMap.sinceAddedChangePercent }
       },
       {
         accessorKey: 'totalChangePercent',
@@ -1961,22 +2283,41 @@ export default function MobileFundTable({
 
           return (
             <div style={{ width: '100%' }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
-                </FitText>
+                </span>
               </span>
               {hasProfit && percentStr && !masked ? (
-                <span className={`${cls} estimate-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
-                  <FitText maxFontSize={11} minFontSize={9}>
+                <span
+                  className={`${cls} estimate-profit-percent`}
+                  style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}
+                >
+                  <span
+                    style={{
+                      fontSize: 'clamp(9px, 2.3vw, 11px)',
+                      display: 'block',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
                     {percentStr}
-                  </FitText>
+                  </span>
                 </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'total-change-cell', width: columnWidthMap.totalChangePercent },
+        meta: { align: 'right', cellClassName: 'total-change-cell', width: columnWidthMap.totalChangePercent }
       },
       {
         accessorKey: 'holdingDays',
@@ -1985,15 +2326,15 @@ export default function MobileFundTable({
           const original = info.row.original || {};
           const value = original.holdingDaysValue;
           if (value == null) {
-            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+            return (
+              <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>
+                —
+              </div>
+            );
           }
-          return (
-            <div style={{ fontWeight: 500, textAlign: 'right' }}>
-              {value}
-            </div>
-          );
+          return <div style={{ fontWeight: 700, textAlign: 'right' }}>{value}</div>;
         },
-        meta: { align: 'right', cellClassName: 'holding-days-cell', width: columnWidthMap.holdingDays ?? 64 },
+        meta: { align: 'right', cellClassName: 'holding-days-cell', width: columnWidthMap.holdingDays ?? 64 }
       },
       {
         accessorKey: 'todayProfit',
@@ -2007,22 +2348,41 @@ export default function MobileFundTable({
           const percentStr = original.todayProfitPercent ?? '';
           return (
             <div style={{ width: '100%' }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
-                </FitText>
+                </span>
               </span>
               {percentStr && !masked ? (
-                <span className={`${cls} today-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
-                  <FitText maxFontSize={11} minFontSize={9}>
+                <span
+                  className={`${cls} today-profit-percent`}
+                  style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}
+                >
+                  <span
+                    style={{
+                      fontSize: 'clamp(9px, 2.3vw, 11px)',
+                      display: 'block',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
                     {percentStr}
-                  </FitText>
+                  </span>
                 </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'profit-cell', width: columnWidthMap.todayProfit },
+        meta: { align: 'right', cellClassName: 'profit-cell', width: columnWidthMap.todayProfit }
       },
       {
         accessorKey: 'yesterdayProfit',
@@ -2035,27 +2395,45 @@ export default function MobileFundTable({
           const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
           const percentStr = original.yesterdayProfitPercent ?? '';
           const pctVal = original.yesterdaySecondLinePctValue;
-          const pctCls = pctVal != null && Number.isFinite(pctVal)
-            ? (pctVal > 0 ? 'up' : pctVal < 0 ? 'down' : '')
-            : 'muted';
+          const pctCls =
+            pctVal != null && Number.isFinite(pctVal) ? (pctVal > 0 ? 'up' : pctVal < 0 ? 'down' : '') : 'muted';
           return (
             <div style={{ width: '100%' }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {masked && hasProfit ? <span className="mask-text">******</span> : amountStr}
-                </FitText>
+                </span>
               </span>
               {percentStr && !masked ? (
-                <span className={`${pctCls} yesterday-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
-                  <FitText maxFontSize={11} minFontSize={9}>
+                <span
+                  className={`${pctCls} yesterday-profit-percent`}
+                  style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}
+                >
+                  <span
+                    style={{
+                      fontSize: 'clamp(9px, 2.3vw, 11px)',
+                      display: 'block',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
                     {percentStr}
-                  </FitText>
+                  </span>
                 </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'yesterday-profit-cell', width: columnWidthMap.yesterdayProfit ?? 80 },
+        meta: { align: 'right', cellClassName: 'yesterday-profit-cell', width: columnWidthMap.yesterdayProfit ?? 80 }
       },
       {
         accessorKey: 'holdingProfit',
@@ -2069,30 +2447,48 @@ export default function MobileFundTable({
           const percentStr = original.holdingProfitPercent ?? '';
           return (
             <div style={{ width: '100%' }}>
-              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 500 }}>
-                <FitText maxFontSize={14} minFontSize={10}>
+              <span className={cls} style={{ display: 'block', width: '100%', fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: 'clamp(10px, 3vw, 14px)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
                   {masked && hasTotal ? <span className="mask-text">******</span> : amountStr}
-                </FitText>
+                </span>
               </span>
               {percentStr && !masked ? (
-                <span className={`${cls} holding-profit-percent`} style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}>
-                  <FitText maxFontSize={11} minFontSize={9}>
+                <span
+                  className={`${cls} holding-profit-percent`}
+                  style={{ display: 'block', width: '100%', fontSize: '0.75em', opacity: 0.9, fontWeight: 500 }}
+                >
+                  <span
+                    style={{
+                      fontSize: 'clamp(9px, 2.3vw, 11px)',
+                      display: 'block',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
                     {percentStr}
-                  </FitText>
+                  </span>
                 </span>
               ) : null}
             </div>
           );
         },
-        meta: { align: 'right', cellClassName: 'holding-cell', width: columnWidthMap.holdingProfit },
-      },
+        meta: { align: 'right', cellClassName: 'holding-cell', width: columnWidthMap.holdingProfit }
+      }
     ],
     [
-      currentTab,
-      favorites,
       columnWidthMap,
       showFullFundName,
       getFundCardProps,
+      handleOpenCardSheet,
       sortBy,
       relatedSectorByCode,
       sectorQuoteByLabel,
@@ -2106,16 +2502,15 @@ export default function MobileFundTable({
       masked,
       onReorder,
       data,
-      selectableCodes,
       batchSelectableCount,
       setAllEditSelected,
-      onFundTagsClick,
+      onFundTagsClick
     ]
   );
 
   const tableColumnOrder = useMemo(
     () => (isEditMode ? ['fundName', EDIT_MOVE_TO_FRONT_COL, EDIT_DRAG_COL] : ['fundName', ...mobileColumnOrder]),
-    [isEditMode, mobileColumnOrder],
+    [isEditMode, mobileColumnOrder]
   );
 
   const tableColumnVisibility = useMemo(() => {
@@ -2127,7 +2522,7 @@ export default function MobileFundTable({
       fundName: true,
       [EDIT_MOVE_TO_FRONT_COL]: isEditMode,
       [EDIT_DRAG_COL]: isEditMode,
-      ...dataVis,
+      ...dataVis
     };
   }, [isEditMode, mobileColumnVisibility]);
 
@@ -2137,13 +2532,13 @@ export default function MobileFundTable({
     getCoreRowModel: getCoreRowModel(),
     state: {
       columnOrder: tableColumnOrder,
-      columnVisibility: tableColumnVisibility,
+      columnVisibility: tableColumnVisibility
     },
     onColumnOrderChange: (updater) => {
       if (isEditMode) return;
       const next = typeof updater === 'function' ? updater(['fundName', ...mobileColumnOrder]) : updater;
       const newNonFrozen = next.filter(
-        (id) => id !== 'fundName' && id !== EDIT_MOVE_TO_FRONT_COL && id !== EDIT_DRAG_COL,
+        (id) => id !== 'fundName' && id !== EDIT_MOVE_TO_FRONT_COL && id !== EDIT_DRAG_COL
       );
       if (newNonFrozen.length) {
         setMobileColumnOrder(newNonFrozen);
@@ -2159,12 +2554,12 @@ export default function MobileFundTable({
     },
     initialState: {
       columnPinning: {
-        left: ['fundName'],
-      },
+        left: ['fundName']
+      }
     },
     defaultColumn: {
-      cell: (info) => info.getValue() ?? '—',
-    },
+      cell: (info) => info.getValue() ?? '—'
+    }
   });
 
   const headerGroup = table.getHeaderGroups()[0];
@@ -2223,39 +2618,68 @@ export default function MobileFundTable({
     };
   }, []);
 
-  const mobileGridLayout = (() => {
+  const mobileGridLayout = useMemo(() => {
     if (!headerGroup?.headers?.length) return { gridTemplateColumns: '', minWidth: undefined };
     const gap = 12;
     const widths = headerGroup.headers.map((h) => h.column.columnDef.meta?.width ?? 80);
     if (widths.length > 0) widths[widths.length - 1] += LAST_COLUMN_EXTRA;
     return {
       gridTemplateColumns: widths.map((w) => `${w}px`).join(' '),
-      minWidth: widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * gap,
+      minWidth: widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * gap
     };
-  })();
+  }, [headerGroup?.headers, columnWidthMap]);
 
-  const getPinClass = (columnId, isHeader) => {
-    if (columnId === 'fundName') {
-      const baseClass = isHeader ? 'table-header-cell-pin-left' : 'table-cell-pin-left';
-      const scrolledClass = isScrolled ? 'is-scrolled' : '';
-      return `${baseClass} ${scrolledClass}`.trim();
-    }
-    return '';
-  };
+  const getPinClass = useCallback(
+    (columnId, isHeader) => {
+      if (columnId === 'fundName') {
+        const baseClass = isHeader ? 'table-header-cell-pin-left' : 'table-cell-pin-left';
+        const scrolledClass = isScrolled ? 'is-scrolled' : '';
+        return `${baseClass} ${scrolledClass}`.trim();
+      }
+      return '';
+    },
+    [isScrolled]
+  );
 
-  const getAlignClass = (columnId) => {
+  const getAlignClass = useCallback((columnId) => {
     if (columnId === 'fundName') return '';
     if (columnId === EDIT_MOVE_TO_FRONT_COL || columnId === EDIT_DRAG_COL) return 'text-center';
-    if (['latestNav', 'estimateNav', 'yesterdayChangePercent', 'estimateChangePercent', 'sinceAddedChangePercent', 'totalChangePercent', 'holdingDays', 'todayProfit', 'yesterdayProfit', 'holdingProfit', 'holdingCost', 'costNav', 'period1w', 'period1m', 'period3m', 'period6m', 'period1y', 'tags'].includes(columnId)) return 'text-right';
+    if (
+      [
+        'latestNav',
+        'estimateNav',
+        'yesterdayChangePercent',
+        'estimateChangePercent',
+        'sinceAddedChangePercent',
+        'totalChangePercent',
+        'holdingDays',
+        'todayProfit',
+        'yesterdayProfit',
+        'holdingProfit',
+        'holdingCost',
+        'costNav',
+        'period1w',
+        'period1m',
+        'period3m',
+        'period6m',
+        'period1y',
+        'tags'
+      ].includes(columnId)
+    )
+      return 'text-right';
     return 'text-right';
-  };
+  }, []);
 
-  const renderTableHeader = ()=>{
-    if(!headerGroup) return null;
+  const renderTableHeader = () => {
+    if (!headerGroup) return null;
     return (
       <div
         className="table-header-row mobile-fund-table-header"
-        style={mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : undefined}
+        style={
+          mobileGridLayout.gridTemplateColumns
+            ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns }
+            : undefined
+        }
       >
         {headerGroup.headers.map((header, headerIndex) => {
           const columnId = header.column.id;
@@ -2265,26 +2689,27 @@ export default function MobileFundTable({
 
           // 匹配排序状态
           const sortMap = {
-            'fundName': 'name',
-            'tags': 'tags',
-            'yesterdayChangePercent': 'yesterdayIncrease',
-            'estimateChangePercent': 'yield',
-            'totalChangePercent': 'estimateProfit',
-            'holdingAmount': 'holdingAmount',
-            'todayProfit': 'todayProfit',
-            'yesterdayProfit': 'yesterdayProfit',
-            'holdingProfit': 'holding',
-            'holdingDays': 'holdingDays',
-            'holdingCost': 'holdingCost',
-            'period1w': 'last1Week',
-            'period1m': 'last1Month',
-            'period3m': 'last3Months',
-            'period6m': 'last6Months',
-            'period1y': 'last1Year'
+            fundName: 'name',
+            tags: 'tags',
+            yesterdayChangePercent: 'yesterdayIncrease',
+            estimateChangePercent: 'yield',
+            totalChangePercent: 'estimateProfit',
+            holdingAmount: 'holdingAmount',
+            todayProfit: 'todayProfit',
+            yesterdayProfit: 'yesterdayProfit',
+            holdingProfit: 'holding',
+            holdingDays: 'holdingDays',
+            holdingCost: 'holdingCost',
+            sinceAddedChangePercent: 'sinceAddedChangePercent',
+            period1w: 'last1Week',
+            period1m: 'last1Month',
+            period3m: 'last3Months',
+            period6m: 'last6Months',
+            period1y: 'last1Year'
           };
           const sortKey = sortMap[columnId];
           const isSorted = sortBy && sortKey === sortBy;
-          let isSortEnabled = sortKey && sortRules.find(r => r.id === sortKey)?.enabled;
+          let isSortEnabled = sortKey && sortRules.find((r) => r.id === sortKey)?.enabled;
 
           // 选择默认排序的时候，隐藏基金名称表头的排序和箭头
           if (sortBy === 'default' && sortKey === 'name') {
@@ -2306,16 +2731,20 @@ export default function MobileFundTable({
                 }
               }}
             >
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-                justifyContent: alignClass.includes('text-center') ? 'center' : alignClass.includes('text-right') ? 'flex-end' : 'flex-start',
-                width: '100%'
-              }}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(header.column.columnDef.header, header.getContext())}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  justifyContent: alignClass.includes('text-center')
+                    ? 'center'
+                    : alignClass.includes('text-right')
+                      ? 'flex-end'
+                      : 'flex-start',
+                  width: '100%'
+                }}
+              >
+                {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                 {isSortEnabled && (
                   <span
                     style={{
@@ -2335,8 +2764,8 @@ export default function MobileFundTable({
           );
         })}
       </div>
-    )
-  }
+    );
+  };
 
   const renderMobileRow = (row, index) => (
     <div
@@ -2349,12 +2778,12 @@ export default function MobileFundTable({
         userSelect: 'none',
         WebkitTouchCallout: 'none',
         touchAction: isEditMode ? 'auto' : 'pan-x pan-y',
-        ...(mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : {}),
+        ...(mobileGridLayout.gridTemplateColumns ? { gridTemplateColumns: mobileGridLayout.gridTemplateColumns } : {})
       }}
       onContextMenu={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
       onPointerDown={(e) => {
-        if (sortBy !== 'default' || isEditMode) return;
+        if (isEditMode) return;
         if (e.button !== 0 && e.pointerType === 'mouse') return;
         const c = row.original?.code;
         if (!c) return;
@@ -2366,7 +2795,9 @@ export default function MobileFundTable({
           try {
             const sel = typeof window !== 'undefined' && window.getSelection?.();
             if (sel?.removeAllRanges) sel.removeAllRanges();
-          } catch { /* empty */ }
+          } catch {
+            /* empty */
+          }
           setIsEditMode(true);
           const linked = !!row.original?.isHoldingLinked;
           setEditSelectedCodes(linked ? new Set() : new Set([c]));
@@ -2387,20 +2818,16 @@ export default function MobileFundTable({
         const alignClass = getAlignClass(columnId);
         const cellClassName = cell.column.columnDef.meta?.cellClassName || '';
         const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
-        const style = isLastColumn ? {paddingRight: LAST_COLUMN_EXTRA} : {};
-        if (cellIndex  === 0) {
+        const style = isLastColumn ? { paddingRight: LAST_COLUMN_EXTRA } : {};
+        if (cellIndex === 0) {
           if (index % 2 !== 0) {
             style.background = 'var(--table-row-alt-bg)';
-          }else {
+          } else {
             style.background = 'var(--bg)';
           }
         }
         return (
-          <div
-            key={cell.id}
-            className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`}
-            style={style}
-          >
+          <div key={cell.id} className={`table-cell ${alignClass} ${cellClassName} ${pinClass}`} style={style}>
             {flexRender(cell.column.columnDef.cell, cell.getContext())}
           </div>
         );
@@ -2411,7 +2838,11 @@ export default function MobileFundTable({
   const renderContent = (onlyShowHeader) => {
     if (onlyShowHeader) {
       return (
-        <div style={{position: 'fixed', top: effectiveStickyTop}} className="mobile-fund-table mobile-fund-table-portal-header" ref={portalHeaderRef}>
+        <div
+          style={{ position: 'fixed', top: effectiveStickyTop }}
+          className="mobile-fund-table mobile-fund-table-portal-header"
+          ref={portalHeaderRef}
+        >
           <div
             className="mobile-fund-table-scroll"
             style={mobileGridLayout.minWidth != null ? { minWidth: mobileGridLayout.minWidth } : undefined}
@@ -2441,19 +2872,37 @@ export default function MobileFundTable({
               dropAnimation={null}
               autoScroll={false}
             >
-              <SortableContext
-                items={data.map((item) => item.code)}
-                strategy={verticalListSortingStrategy}
-              >
+              <SortableContext items={data.map((item) => item.code)} strategy={verticalListSortingStrategy}>
                 <AnimatePresence>
                   {tableRows.map((row, index) => (
-                    <SortableRow
+                    <MemoizedMobileTableRow
                       key={row.original.code || row.id}
                       row={row}
-                      disabled={sortBy !== 'default' || !isEditMode}
-                    >
-                      {() => renderMobileRow(row, index)}
-                    </SortableRow>
+                      index={index}
+                      sortBy={sortBy}
+                      isEditMode={isEditMode}
+                      mobileGridLayout={mobileGridLayout}
+                      isFavorites={favorites?.has?.(row.original.code)}
+                      isSelected={editSelectedCodes?.has?.(row.original.code)}
+                      masked={masked}
+                      periodReturns={periodReturnsByCode[row.original.code]}
+                      relatedSector={relatedSectorByCode[row.original.code]}
+                      sectorQuote={
+                        relatedSectorByCode[row.original.code]
+                          ? sectorQuoteByLabel[String(relatedSectorByCode[row.original.code]).trim()]
+                          : null
+                      }
+                      fundExtraData={fundExtraDataByCode[row.original.code]}
+                      tableColumnOrder={tableColumnOrder}
+                      tableColumnVisibility={tableColumnVisibility}
+                      getPinClass={getPinClass}
+                      getAlignClass={getAlignClass}
+                      LAST_COLUMN_EXTRA={LAST_COLUMN_EXTRA}
+                      editLongPressRef={editLongPressRef}
+                      clearEditLongPressTimer={clearEditLongPressTimer}
+                      setIsEditMode={setIsEditMode}
+                      setEditSelectedCodes={setEditSelectedCodes}
+                    />
                   ))}
                 </AnimatePresence>
               </SortableContext>
@@ -2492,19 +2941,23 @@ export default function MobileFundTable({
           />
         )}
 
-        {syncSuccessOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
-          <SuccessModal
-            message="同步成功"
-            onClose={() => setSyncSuccessOpen(false)}
-            overlayStyle={{ zIndex: 10004 }}
-            cardStyle={{ maxWidth: '420px', width: '90vw', zIndex: 10005 }}
-          />,
-          document.body,
-        )}
+        {syncSuccessOpen &&
+          typeof document !== 'undefined' &&
+          ReactDOM.createPortal(
+            <SuccessModal
+              message="同步成功"
+              onClose={() => setSyncSuccessOpen(false)}
+              overlayStyle={{ zIndex: 10004 }}
+              cardStyle={{ maxWidth: '420px', width: '90vw', zIndex: 10005 }}
+            />,
+            document.body
+          )}
 
         <MobileFundCardDrawer
           open={!!(cardSheetRow && getFundCardProps)}
-          onOpenChange={(open) => { if (!open) setCardSheetRow(null); }}
+          onOpenChange={(open) => {
+            if (!open) setCardSheetRow(null);
+          }}
           blockDrawerClose={blockDrawerClose || moveGroupOpen}
           ignoreNextDrawerCloseRef={ignoreNextDrawerCloseRef}
           cardSheetRow={cardSheetRow}
@@ -2533,9 +2986,5 @@ export default function MobileFundTable({
     );
   };
 
-  return (
-    <>
-      {renderContent()}
-    </>
-  );
+  return <>{renderContent()}</>;
 }

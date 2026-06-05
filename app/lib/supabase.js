@@ -5,58 +5,56 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 const createNoopChannel = () => {
-    const channel = {
-        on: () => channel,
-        subscribe: () => channel
-    };
-    return channel;
+  const channel = {
+    on: () => channel,
+    subscribe: () => channel
+  };
+  return channel;
 };
 
 const createNoopTable = () => {
-    return {
-        select: () => ({
-            eq: () => ({
-                maybeSingle: async () => ({ data: null, error: { message: 'Supabase not configured' } })
-            })
-        }),
-        insert: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-        upsert: () => ({
-            select: async () => ({ data: null, error: { message: 'Supabase not configured' } })
-        })
-    };
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: async () => ({ data: null, error: { message: 'Supabase not configured' } })
+      })
+    }),
+    insert: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+    upsert: () => ({
+      select: async () => ({ data: null, error: { message: 'Supabase not configured' } })
+    })
+  };
 };
 
 const createNoopSupabase = () => ({
-    auth: {
-        getSession: async () => ({ data: { session: null }, error: null }),
-        onAuthStateChange: () => ({
-            data: { subscription: { unsubscribe: () => { } } }
-        }),
-        signInWithOtp: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-        signInWithOAuth: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-        verifyOtp: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
-        signOut: async () => ({ error: null })
-    },
-    from: () => createNoopTable(),
-    channel: () => createNoopChannel(),
-    removeChannel: () => { },
-    rpc: async () => ({ data: null, error: { message: 'Supabase not configured' } })
+  auth: {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    onAuthStateChange: () => ({
+      data: { subscription: { unsubscribe: () => {} } }
+    }),
+    signInWithOtp: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+    signInWithOAuth: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+    verifyOtp: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+    signOut: async () => ({ error: null })
+  },
+  from: () => createNoopTable(),
+  channel: () => createNoopChannel(),
+  removeChannel: () => {},
+  rpc: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+  functions: {
+    invoke: async () => ({ data: null, error: { message: 'Supabase not configured' } })
+  }
 });
 
-export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
         // 启用自动刷新 token
         autoRefreshToken: true,
         // 持久化 session 到 localStorage
         persistSession: true,
         // 检测 URL 中的 session（用于邮箱验证回调）
-        detectSessionInUrl: true,
-        // 使用自定义存储键，避免与其他应用冲突
-        storageKey: 'fund_supabase_auth_token',
-        // 增加存储检查间隔（毫秒）
-        storageOptions: {
-            // 每次检查 session 的间隔
-            checkInterval: 60000 // 60秒
-        }
-    }
-}) : createNoopSupabase();
+        detectSessionInUrl: true
+      }
+    })
+  : createNoopSupabase();

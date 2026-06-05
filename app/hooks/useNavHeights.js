@@ -54,7 +54,6 @@ export function useNavHeights({ groups, currentTab }) {
     navbarRef,
     filterBarRef,
     navbarHeight,
-    filterBarHeight,
+    filterBarHeight
   };
 }
-

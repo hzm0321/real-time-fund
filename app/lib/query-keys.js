@@ -23,3 +23,6 @@ export const fundHistory = (code, range) => ['fundHistory', String(code).trim(),
 export const fundSearch = (val) => ['fundSearch', String(val).trim()];
 
 export const eastmoneyFundcodeSearchList = () => ['eastmoneyFundcodeSearchList'];
+
+/** @param {string} fundCode @param {string} dateStr */
+export const ocrFundChart = (fundCode, dateStr) => ['ocrFundChart', String(fundCode).trim(), dateStr];

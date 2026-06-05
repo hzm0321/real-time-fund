@@ -85,3 +85,6 @@ fabric.properties
 .DS_Store
 .idea/*
 .husky/_/
+
+# Sentry Config File
+.env.sentry-build-plugin

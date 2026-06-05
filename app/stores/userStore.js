@@ -10,7 +10,7 @@ export const useUserStore = create((set) => ({
   /** @param {import('@supabase/supabase-js').User | null} next */
   setUser: (next) => set({ user: next }),
 
-  clearUser: () => set({ user: null }),
+  clearUser: () => set({ user: null })
 }));
 
 /** 在非 React 代码（如异步回调）中读取当前用户 */

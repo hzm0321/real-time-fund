@@ -4,18 +4,11 @@ import { useEffect, useMemo, useRef } from 'react';
 
 function isTouchDevice() {
   if (typeof window === 'undefined') return false;
-  return (
-    ('ontouchstart' in window) ||
-    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0)
-  );
+  return 'ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
 }
 
 function supportsWakeLock() {
-  return (
-    typeof navigator !== 'undefined' &&
-    !!navigator.wakeLock &&
-    typeof navigator.wakeLock.request === 'function'
-  );
+  return typeof navigator !== 'undefined' && !!navigator.wakeLock && typeof navigator.wakeLock.request === 'function';
 }
 
 /**
@@ -153,4 +146,3 @@ export default function KeepScreenAwake() {
 
   return null;
 }
-

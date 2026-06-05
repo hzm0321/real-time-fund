@@ -3,11 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { CloseIcon } from './Icons';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function SelectFundSingleModal({
   title = '选择基金',
@@ -15,7 +11,7 @@ export default function SelectFundSingleModal({
   excludeCodes = [],
   initialSelectedCode = '',
   onClose,
-  onConfirm,
+  onConfirm
 }) {
   const [selectedCode, setSelectedCode] = useState(initialSelectedCode || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,12 +19,11 @@ export default function SelectFundSingleModal({
   const availableFunds = useMemo(() => {
     const excluded = new Set((excludeCodes || []).filter(Boolean));
     const base = (allFunds || []).filter((f) => f?.code && !excluded.has(f.code));
-    const query = String(searchQuery ?? '').trim().toLowerCase();
+    const query = String(searchQuery ?? '')
+      .trim()
+      .toLowerCase();
     if (!query) return base;
-    return base.filter((f) =>
-      (f.name && f.name.toLowerCase().includes(query)) ||
-      (f.code && f.code.includes(query))
-    );
+    return base.filter((f) => (f.name && f.name.toLowerCase().includes(query)) || (f.code && f.code.includes(query)));
   }, [allFunds, excludeCodes, searchQuery]);
 
   const handleOpenChange = (open) => {
@@ -67,7 +62,7 @@ export default function SelectFundSingleModal({
               left: 12,
               top: '50%',
               transform: 'translateY(-50%)',
-              pointerEvents: 'none',
+              pointerEvents: 'none'
             }}
           />
           <input
@@ -78,7 +73,7 @@ export default function SelectFundSingleModal({
             placeholder="搜索基金名称或编号"
             style={{
               width: '100%',
-              paddingLeft: 36,
+              paddingLeft: 36
             }}
           />
         </div>
@@ -88,7 +83,7 @@ export default function SelectFundSingleModal({
           style={{
             maxHeight: '50vh',
             overflowY: 'auto',
-            paddingRight: '4px',
+            paddingRight: '4px'
           }}
         >
           {availableFunds.length === 0 ? (
@@ -111,7 +106,9 @@ export default function SelectFundSingleModal({
                     </div>
                     <div className="fund-info" style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600 }}>{fund.name}</div>
-                      <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
+                      <div
+                        style={{ fontSize: '12px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}
+                      >
                         <span className="muted">#{fund.code}</span>
                       </div>
                     </div>
@@ -149,4 +146,3 @@ export default function SelectFundSingleModal({
     </Dialog>
   );
 }
-

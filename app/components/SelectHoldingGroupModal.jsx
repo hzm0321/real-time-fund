@@ -2,19 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { CloseIcon } from './Icons';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
-export default function SelectHoldingGroupModal({
-  fund,
-  groups = [],
-  groupHoldings = {},
-  onClose,
-  onNext,
-}) {
+export default function SelectHoldingGroupModal({ fund, groups = [], groupHoldings = {}, onClose, onNext }) {
   const availableGroups = useMemo(() => {
     const code = fund?.code;
     if (!code) return [];
@@ -53,8 +43,12 @@ export default function SelectHoldingGroupModal({
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
-          <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>{fund?.name}</div>
-          <div className="muted" style={{ fontSize: '12px' }}>#{fund?.code}</div>
+          <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>
+            {fund?.name}
+          </div>
+          <div className="muted" style={{ fontSize: '12px' }}>
+            #{fund?.code}
+          </div>
         </div>
 
         <div
@@ -62,7 +56,7 @@ export default function SelectHoldingGroupModal({
           style={{
             maxHeight: '46vh',
             overflowY: 'auto',
-            paddingRight: '4px',
+            paddingRight: '4px'
           }}
         >
           {availableGroups.length === 0 ? (

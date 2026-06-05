@@ -4,9 +4,9 @@ import { useSyncExternalStore } from 'react';
 function subscribe(callback) {
   // 只在浏览器环境下执行
   if (typeof window === 'undefined') return () => {};
-  
+
   const mediaQuery = window.matchMedia('(max-width: 640px)');
-  
+
   // 兼容旧版 Safari 的 listener 写法
   if (mediaQuery.addEventListener) {
     mediaQuery.addEventListener('change', callback);

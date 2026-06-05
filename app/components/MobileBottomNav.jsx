@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, LayoutGroup, useReducedMotion, AnimatePresence } from 'framer-motion';
-import { Home, User } from 'lucide-react';
+import { Home, User, TrendingUp } from 'lucide-react';
 
 const TABS = [
   { id: 'home', label: '首页', Icon: Home },
-  { id: 'mine', label: '我的', Icon: User },
+  { id: 'market', label: '行情', Icon: TrendingUp },
+  { id: 'mine', label: '我的', Icon: User }
 ];
 
 export default function MobileBottomNav({ value, onChange, hidden }) {
@@ -18,29 +19,21 @@ export default function MobileBottomNav({ value, onChange, hidden }) {
 
   if (!mounted || typeof document === 'undefined') return null;
 
-  const spring = reduceMotion
-    ? { duration: 0.2 }
-    : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 };
+  const spring = reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 };
 
-  const tapSpring = reduceMotion
-    ? { duration: 0.15 }
-    : { type: 'spring', stiffness: 600, damping: 32 };
+  const tapSpring = reduceMotion ? { duration: 0.15 } : { type: 'spring', stiffness: 600, damping: 32 };
 
   const slideVariants = {
     visible: {
       y: 0,
       opacity: 1,
-      transition: reduceMotion
-        ? { duration: 0.2 }
-        : { type: 'spring', stiffness: 300, damping: 30 },
+      transition: reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 300, damping: 30 }
     },
     hidden: {
       y: '120%',
       opacity: 0,
-      transition: reduceMotion
-        ? { duration: 0.2 }
-        : { type: 'spring', stiffness: 300, damping: 30 },
-    },
+      transition: reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 300, damping: 30 }
+    }
   };
 
   const node = (
@@ -76,17 +69,13 @@ export default function MobileBottomNav({ value, onChange, hidden }) {
                       )}
                       <span className="mobile-bottom-nav-tab-inner">
                         <span className="mobile-bottom-nav-icon-wrap">
-                          <Icon
-                            className="mobile-bottom-nav-icon"
-                            aria-hidden
-                            strokeWidth={2}
-                          />
+                          <Icon className="mobile-bottom-nav-icon" aria-hidden strokeWidth={2} />
                         </span>
                         <motion.span
                           className="mobile-bottom-nav-label"
                           animate={{
                             opacity: active ? 1 : 0.5,
-                            fontWeight: active ? 600 : 500,
+                            fontWeight: active ? 600 : 500
                           }}
                           transition={tapSpring}
                         >

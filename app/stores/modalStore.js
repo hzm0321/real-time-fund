@@ -10,6 +10,7 @@ const DEFAULTS = {
   actionModal: { open: false, fundCode: null, groupId: undefined },
   tradeModal: { open: false, fundCode: null, type: 'buy', groupId: undefined },
   convertModal: { open: false, fundCode: null, groupId: undefined },
+  dividendMethodModal: { open: false, fundCode: null, groupId: undefined },
   selectFundSingleModal: { open: false, excludeCodes: [], initialSelectedCode: '', _nonce: null },
   selectHoldingGroupModal: { open: false, fundCode: null },
   dataSourceModal: { open: false, fundCode: null },
@@ -20,7 +21,7 @@ const DEFAULTS = {
   holdingMigrateDialog: { open: false, code: null, name: '', targetGroupId: null },
   cloudConfigModal: { open: false, userId: null, type: null, cloudData: null },
   deviceConflictModal: { open: false, message: '', userId: null, payload: null, isPartial: false },
-  successModal: { open: false, message: '' },
+  successModal: { open: false, message: '' }
 };
 
 export const useModalStore = create((set, get) => ({
@@ -40,6 +41,10 @@ export const useModalStore = create((set, get) => ({
   mobileFundDrawerOpen: false,
   portfolioEarningsOpen: false,
   sortSettingOpen: false,
+  allSectorsModalOpen: false,
+  allSectorsFilter: 'industry',
+  allSectorsSort: 'change_pct',
+  allSectorsSortOrder: 'desc',
 
   // ---- Group modals ----
   groupModalOpen: false,
@@ -51,6 +56,7 @@ export const useModalStore = create((set, get) => ({
   actionModal: { ...DEFAULTS.actionModal },
   tradeModal: { ...DEFAULTS.tradeModal },
   convertModal: { ...DEFAULTS.convertModal },
+  dividendMethodModal: { ...DEFAULTS.dividendMethodModal },
   selectFundSingleModal: { ...DEFAULTS.selectFundSingleModal },
   selectHoldingGroupModal: { ...DEFAULTS.selectHoldingGroupModal },
   dataSourceModal: { ...DEFAULTS.dataSourceModal },
@@ -107,6 +113,8 @@ export const useModalStore = create((set, get) => ({
       set({ ...base, dcaModal: { open: true, fundCode, groupId } });
     } else if (type === 'convert') {
       set({ ...base, convertModal: { open: true, fundCode, groupId } });
+    } else if (type === 'dividend') {
+      set({ ...base, dividendMethodModal: { open: true, fundCode, groupId } });
     }
   },
 
@@ -123,8 +131,8 @@ export const useModalStore = create((set, get) => ({
           open: true,
           excludeCodes: excludeCodes || [],
           initialSelectedCode: initialSelectedCode || '',
-          _nonce: nonce,
-        },
+          _nonce: nonce
+        }
       });
     });
   },
@@ -141,7 +149,7 @@ export const useModalStore = create((set, get) => ({
       }
     }
     set({ selectFundSingleModal: { ...DEFAULTS.selectFundSingleModal } });
-  },
+  }
 }));
 
 // ---- Non-React accessor for use in callbacks ----
@@ -162,6 +170,7 @@ const selectIsAnyModalOpen = (s) =>
   s.mobileFundDrawerOpen ||
   s.portfolioEarningsOpen ||
   s.sortSettingOpen ||
+  s.allSectorsModalOpen ||
   s.groupModalOpen ||
   s.groupManageOpen ||
   s.addFundToGroupOpen ||
@@ -169,6 +178,7 @@ const selectIsAnyModalOpen = (s) =>
   s.actionModal.open ||
   s.tradeModal.open ||
   s.convertModal.open ||
+  s.dividendMethodModal.open ||
   s.selectFundSingleModal.open ||
   s.selectHoldingGroupModal.open ||
   s.dataSourceModal.open ||

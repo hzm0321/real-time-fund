@@ -39,7 +39,7 @@ export default function GroupModal({ onClose, onConfirm }) {
               <input
                 id="group-modal-name"
                 className={cn(
-                  'flex h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--input)] px-3.5 py-2 text-sm text-[var(--foreground)] outline-none',
+                  'flex h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--input)] px-3.5 py-2 text-base text-[var(--foreground)] outline-none',
                   'placeholder:text-[var(--muted-foreground)]',
                   'transition-colors duration-200 focus:border-[var(--ring)] focus:ring-2 focus:ring-[var(--ring)]/20 focus:ring-offset-2 focus:ring-offset-[var(--card)]',
                   'disabled:cursor-not-allowed disabled:opacity-50'

@@ -53,7 +53,6 @@ export function useTradingDay() {
     // 每30分钟检查一次
     const timer = setInterval(checkTradingDay, 60000 * 30);
     return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { isTradingDay };

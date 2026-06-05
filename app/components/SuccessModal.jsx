@@ -38,9 +38,9 @@ export default function SuccessModal({ message, onClose, overlayStyle, cardStyle
               e.stopPropagation();
               onClose();
             }}
-            style={{ 
-              marginTop: 24, 
-              width: '100%', 
+            style={{
+              marginTop: 24,
+              width: '100%',
               pointerEvents: 'auto',
               display: 'flex',
               alignItems: 'center',

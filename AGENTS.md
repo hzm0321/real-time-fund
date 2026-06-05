@@ -41,28 +41,28 @@ real-time-fund/
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-|------|----------|-------|
-| Fund valuation logic | `app/api/fund.js` | JSONP to 天天基金, script injection to 腾讯财经 |
-| Main UI orchestration | `app/page.jsx` | Monolithic — all useState, business logic, rendering |
-| Modal rendering layer | `app/components/ModalsLayer.jsx` | All modal rendering extracted from page.jsx |
-| Fund card display | `app/components/FundCard.jsx` | Individual fund card with holdings |
-| Desktop table | `app/components/PcFundTable.jsx` | PC-specific table layout |
-| Mobile table | `app/components/MobileFundTable.jsx` | Mobile-specific layout, swipe actions |
-| Holding calculations | `app/page.jsx` (getHoldingProfit) | Profit/loss computation |
-| Cloud sync | `app/lib/supabase.js` + page.jsx sync functions | Supabase auth + data sync |
-| Trading/DCA | `app/components/TradeModal.jsx`, `DcaModal.jsx` | Buy/sell, dollar-cost averaging |
-| Fund fuzzy search | `app/hooks/useFundFuzzyMatcher.js` | Fuse.js based name/code matching |
-| OCR import | `app/page.jsx` (processFiles) | Tesseract.js + LLM parsing |
-| Valuation intraday chart | `app/lib/valuationTimeseries.js` | localStorage time-series |
-| Trading calendar | `app/lib/tradingCalendar.js` | Chinese holiday detection via CDN |
-| Request caching | TanStack Query (`app/lib/get-query-client.js`, `app/lib/query-keys.js`) | Dedup + staleTime/gcTime |
-| UI primitives | `components/ui/` | shadcn/ui — accordion, dialog, drawer, select, etc. |
-| Global styles | `app/globals.css` | CSS variables, glassmorphism, responsive |
-| CI/CD | `.github/workflows/nextjs.yml` | Build + deploy to GitHub Pages |
-| Docker | `Dockerfile`, `docker-compose.yml` | Multi-stage build with runtime env injection |
-| localStorage schema | `doc/localStorage 数据结构.md` | Full documentation of stored data shapes |
-| Supabase schema | `doc/supabase.sql` | Database tables for cloud sync |
+| Task                     | Location                                                                | Notes                                                |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------- |
+| Fund valuation logic     | `app/api/fund.js`                                                       | JSONP to 天天基金, script injection to 腾讯财经      |
+| Main UI orchestration    | `app/page.jsx`                                                          | Monolithic — all useState, business logic, rendering |
+| Modal rendering layer    | `app/components/ModalsLayer.jsx`                                        | All modal rendering extracted from page.jsx          |
+| Fund card display        | `app/components/FundCard.jsx`                                           | Individual fund card with holdings                   |
+| Desktop table            | `app/components/PcFundTable.jsx`                                        | PC-specific table layout                             |
+| Mobile table             | `app/components/MobileFundTable.jsx`                                    | Mobile-specific layout, swipe actions                |
+| Holding calculations     | `app/page.jsx` (getHoldingProfit)                                       | Profit/loss computation                              |
+| Cloud sync               | `app/lib/supabase.js` + page.jsx sync functions                         | Supabase auth + data sync                            |
+| Trading/DCA              | `app/components/TradeModal.jsx`, `DcaModal.jsx`                         | Buy/sell, dollar-cost averaging                      |
+| Fund fuzzy search        | `app/hooks/useFundFuzzyMatcher.js`                                      | Fuse.js based name/code matching                     |
+| OCR import               | `app/page.jsx` (processFiles)                                           | Tesseract.js + LLM parsing                           |
+| Valuation intraday chart | `app/lib/valuationTimeseries.js`                                        | localStorage time-series                             |
+| Trading calendar         | `app/lib/tradingCalendar.js`                                            | Chinese holiday detection via CDN                    |
+| Request caching          | TanStack Query (`app/lib/get-query-client.js`, `app/lib/query-keys.js`) | Dedup + staleTime/gcTime                             |
+| UI primitives            | `components/ui/`                                                        | shadcn/ui — accordion, dialog, drawer, select, etc.  |
+| Global styles            | `app/globals.css`                                                       | CSS variables, glassmorphism, responsive             |
+| CI/CD                    | `.github/workflows/nextjs.yml`                                          | Build + deploy to GitHub Pages                       |
+| Docker                   | `Dockerfile`, `docker-compose.yml`                                      | Multi-stage build with runtime env injection         |
+| localStorage schema      | `doc/localStorage 数据结构.md`                                          | Full documentation of stored data shapes             |
+| Supabase schema          | `doc/supabase.sql`                                                      | Database tables for cloud sync                       |
 
 ## CONVENTIONS
 
@@ -137,3 +137,56 @@ cp env.example .env.local   # Copy template, fill NEXT_PUBLIC_* values
 - **Node requirement**: >= 20.9.0 (enforced in package.json engines).
 - **License**: AGPL-3.0 — derivative works must be open-sourced under same license.
 - **Chinese UI** — all user-facing text is Chinese (zh-CN). README is bilingual (Chinese primary).
+
+---
+
+### 2026-06-05 - sector-fund-flow-sync Edge Function TCP 超时优化方案实施
+
+- **新增文件**：`.trae/documents/sector-fund-flow-sync-optimization-plan.md`（优化方案文档）
+- **修改文件**：
+  - `app/lib/sectorFundFlowSync.js`（P1: 批量查询涨跌幅、P2: secid 去重、P3: 请求超时+重试）
+  - `app/page.jsx`（P0: 在 useEffect 中集成 SectorFundFlowSync 启动，页面挂载即开始每 5 分钟后台同步）
+- **关键决策**：同步主体从 Edge Function 迁移到浏览器端，彻底规避 60s 超时限制。涨跌幅查询改用批量 API（一次查 50 个 secid），请求量从 ~1964 次降至 ~1000 次。secid 去重避免重复请求。对 fetch 加 10s 超时和 1 次重试提升可靠性。
+- **未完成**：如果需要无人打开页面时也保持数据同步，需实施 P5（分片执行 + 状态管理），依赖 Supabase 项目的 Edge Function 超时上限配置。
+- **AI 指令记录**：
+  - "/plan sector-fund-flow-sync Edge Function TCP 超时原因 这个有哪些好的优化方案"
+  - "总结一下，当前什么时候会触发同步啊，而且也计算下大概一个月消耗多少啊"
+  - "代码执行流程是什么啊。切回 market 时立即刷新数据，此时market 页面不会卡顿嘛？我想要体验感流畅"
+  - "Use Skill: conversation-handoff"
+
+---
+
+## SUPABASE EDGE FUNCTIONS
+
+所有 Edge Function 源码统一存放在 `supabase/functions/` 目录下，每个函数一个子目录。
+
+| Function                 | 路径                                                 | 用途                                             | 鉴权                     |
+| ------------------------ | ---------------------------------------------------- | ------------------------------------------------ | ------------------------ |
+| `analyze-fund`           | `supabase/functions/analyze-fund/index.ts`           | OCR 基金持仓解析（调用 AINX AI）                 | JWT 用户鉴权             |
+| `fund-valuation-ranking` | `supabase/functions/fund-valuation-ranking/index.ts` | 天天基金估值排行代理                             | JWT 用户鉴权             |
+| `sector-fund-flow-sync`  | `supabase/functions/sector-fund-flow-sync/index.ts`  | 板块资金流向定时同步（已停用，改用浏览器端同步） | service_role（无需 JWT） |
+
+### 部署方式
+
+- **analyze-fund** / **fund-valuation-ranking**：Supabase 控制台 → Edge Functions → Via Editor 粘贴代码
+- **sector-fund-flow-sync**：Supabase CLI `supabase functions deploy sector-fund-flow-sync --no-verify-jwt`
+
+---
+
+### 2026-06-05 - 修复热门板块涨跌幅 0.00% bug + sector_id 字段写入，Edge Functions 迁移到 supabase/functions/
+
+- **新增文件**：`supabase/functions/analyze-fund/index.ts`（从 doc/edgeFunction/ 迁移）
+- **修改文件**：
+  - `app/lib/sectorFundFlowSync.js`（修复 fetchSectorQuotesBatch 中 f12→secid 拼接；插入时添加 sector_id 字段）
+  - `doc/supabase.sql`（fund_topic 表添加 sector_id 列定义）
+  - `doc/edgeFunction/`（删除，函数迁移到 `supabase/functions/` 目录）
+- **关键决策**：
+  - 批量 API 返回 f12 为板块代码（如 "BK1128"）而非完整 secid，需用 f13.f12 拼接（如 "90.BK1128"）才能正确匹配
+  - 同步数据时写入 sector_id 字段
+- **未完成**：无
+- **AI 指令记录**：
+  - "为什么跌涨幅都为0.00%啊。分析一下代码"
+  - "表fund_topic中sector_id字段也要存入数据啊"
+  - "D:\CODE\real-time-fund\doc 里面的函数都删除。函数都是记录在D:\CODE\real-time-fund\supabase\functions目录下"
+
+---

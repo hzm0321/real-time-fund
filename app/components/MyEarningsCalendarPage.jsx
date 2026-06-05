@@ -8,23 +8,12 @@ import 'dayjs/locale/zh-cn';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Calendar, CalendarDayButton } from '@/components/ui/calendar';
 import { zhCN } from 'date-fns/locale/zh-CN';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { CloseIcon } from './Icons';
 import FitText from './FitText';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 dayjs.locale('zh-cn');
 
@@ -46,7 +35,7 @@ function earningsClass(v) {
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-export default function MyEarningsCalendarPage({open, onOpenChange, series = [], masked, onGoHome}) {
+export default function MyEarningsCalendarPage({ open, onOpenChange, series = [], masked, onGoHome }) {
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
 
@@ -137,11 +126,7 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
   const yearSum = monthTotalsForYear.reduce((a, b) => a + b, 0);
 
   const headerTitle =
-    viewTab === 'day'
-      ? cursorMonth.format('YYYY年M月')
-      : viewTab === 'month'
-        ? `${cursorYear}年`
-        : '历年收益';
+    viewTab === 'day' ? cursorMonth.format('YYYY年M月') : viewTab === 'month' ? `${cursorYear}年` : '历年收益';
 
   const now = dayjs();
   const nextPeriodDisabled =
@@ -154,7 +139,9 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
   const resolvedIsMobile =
     typeof isMobile === 'boolean'
       ? isMobile
-      : (typeof window !== 'undefined' ? window.matchMedia?.('(max-width: 640px)')?.matches : false);
+      : typeof window !== 'undefined'
+        ? window.matchMedia?.('(max-width: 640px)')?.matches
+        : false;
 
   const pcCellDayFontSize = resolvedIsMobile ? 15 : 16;
   const pcEarningsMaxFontSize = resolvedIsMobile ? 10 : 12;
@@ -162,57 +149,55 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
 
   const content = (
     <div className="my-earnings-drawer-inner flex min-h-0 flex-1 flex-col overflow-hidden px-5">
-          {hasData && (
-            <div className="my-earnings-context-header shrink-0 pb-3">
-              <div
-                className={cn(
-                  'my-earnings-title-row my-earnings-period-row',
-                  viewTab === 'year' && 'my-earnings-period-row-single'
-                )}
-              >
-                {viewTab === 'year' ? (
-                  <span className="my-earnings-context-title">{headerTitle}</span>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="my-earnings-period-nav-btn"
-                      aria-label={viewTab === 'day' ? '上一月' : '上一年'}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        goPrev();
-                      }}
-                    >
-                      <ChevronLeft size={22} strokeWidth={2} aria-hidden />
-                    </button>
-                    <span className="my-earnings-context-title my-earnings-period-label" aria-live="polite">
-                      {headerTitle}
-                    </span>
-                    <button
-                      type="button"
-                      className="my-earnings-period-nav-btn"
-                      aria-label={viewTab === 'day' ? '下一月' : '下一年'}
-                      disabled={nextPeriodDisabled}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        goNext();
-                      }}
-                    >
-                      <ChevronRight size={22} strokeWidth={2} aria-hidden />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+      {hasData && (
+        <div className="my-earnings-context-header shrink-0 pb-3">
+          <div
+            className={cn(
+              'my-earnings-title-row my-earnings-period-row',
+              viewTab === 'year' && 'my-earnings-period-row-single'
+            )}
+          >
+            {viewTab === 'year' ? (
+              <span className="my-earnings-context-title">{headerTitle}</span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="my-earnings-period-nav-btn"
+                  aria-label={viewTab === 'day' ? '上一月' : '上一年'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goPrev();
+                  }}
+                >
+                  <ChevronLeft size={22} strokeWidth={2} aria-hidden />
+                </button>
+                <span className="my-earnings-context-title my-earnings-period-label" aria-live="polite">
+                  {headerTitle}
+                </span>
+                <button
+                  type="button"
+                  className="my-earnings-period-nav-btn"
+                  aria-label={viewTab === 'day' ? '下一月' : '下一年'}
+                  disabled={nextPeriodDisabled}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goNext();
+                  }}
+                >
+                  <ChevronRight size={22} strokeWidth={2} aria-hidden />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
-          <div className="my-earnings-drawer-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="my-earnings-drawer-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {!hasData ? (
           <div className="my-earnings-empty">
             <p className="my-earnings-empty-title">暂无每日收益记录</p>
-            <p className="my-earnings-empty-desc">
-              请先在首页添加基金并维护持仓，系统会在刷新估值后自动累计每日收益。
-            </p>
+            <p className="my-earnings-empty-desc">请先在首页添加基金并维护持仓，系统会在刷新估值后自动累计每日收益。</p>
             {onGoHome && (
               <button
                 type="button"
@@ -231,7 +216,7 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
               {[
                 { id: 'day', label: '日' },
                 { id: 'month', label: '月' },
-                { id: 'year', label: '年' },
+                { id: 'year', label: '年' }
               ].map((t) => (
                 <button
                   key={t.id}
@@ -305,11 +290,11 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
                       captionLayout="label"
                       locale={zhCN}
                       formatters={{
-                        formatWeekdayName: (date) => WEEKDAY_LABELS[date.getDay()],
+                        formatWeekdayName: (date) => WEEKDAY_LABELS[date.getDay()]
                       }}
                       style={{
                         // 让 7 列宽度跟随父容器伸缩，而不是固定 cell-size
-                        '--cell-size': 'calc((100% - 12px) / 7)',
+                        '--cell-size': 'calc((100% - 12px) / 7)'
                       }}
                       className="w-full bg-transparent p-0"
                       classNames={{
@@ -322,14 +307,13 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
                         table: 'w-full border-collapse table-fixed',
                         tbody: 'w-full',
                         weekdays: 'flex',
-                        weekday:
-                          'flex-1 rounded-md text-[0.8rem] font-normal text-muted-foreground select-none',
+                        weekday: 'flex-1 rounded-md text-[0.8rem] font-normal text-muted-foreground select-none',
                         week: 'mt-2 flex w-full',
                         day: cn(
                           'group/day relative aspect-square w-full overflow-hidden p-0 align-top text-center select-none',
                           '[&:last-child[data-selected=true]_button]:rounded-r-md'
                         ),
-                        today: 'bg-transparent text-inherit',
+                        today: 'bg-transparent text-inherit'
                       }}
                       components={{
                         DayButton: ({ children, modifiers, day, ...props }) => {
@@ -339,25 +323,20 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
                           const isFutureDay = dayjs(day.date).startOf('day').isAfter(dayjs().startOf('day'));
 
                           const dayEarnings = !isOutside ? earningsByDate.get(key) : undefined;
-                          const hasEarnings =
-                            typeof dayEarnings === 'number' && Number.isFinite(dayEarnings);
+                          const hasEarnings = typeof dayEarnings === 'number' && Number.isFinite(dayEarnings);
 
                           const earningsTone =
-                            hasEarnings && dayEarnings > 0
-                              ? 'up'
-                              : hasEarnings && dayEarnings < 0
-                                ? 'down'
-                                : 'zero';
+                            hasEarnings && dayEarnings > 0 ? 'up' : hasEarnings && dayEarnings < 0 ? 'down' : 'zero';
 
                           const showEarningsRow = !isFutureDay;
                           const bgToneClass = showEarningsRow
-                            ? (hasEarnings
-                              ? (dayEarnings > 0
+                            ? hasEarnings
+                              ? dayEarnings > 0
                                 ? '!bg-[color-mix(in_srgb,var(--danger)_18%,transparent)] hover:!bg-[color-mix(in_srgb,var(--danger)_24%,transparent)]'
                                 : dayEarnings < 0
                                   ? '!bg-[color-mix(in_srgb,var(--success)_18%,transparent)] hover:!bg-[color-mix(in_srgb,var(--success)_24%,transparent)]'
-                                  : '!bg-[color-mix(in_srgb,var(--muted-foreground)_8%,transparent)] hover:!bg-[color-mix(in_srgb,var(--muted-foreground)_12%,transparent)]')
-                              : '!bg-[color-mix(in_srgb,var(--muted-foreground)_8%,transparent)] hover:!bg-[color-mix(in_srgb,var(--muted-foreground)_12%,transparent)]')
+                                  : '!bg-[color-mix(in_srgb,var(--muted-foreground)_8%,transparent)] hover:!bg-[color-mix(in_srgb,var(--muted-foreground)_12%,transparent)]'
+                              : '!bg-[color-mix(in_srgb,var(--muted-foreground)_8%,transparent)] hover:!bg-[color-mix(in_srgb,var(--muted-foreground)_12%,transparent)]'
                             : '';
 
                           return (
@@ -370,7 +349,7 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
                                 borderRadius: 2,
                                 padding: 0,
                                 minHeight: 0,
-                                overflow: 'hidden',
+                                overflow: 'hidden'
                               }}
                               className={cn(
                                 'my-earnings-cell',
@@ -380,10 +359,7 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
                                 bgToneClass
                               )}
                             >
-                              <span
-                                className="my-earnings-cell-num"
-                                style={{ fontSize: pcCellDayFontSize }}
-                              >
+                              <span className="my-earnings-cell-num" style={{ fontSize: pcCellDayFontSize }}>
                                 {isToday ? '今' : children}
                               </span>
                               {showEarningsRow && (
@@ -403,7 +379,7 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
                               )}
                             </CalendarDayButton>
                           );
-                        },
+                        }
                       }}
                     />
                   </>
@@ -461,8 +437,8 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
             </motion.div>
           </>
         )}
-          </div>
-        </div>
+      </div>
+    </div>
   );
 
   if (resolvedIsMobile) {
@@ -476,13 +452,19 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
         >
           <DrawerHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-5 pb-3 pt-2 text-left">
             <DrawerTitle className="text-base font-semibold text-[var(--text)]">我的收益</DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DrawerClose
+                  className="icon-button border-none bg-transparent p-1"
+                  style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
+                >
+                  <CloseIcon width="20" height="20" />
+                </DrawerClose>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>关闭</p>
+              </TooltipContent>
+            </Tooltip>
           </DrawerHeader>
           {content}
         </DrawerContent>
@@ -494,19 +476,27 @@ export default function MyEarningsCalendarPage({open, onOpenChange, series = [],
     <Dialog open={!!open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className={cn('my-earnings-drawer-content flex max-h-[92vh] w-[min(650px,calc(100vw-24px))] flex-col gap-0 overflow-hidden p-0')}
+        className={cn(
+          'my-earnings-drawer-content flex max-h-[92vh] w-[min(650px,calc(100vw-24px))] flex-col gap-0 overflow-hidden p-0'
+        )}
       >
         <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-5 pb-3 pt-4 text-left border-b border-[var(--border)]">
           <DialogTitle className="text-base font-semibold text-[var(--text)]">我的收益</DialogTitle>
           <DialogClose asChild>
-            <button
-              type="button"
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
-            >
-              <CloseIcon width="20" height="20" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="icon-button border-none bg-transparent p-1"
+                  style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
+                >
+                  <CloseIcon width="20" height="20" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>关闭</p>
+              </TooltipContent>
+            </Tooltip>
           </DialogClose>
         </DialogHeader>
         {content}

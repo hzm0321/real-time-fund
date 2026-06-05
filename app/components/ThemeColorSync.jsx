@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 const THEME_COLORS = {
   dark: '#0f172a',
-  light: '#ffffff',
+  light: '#ffffff'
 };
 
 function getThemeColor() {
@@ -28,7 +28,7 @@ export default function ThemeColorSync() {
     const observer = new MutationObserver(() => applyThemeColor());
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme'],
+      attributeFilter: ['data-theme']
     });
     return () => observer.disconnect();
   }, []);

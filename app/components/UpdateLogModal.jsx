@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@/components/ui/drawer';
 import { CloseIcon } from './Icons';
 import dayjs from 'dayjs';
+import { withRetry } from '@/app/lib/asyncHelper';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function UpdateLogModal({ open, onOpenChange }) {
   const isMobile = useIsMobile();
@@ -15,29 +17,45 @@ export default function UpdateLogModal({ open, onOpenChange }) {
 
   useEffect(() => {
     if (open) {
-      setLoading(true);
-      setError(null);
-      fetch('https://api.github.com/repos/hzm0321/real-time-fund/releases')
-        .then((res) => {
-          if (!res.ok) throw new Error('Failed to fetch releases');
-          return res.json();
-        })
-        .then((data) => {
+      const fetchReleases = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const data = await withRetry(
+            async () => {
+              const res = await fetch('https://api.github.com/repos/hzm0321/real-time-fund/releases');
+              if (!res.ok) throw new Error('Failed to fetch releases');
+              return res.json();
+            },
+            2,
+            500
+          );
           setReleases(data);
-          setLoading(false);
-        })
-        .catch((err) => {
+        } catch (err) {
           setError(err.message);
+        } finally {
           setLoading(false);
-        });
+        }
+      };
+      fetchReleases();
     }
   }, [open]);
 
   const content = (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-y-styled" style={{ WebkitOverflowScrolling: 'touch' }}>
       {loading ? (
         <div className="flex justify-center items-center py-8">
-          <span className="loading-spinner" style={{ width: 24, height: 24, border: '2px solid var(--muted)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <span
+            className="loading-spinner"
+            style={{
+              width: 24,
+              height: 24,
+              border: '2px solid var(--muted)',
+              borderTopColor: 'var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}
+          />
         </div>
       ) : error ? (
         <div className="text-center py-8 text-[var(--danger)]">加载失败: {error}</div>
@@ -52,9 +70,9 @@ export default function UpdateLogModal({ open, onOpenChange }) {
                 <h3 className="text-base font-semibold text-[var(--text)]">{release.name || release.tag_name}</h3>
                 <span className="text-xs text-[var(--muted)]">{dayjs(release.published_at).format('YYYY-MM-DD')}</span>
               </div>
-              <div 
+              <div
                 className="text-sm text-[var(--muted-foreground)] whitespace-pre-wrap break-words"
-                dangerouslySetInnerHTML={{ __html: release.body?.replace(/\n/g, '<br />') }}
+                dangerouslySetInnerHTML={{ __html: release.body?.replace(/\\n/g, '<br />') }}
               />
             </div>
           ))}
@@ -69,13 +87,19 @@ export default function UpdateLogModal({ open, onOpenChange }) {
         <DrawerContent className="glass" style={{ height: '85vh' }}>
           <DrawerHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-5 pb-3 pt-4 text-left border-b border-[var(--border)]">
             <DrawerTitle className="text-base font-semibold text-[var(--text)]">更新日志</DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DrawerClose
+                  className="icon-button border-none bg-transparent p-1"
+                  style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
+                >
+                  <CloseIcon width="20" height="20" />
+                </DrawerClose>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>关闭</p>
+              </TooltipContent>
+            </Tooltip>
           </DrawerHeader>
           {content}
         </DrawerContent>

@@ -3,119 +3,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Plus, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-
-export const TAG_THEME_OPTIONS = [
-  {
-    key: 'default',
-    label: '默认',
-    badgeVariant: 'outline',
-    badgeClassName: '',
-  },
-  {
-    key: 'blue',
-    label: '蓝色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300',
-  },
-  {
-    key: 'green',
-    label: '绿色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300',
-  },
-  {
-    key: 'sky',
-    label: '天空蓝',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300',
-  },
-  {
-    key: 'purple',
-    label: '紫色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300',
-  },
-  {
-    key: 'red',
-    label: '红色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300',
-  },
-  {
-    key: 'orange',
-    label: '橙色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300',
-  },
-  {
-    key: 'amber',
-    label: '琥珀色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  },
-  {
-    key: 'lime',
-    label: '柠檬绿',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-lime-200 bg-lime-50 text-lime-800 dark:border-lime-800 dark:bg-lime-950 dark:text-lime-300',
-  },
-  {
-    key: 'teal',
-    label: '水鸭色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300',
-  },
-  {
-    key: 'cyan',
-    label: '青色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
-  },
-  {
-    key: 'indigo',
-    label: '靛蓝色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300',
-  },
-  {
-    key: 'violet',
-    label: '罗兰紫',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300',
-  },
-  {
-    key: 'pink',
-    label: '粉红色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-pink-200 bg-pink-50 text-pink-800 dark:border-pink-800 dark:bg-pink-950 dark:text-pink-300',
-  },
-  {
-    key: 'rose',
-    label: '玫瑰色',
-    badgeVariant: 'default',
-    badgeClassName:
-      'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300',
-  },
-];
+import { TAG_THEME_OPTIONS } from '@/app/constants';
 
 const TAG_THEME_KEY_SET = new Set(TAG_THEME_OPTIONS.map((o) => o.key));
 
@@ -148,7 +38,7 @@ export function getTagThemeBadgeProps(rawTheme) {
   const isDefault = key === 'default';
   return {
     variant: isDefault ? 'outline' : 'default',
-    className: opt.badgeClassName || '',
+    className: opt.badgeClassName || ''
   };
 }
 
@@ -242,7 +132,7 @@ export default function AddTagDialog({ open, onOpenChange, onAdd }) {
               autoComplete="off"
               className={cn(
                 'min-h-[72px] w-full min-w-0 resize-y rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30',
-                'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
               )}
             />
             <p className="text-muted-foreground text-xs leading-relaxed">
@@ -275,7 +165,7 @@ export default function AddTagDialog({ open, onOpenChange, onAdd }) {
                         opt.badgeClassName,
                         active
                           ? 'ring-2 ring-ring ring-offset-2 ring-offset-background'
-                          : 'opacity-85 hover:opacity-100',
+                          : 'opacity-85 hover:opacity-100'
                       )}
                     >
                       {opt.label}
@@ -288,7 +178,12 @@ export default function AddTagDialog({ open, onOpenChange, onAdd }) {
         </div>
 
         <div className="row" style={{ gap: 12, marginTop: 34 }}>
-          <button type="button" className="button secondary trade-cancel-btn" onClick={() => onOpenChange(false)} style={{ flex: 1 }}>
+          <button
+            type="button"
+            className="button secondary trade-cancel-btn"
+            onClick={() => onOpenChange(false)}
+            style={{ flex: 1 }}
+          >
             取消
           </button>
           <button
@@ -300,7 +195,7 @@ export default function AddTagDialog({ open, onOpenChange, onAdd }) {
               submitGuardRef.current = true;
               onAdd?.({
                 names: parsedNames,
-                theme: themeKey,
+                theme: themeKey
               });
               onOpenChange(false);
             }}

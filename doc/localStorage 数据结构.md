@@ -19,24 +19,35 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
   {
-    code: string,      // 基金代码（唯一标识）
-    name: string,      // 基金名称
-    type: string,      // 基金类型
-    dwjz: number,      // 单位净值
-    gsz: number,       // 估算净值
-    gszzl: number,     // 估算涨跌幅
-    jzrq: string,      // 净值日期
-    gztime: string,    // 估值时间
-    dataSource?: number, // 估值数据源标识（1=天天基金，2=新浪基金预估等，缺省为1）
-    // ... 其他基金字段
+    code: string,                  // 基金代码（唯一标识，如 "000001"）
+    name: string,                  // 基金名称
+    dwjz: string,                  // 最新净值（最新公布的单位净值，存储为字符串，如 "1.2345"）
+    lastNav: string | null,        // 上一个交易日的单位净值，存储为字符串
+    gsz: number | null,            // 估算净值（当前交易日实时估算净值）
+    gszzl: number | null,          // 估算涨跌幅（百分比数值，如 1.23 表示 +1.23%）
+    jzrq: string,                  // 净值日期（格式: "YYYY-MM-DD"）
+    gztime: string | null,         // 估值时间（格式: "YYYY-MM-DD HH:mm"）
+    zzl: number | null,            // 净值涨跌幅（昨日/最新公布日单位净值实际涨跌幅，百分比数值）
+    yesterdayZzl: number | null,   // 昨日（再前一交易日）实际涨跌幅
+    yesterdayNavDelta: number | null, // 昨日（再前一交易日）单位净值变动净额
+    noValuation: boolean,          // 是否无估值数据（true 时界面将不展示估值，仅显示历史净值）
+    valuationSource: string | null, // 估值数据来源标识（如 'fundgz', 'sina_ds2', 'sina_ds3', 'supabase_qdii', 'fallback'）
+    dataSource: number,            // 估值数据源设置（1=天天基金，2=新浪基金口径一，3=新浪基金口径二，默认为1）
+    addedAt: number,               // 基金添加时间戳（毫秒数）
+    addBaseNav: number | null,     // 基金添加时的基准净值（用于计算“自添加来”收益率）
+    addBaseDate: string | null,    // 基金添加时的基准净值日期（格式: "YYYY-MM-DD" 或估值时间）
+    gzstatus?: string | null,      // 可选。从 Supabase 获取的 QDII 估值状态
+    showImageChart?: boolean       // 可选。用户是否选择在实时估值分时处展示净值估算图
   }
 ]
 ```
 
 **使用场景**:
+
 - 页面加载时恢复基金列表
 - 添加/删除基金时更新
 - 导入/导出配置时包含
@@ -53,15 +64,17 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
-  "000001",  // 基金代码
-  "110022",
+  '000001', // 基金代码
+  '110022'
   // ...
-]
+];
 ```
 
 **使用场景**:
+
 - 显示自选基金标签页
 - 添加/移除自选时更新
 - 导入/导出配置时包含
@@ -77,6 +90,7 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
   {
@@ -88,6 +102,7 @@
 ```
 
 **使用场景**:
+
 - 显示分组标签页
 - 分组管理（添加、编辑、删除）
 - 导入/导出配置时包含
@@ -103,15 +118,17 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
-  "000001",  // 收起的基金代码
-  "110022",
+  '000001', // 收起的基金代码
+  '110022'
   // ...
-]
+];
 ```
 
 **使用场景**:
+
 - 记录用户折叠的基金卡片
 - 页面刷新后保持折叠状态
 
@@ -126,15 +143,17 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
-  "000001",  // 收起走势图的基金代码
-  "110022",
+  '000001', // 收起走势图的基金代码
+  '110022'
   // ...
-]
+];
 ```
 
 **使用场景**:
+
 - 记录用户折叠的业绩走势图表
 - 页面刷新后保持折叠状态
 
@@ -149,15 +168,17 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
-  "000001",  // 收起收益图的基金代码
-  "110022",
+  '000001', // 收起收益图的基金代码
+  '110022'
   // ...
-]
+];
 ```
 
 **使用场景**:
+
 - 记录用户折叠的收益图表
 - 页面刷新后保持折叠状态
 
@@ -173,12 +194,14 @@
 **导入/导出**: 是（直接作为顶层字段导出/导入）
 
 **数据结构**:
+
 ```javascript
-'card'  // 卡片视图
-'list'  // 列表视图
+'card'; // 卡片视图
+'list'; // 列表视图
 ```
 
 **使用场景**:
+
 - 切换卡片/列表视图
 - 页面刷新后保持视图模式
 
@@ -194,12 +217,14 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
-'30000'  // 30秒刷新一次
-'60000'  // 60秒刷新一次
+'30000'; // 30秒刷新一次
+'60000'; // 60秒刷新一次
 ```
 
 **使用场景**:
+
 - 控制基金数据自动刷新频率
 - 用户设置刷新间隔时更新
 
@@ -214,6 +239,7 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 {
   "000001": {
@@ -228,6 +254,7 @@
 ```
 
 **使用场景**:
+
 - 计算持仓收益
 - 买入/卖出操作时更新
 - 导入/导出配置时包含
@@ -245,6 +272,7 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 {
   "group_1730000000000": {
@@ -260,6 +288,7 @@
 **历史兼容**: 升级后首次加载时，若某分组内某基金代码在全局 `holdings` 中有有效持仓且该分组槽位为空，会**深拷贝**一份到该分组；同一基金在多个分组中会出现多份独立数据。
 
 **使用场景**:
+
 - 自定义分组 Tab 下的持仓金额、收益、排序
 - 分组内编辑持仓、买卖、定投、待定成交、交易记录（带 `groupId`）
 - 导入/导出与云端同步
@@ -275,6 +304,7 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 [
   {
@@ -297,6 +327,7 @@
 ```
 
 **使用场景**:
+
 - 净值未更新时暂存交易
 - 净值更新后自动处理待处理交易
 - 导入/导出配置时包含
@@ -312,11 +343,13 @@
 **导入/导出**: 否
 
 **数据结构**:
+
 ```javascript
-'2024-01-15T10:30:00.000Z'
+'2024-01-15T10:30:00.000Z';
 ```
 
 **使用场景**:
+
 - 云端同步时比较数据版本
 - 检测本地和云端数据冲突
 
@@ -332,11 +365,13 @@
 **导入/导出**: 否
 
 **数据结构**:
+
 ```javascript
-'true'  // 用户已关闭公告
+'true'; // 用户已关闭公告
 ```
 
 **使用场景**:
+
 - 控制公告弹窗显示
 - 版本号后缀（v20）用于控制公告版本
 - 组件会自动清理旧版本的公告关闭标记（如 v19）
@@ -352,6 +387,7 @@
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 {
   localSortRules: [  // 排序规则配置
@@ -374,6 +410,7 @@
 ```
 
 **使用场景**:
+
 - 排序规则持久化
 - PC端布局宽度设置
 - 市场指数选择与显示控制
@@ -391,17 +428,19 @@
 **导入/导出**: 否（通过 customSettings 导入/导出）
 
 **数据结构**:
+
 ```javascript
 // localSortBy
-'gszzl'  // 按估算涨跌幅排序
-'default'  // 默认排序
+'gszzl'; // 按估算涨跌幅排序
+'default'; // 默认排序
 
 // localSortOrder
-'asc'   // 升序
-'desc'  // 降序
+'asc'; // 升序
+'desc'; // 降序
 ```
 
 **使用场景**:
+
 - 快速访问当前排序状态
 - 与 customSettings.localSortRules 保持同步
 
@@ -428,13 +467,15 @@
 **导入/导出**: 否
 
 **数据结构**:
+
 ```javascript
-'all'     // 全部资产
-'fav'     // 自选
-groupId   // 分组ID，如 'group_xxx'
+'all'; // 全部资产
+'fav'; // 自选
+groupId; // 分组ID，如 'group_xxx'
 ```
 
 **使用场景**:
+
 - 恢复用户上次查看的标签页
 - 页面刷新后保持标签页状态
 
@@ -450,12 +491,14 @@ groupId   // 分组ID，如 'group_xxx'
 **导入/导出**: 否
 
 **数据结构**:
+
 ```javascript
-'dark'  // 暗色主题
-'light'  // 亮色主题
+'dark'; // 暗色主题
+'light'; // 亮色主题
 ```
 
 **使用场景**:
+
 - 控制应用整体配色
 - 页面加载时立即应用（通过 layout.jsx 内联脚本）
 
@@ -470,6 +513,7 @@ groupId   // 分组ID，如 'group_xxx'
 **导入/导出**: 否（数据量较大且属于临时性数据）
 
 **数据结构**:
+
 ```javascript
 {
   "000001": [  // 按基金代码索引
@@ -486,10 +530,12 @@ groupId   // 分组ID，如 'group_xxx'
 ```
 
 **数据清理规则**:
+
 - 当新数据日期大于已存储的最大日期时，清空该基金所有旧日期数据，只保留当日分时
 - 同一日期内按时间顺序追加数据
 
 **使用场景**:
+
 - 基金详情页分时图展示
 - 实时估值数据记录
 
@@ -504,6 +550,7 @@ groupId   // 分组ID，如 'group_xxx'
 **导入/导出**: 是
 
 **数据结构**:
+
 ```javascript
 {
   "000001": [  // 按基金代码索引的交易列表
@@ -528,6 +575,7 @@ groupId   // 分组ID，如 'group_xxx'
 ```
 
 **使用场景**:
+
 - 交易历史查询
 - 收益计算
 - 买入/卖出操作记录
@@ -543,6 +591,7 @@ groupId   // 分组ID，如 'group_xxx'
 **导入/导出**: 是
 
 **数据结构（当前版本）**:
+
 ```javascript
 {
   "__global__": {
@@ -566,6 +615,7 @@ groupId   // 分组ID，如 'group_xxx'
 **旧版兼容**: 若本地仍为「基金代码 → 计划」的扁平对象（无 `__global__` 键），加载时会自动迁移为 `{ "__global__": 原对象 }`。导入时同样会调用 `migrateDcaPlansToScoped` 进行迁移。
 
 **使用场景**:
+
 - 自动定投执行（按 scope 生成带 `groupId` 的 pending）
 - 定投计划管理（在「全部/自选」下编辑全局计划，在分组 Tab 下编辑该分组计划）
 
@@ -580,15 +630,17 @@ groupId   // 分组ID，如 'group_xxx'
 **导入/导出**: 否（通过 customSettings 导入/导出）
 
 **数据结构**:
+
 ```javascript
 [
-  "sh000001",  // 上证指数
-  "sz399001",  // 深证成指
+  'sh000001', // 上证指数
+  'sz399001' // 深证成指
   // ...
-]
+];
 ```
 
 **使用场景**:
+
 - 市场指数面板显示
 - 指数选择管理
 
@@ -603,6 +655,7 @@ groupId   // 分组ID，如 'group_xxx'
 **导入/导出**: 是
 
 **数据结构（当前版本 — 按作用域分桶）**:
+
 ```javascript
 {
   "all": {                    // 作用域：'all' 为全局，自定义分组 id 为分组维度
@@ -628,11 +681,13 @@ groupId   // 分组ID，如 'group_xxx'
 **旧版兼容**: 若存储的数据为扁平结构 `{ [code]: [...] }`（无作用域分桶），加载时会自动迁移为 `{ "all": 原对象 }`。`normalizeFundDailyEarningsScoped` 函数负责此兼容处理。
 
 **数据清理规则**:
+
 - 云端同步全量收集时，会过滤无效日期格式（必须 `YYYY-MM-DD`）、无效 earnings 数值
 - 仅保留有效基金代码对应的收益数据
 - 仅保留有效作用域（`'all'` 或已存在的分组 ID）对应的数据
 
 **使用场景**:
+
 - 基金详情页收益折线图展示
 - 每日收益历史记录
 - 组合收益汇总（`aggregatePortfolioDailyEarnings`）
@@ -647,6 +702,7 @@ groupId   // 分组ID，如 'group_xxx'
 项目支持通过 Supabase 进行云端数据同步。以下键参与云端同步：
 
 **参与云端同步的键**:
+
 - funds
 - favorites
 - groups
@@ -663,6 +719,7 @@ groupId   // 分组ID，如 'group_xxx'
 - fundDailyEarnings
 
 **不参与云端同步的键**:
+
 - localUpdatedAt（本地专用）
 - hasClosedAnnouncement_v20（本地专用）
 - localSortBy / localSortOrder（通过 customSettings 同步）
@@ -674,6 +731,7 @@ groupId   // 分组ID，如 'group_xxx'
 - viewMode（通过 customSettings 同步）
 
 **同步流程**:
+
 1. 用户登录后，本地数据会自动上传到云端
 2. 用户在其他设备登录时，会从云端下载数据
 3. 当本地和云端数据不一致时，会提示用户选择使用哪份数据
@@ -683,6 +741,7 @@ groupId   // 分组ID，如 'group_xxx'
 用户可以导出配置到 JSON 文件，或从 JSON 文件导入配置：
 
 **导出格式**:
+
 ```javascript
 {
   funds: [],
@@ -706,25 +765,26 @@ groupId   // 分组ID，如 'group_xxx'
 
 **导入合并策略**:
 
-| 字段 | 合并策略 |
-|------|----------|
-| funds | 追加去重：仅添加本地不存在的基金（按 code 去重） |
-| favorites | 合并去重：合并本地与导入的自选代码，过滤不存在的基金 |
-| groups | 按分组 ID 合并：ID 相同则合并 codes，否则添加新分组 |
-| collapsedCodes | 合并去重 |
-| collapsedTrends | 合并去重 |
-| collapsedEarnings | 合并去重 |
-| refreshMs | 覆盖（仅当导入值 ≥ 5000 时生效） |
-| viewMode | 覆盖（仅当值为 `'card'` 或 `'list'` 时生效） |
-| holdings | 浅合并（导入覆盖同 key） |
-| groupHoldings | 按分组 ID 浅合并（导入覆盖同分组同基金 key） |
-| pendingTrades | 按唯一键合并去重（优先使用 id，否则按组合键） |
-| transactions | 按基金代码合并：同 id 交易不重复，新交易按 timestamp 排序追加 |
-| dcaPlans | 按 scope 浅合并（自动迁移旧版扁平格式） |
-| customSettings | 浅合并（导入覆盖同 key 设置） |
+| 字段              | 合并策略                                                                |
+| ----------------- | ----------------------------------------------------------------------- |
+| funds             | 追加去重：仅添加本地不存在的基金（按 code 去重）                        |
+| favorites         | 合并去重：合并本地与导入的自选代码，过滤不存在的基金                    |
+| groups            | 按分组 ID 合并：ID 相同则合并 codes，否则添加新分组                     |
+| collapsedCodes    | 合并去重                                                                |
+| collapsedTrends   | 合并去重                                                                |
+| collapsedEarnings | 合并去重                                                                |
+| refreshMs         | 覆盖（仅当导入值 ≥ 5000 时生效）                                        |
+| viewMode          | 覆盖（仅当值为 `'card'` 或 `'list'` 时生效）                            |
+| holdings          | 浅合并（导入覆盖同 key）                                                |
+| groupHoldings     | 按分组 ID 浅合并（导入覆盖同分组同基金 key）                            |
+| pendingTrades     | 按唯一键合并去重（优先使用 id，否则按组合键）                           |
+| transactions      | 按基金代码合并：同 id 交易不重复，新交易按 timestamp 排序追加           |
+| dcaPlans          | 按 scope 浅合并（自动迁移旧版扁平格式）                                 |
+| customSettings    | 浅合并（导入覆盖同 key 设置）                                           |
 | fundDailyEarnings | 按作用域 + 基金代码合并：同日期覆盖，新日期追加（自动迁移旧版扁平格式） |
 
 **导入后自动操作**:
+
 - 仅刷新新追加的基金数据
 - 自动关闭设置弹框
 - 显示「导入成功」提示
@@ -740,7 +800,7 @@ groupId   // 分组ID，如 'group_xxx'
 ```javascript
 const dedupeByCode = (list) => {
   const seen = new Set();
-  return list.filter(f => {
+  return list.filter((f) => {
     if (!f?.code) return false;
     if (seen.has(f.code)) return false;
     seen.add(f.code);
@@ -788,16 +848,28 @@ const storageHelper = {
 ```
 
 **同步键集合**:
+
 ```javascript
 const SYNC_KEYS = new Set([
-  'funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends',
-  'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings',
-  'pendingTrades', 'transactions', 'dcaPlans', 'customSettings',
+  'funds',
+  'favorites',
+  'groups',
+  'collapsedCodes',
+  'collapsedTrends',
+  'collapsedEarnings',
+  'refreshMs',
+  'holdings',
+  'groupHoldings',
+  'pendingTrades',
+  'transactions',
+  'dcaPlans',
+  'customSettings',
   'fundDailyEarnings'
 ]);
 ```
 
 **特性**:
+
 - 自动触发云端同步（对于参与同步的键）
 - 自动更新 localUpdatedAt 时间戳
 - funds 变更时比较签名（`getFundCodesSignature`），避免无意义同步
@@ -836,6 +908,7 @@ const SYNC_KEYS = new Set([
 
 ## 更新日志
 
+- **2026-05-25**: 检查并更新 `funds` 基金数据结构，详尽补充基金对象所有可能的属性字段（如 `lastNav`, `zzl`, `yesterdayZzl`, `yesterdayNavDelta`, `noValuation`, `valuationSource`, `dataSource`, `addedAt`, `addBaseNav`, `addBaseDate` 等），剔除了非实际存在的 legacy `type` 字段，并修正 `dwjz` 的类型说明为字符串类型。
 - **2026-04-13**: 完善 `fundDailyEarnings` 文档（更新为按作用域分桶结构，补充旧版兼容说明）；补充 `customSettings` 中 `showGroupFundSearchPc`、`showGroupFundSearchMobile` 字段；完善导入/导出格式说明（新增 `customSettings`、`fundDailyEarnings`、`collapsedEarnings` 导出支持）；新增导入合并策略详细表格；补充 storageHelper 同步键集合；为每个键标注导入/导出和云端同步状态
 - **2026-04-05（分组独立持仓）**: 新增 `groupHoldings`；`pendingTrades` / `transactions` 支持可选 `groupId`；`dcaPlans` 改为分桶结构（`__global__` + 分组 ID）；同步键与导入导出格式已更新；说明分组持仓从历史全局 `holdings` 的幂等深拷贝迁移规则
 - **2026-04-05**: 全面更新文档，新增 `collapsedEarnings`、`fundDailyEarnings` 键；更新 `customSettings`（新增 `localSortDisplayMode`、`showMarketIndexPc`、`showMarketIndexMobile`）；更新 `dcaPlans`（新增 `weeklyDay`、`monthlyDay`、`lastDate`）；更新 `transactions`（新增 `isDca`、`isHistoryOnly`）；更新 `pendingTrades`（新增 `isDca`）；更新公告版本号至 v20；更新云端同步键列表

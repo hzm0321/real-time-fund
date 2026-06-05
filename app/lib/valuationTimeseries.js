@@ -76,12 +76,13 @@ export function recordValuation(code, payload, dataSource = 1) {
   const dateStr = toDateStr(gztime);
   if (!dateStr) return getSeriesBySource(code, dataSource);
 
-  const timeLabel = isString(gztime) && gztime.length > 10
-    ? gztime.slice(11, 16)
-    : (() => {
-        const d = new Date();
-        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      })();
+  const timeLabel =
+    isString(gztime) && gztime.length > 10
+      ? gztime.slice(11, 16)
+      : (() => {
+          const d = new Date();
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        })();
 
   const newPoint = { time: timeLabel, value, date: dateStr };
 

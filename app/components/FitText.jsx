@@ -20,7 +20,7 @@ export default function FitText({
   minFontSize = 10,
   className,
   style = {},
-  as: Tag = 'span',
+  as: Tag = 'span'
 }) {
   const containerRef = useRef(null);
   const contentRef = useRef(null);
@@ -31,8 +31,7 @@ export default function FitText({
     if (!container || !content) return;
 
     const containerRect = container.getBoundingClientRect();
-    const containerWidth =
-      container.clientWidth > 0 ? container.clientWidth : containerRect.width;
+    const containerWidth = container.clientWidth > 0 ? container.clientWidth : containerRect.width;
     if (!Number.isFinite(containerWidth) || containerWidth <= 0) return;
 
     // 先恢复到最大字号再测量，确保在「未缩放」状态下取到真实内容宽度
@@ -95,7 +94,7 @@ export default function FitText({
         minWidth: 0,
         maxWidth: '100%',
         overflow: 'hidden',
-        ...style,
+        ...style
       }}
     >
       <span
@@ -104,7 +103,7 @@ export default function FitText({
           display: 'inline-block',
           whiteSpace: 'nowrap',
           fontWeight: 'inherit',
-          fontSize: `${maxFontSize}px`,
+          fontSize: `${maxFontSize}px`
         }}
       >
         {children}

@@ -2,7 +2,6 @@
 import Script from 'next/script';
 
 export default function AnalyticsGate({ GA_ID }) {
-
   if (!GA_ID) return null;
 
   return (
