@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import { isNumber, isString, isPlainObject } from 'lodash';
+import { isArray, isFunction, isNumber, isObject, isPlainObject, isString } from 'lodash';
 import {
   DEFAULT_TZ,
   TAG_THEME_OPTIONS,
@@ -50,7 +50,7 @@ export function normalizeFundTagInstanceListFromInput(rows) {
   const out = [];
   const usedIds = new Set();
   for (const r of rows || []) {
-    if (!r || typeof r !== 'object') continue;
+    if (!r || !isObject(r)) continue;
     const name = String(r.name ?? '').trim();
     if (!name || name.length > 24) continue;
     let id = String(r.id ?? '').trim();
@@ -68,20 +68,20 @@ export function normalizeFundTagInstanceListFromInput(rows) {
 
 /** 从基金对象中移除旧版内联字段 `tags`（已迁移到独立 `tags` 存储） */
 export function stripLegacyTagsFromFundObject(f) {
-  if (!f || typeof f !== 'object' || !hasOwn(f, 'tags')) return f;
+  if (!f || !isObject(f) || !hasOwn(f, 'tags')) return f;
   const { tags: _removed, ...rest } = f;
   return rest;
 }
 
 /** 从标签记录读取基金代码列表（仅 `fundCodes`） */
 export function getFundCodesFromTagRecord(r) {
-  if (!r || typeof r !== 'object' || !Array.isArray(r.fundCodes)) return [];
+  if (!r || !isObject(r) || !isArray(r.fundCodes)) return [];
   return [...new Set(r.fundCodes.map((c) => String(c).trim()).filter(Boolean))];
 }
 
 /** 仅保留 id / name / theme / fundCodes（fundCodes 可为空：仅存在于可选池、尚未挂到任何基金） */
 export function sanitizeTagRowForStorage(r) {
-  if (!r || typeof r !== 'object') return null;
+  if (!r || !isObject(r)) return null;
   const name = String(r.name ?? '').trim();
   const codes = getFundCodesFromTagRecord(r);
   if (!name) return null;
@@ -111,7 +111,7 @@ export function serializeTagRecordsForCompare(rows) {
 export function mergeTagRowsByName(rows) {
   const byName = new Map();
   for (const row of rows || []) {
-    if (!row || typeof row !== 'object') continue;
+    if (!row || !isObject(row)) continue;
     const nm = String(row.name ?? '').trim();
     if (!nm) continue;
     const codes = getFundCodesFromTagRecord(row);
@@ -133,7 +133,7 @@ export function mergeTagRowsByName(rows) {
 export function cloneHoldingDeep(src) {
   if (!isPlainObject(src)) return null;
   try {
-    return typeof structuredClone === 'function' ? structuredClone(src) : JSON.parse(JSON.stringify(src));
+    return isFunction(structuredClone) ? structuredClone(src) : JSON.parse(JSON.stringify(src));
   } catch {
     return { ...src };
   }

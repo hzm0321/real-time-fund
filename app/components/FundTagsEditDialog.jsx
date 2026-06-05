@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isObject } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -19,11 +20,11 @@ const DEFAULT_TAG_THEME = 'default';
 const ALLOWED_THEMES = new Set(TAG_THEME_OPTIONS.map((x) => x.key));
 
 function normalizeTagDraft(raw) {
-  if (!Array.isArray(raw)) return [];
+  if (!isArray(raw)) return [];
   const out = [];
   const usedIds = new Set();
   for (const item of raw) {
-    if (!item || typeof item !== 'object') continue;
+    if (!item || !isObject(item)) continue;
     const name = String(item.name ?? '').trim();
     if (!name || name.length > 24) continue;
     let id = String(item.id ?? '').trim();
@@ -93,7 +94,7 @@ export default function FundTagsEditDialog({
   const addTagsToFund = useCallback(
     (rawNames, theme = DEFAULT_TAG_THEME, preferredId) => {
       const normalizedTheme = ALLOWED_THEMES.has(theme) ? theme : DEFAULT_TAG_THEME;
-      const single = Array.isArray(rawNames) && rawNames.length === 1;
+      const single = isArray(rawNames) && rawNames.length === 1;
       const poolId = single && String(preferredId ?? '').trim() ? String(preferredId).trim() : '';
       /** id 必须在 setState updater 外生成：Strict Mode 会重复执行 updater，内部 uuid 会产生两个 id、两次 persist，全局 tags 出现两条 */
       const rowsToAdd = [];
@@ -173,7 +174,7 @@ export default function FundTagsEditDialog({
     (payload) => {
       const theme = payload?.theme ?? DEFAULT_TAG_THEME;
       const names =
-        Array.isArray(payload?.names) && payload.names.length
+        isArray(payload?.names) && payload.names.length
           ? payload.names
           : payload?.name != null
             ? [String(payload.name).trim()].filter(Boolean)

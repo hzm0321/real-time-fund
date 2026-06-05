@@ -1,4 +1,5 @@
 'use client';
+import { isArray } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 
 function buildRows(history) {
-  if (!Array.isArray(history) || history.length === 0) return [];
+  if (!isArray(history) || history.length === 0) return [];
   const reversed = [...history].reverse();
   return reversed.map((item, i) => {
     const prev = reversed[i + 1];

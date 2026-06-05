@@ -1,3 +1,4 @@
+import { isBoolean, isFunction, isObject } from 'lodash';
 import { create } from 'zustand';
 
 /**
@@ -14,39 +15,37 @@ export const useSettingsStore = create((set) => ({
   dynamicStyleMobile: true,
   isGroupSummarySticky: false,
 
-  setTempSeconds: (val) =>
-    set({ tempSeconds: typeof val === 'function' ? val(useSettingsStore.getState().tempSeconds) : val }),
+  setTempSeconds: (val) => set({ tempSeconds: isFunction(val) ? val(useSettingsStore.getState().tempSeconds) : val }),
   setContainerWidth: (val) =>
-    set({ containerWidth: typeof val === 'function' ? val(useSettingsStore.getState().containerWidth) : val }),
+    set({ containerWidth: isFunction(val) ? val(useSettingsStore.getState().containerWidth) : val }),
   setShowMarketIndexPc: (val) =>
-    set({ showMarketIndexPc: typeof val === 'function' ? val(useSettingsStore.getState().showMarketIndexPc) : val }),
+    set({ showMarketIndexPc: isFunction(val) ? val(useSettingsStore.getState().showMarketIndexPc) : val }),
   setShowMarketIndexMobile: (val) =>
     set({
-      showMarketIndexMobile: typeof val === 'function' ? val(useSettingsStore.getState().showMarketIndexMobile) : val
+      showMarketIndexMobile: isFunction(val) ? val(useSettingsStore.getState().showMarketIndexMobile) : val
     }),
   setShowGroupFundSearchPc: (val) =>
     set({
-      showGroupFundSearchPc: typeof val === 'function' ? val(useSettingsStore.getState().showGroupFundSearchPc) : val
+      showGroupFundSearchPc: isFunction(val) ? val(useSettingsStore.getState().showGroupFundSearchPc) : val
     }),
   setShowGroupFundSearchMobile: (val) =>
     set({
-      showGroupFundSearchMobile:
-        typeof val === 'function' ? val(useSettingsStore.getState().showGroupFundSearchMobile) : val
+      showGroupFundSearchMobile: isFunction(val) ? val(useSettingsStore.getState().showGroupFundSearchMobile) : val
     }),
   setDynamicStylePc: (val) =>
-    set({ dynamicStylePc: typeof val === 'function' ? val(useSettingsStore.getState().dynamicStylePc) : val }),
+    set({ dynamicStylePc: isFunction(val) ? val(useSettingsStore.getState().dynamicStylePc) : val }),
   setDynamicStyleMobile: (val) =>
-    set({ dynamicStyleMobile: typeof val === 'function' ? val(useSettingsStore.getState().dynamicStyleMobile) : val }),
+    set({ dynamicStyleMobile: isFunction(val) ? val(useSettingsStore.getState().dynamicStyleMobile) : val }),
   setIsGroupSummarySticky: (val) =>
     set({
-      isGroupSummarySticky: typeof val === 'function' ? val(useSettingsStore.getState().isGroupSummarySticky) : val
+      isGroupSummarySticky: isFunction(val) ? val(useSettingsStore.getState().isGroupSummarySticky) : val
     }),
 
   /**
    * 从 customSettings 解析并同步配置到 Zustand 状态
    */
   syncFromCustomSettings: (customSettings) => {
-    if (!customSettings || typeof customSettings !== 'object') return;
+    if (!customSettings || !isObject(customSettings)) return;
     try {
       const patch = {};
       const w = customSettings.pcContainerWidth;
@@ -60,17 +59,15 @@ export const useSettingsStore = create((set) => ({
               : 1200;
         patch.containerWidth = Math.min(maxWidth, Math.max(600, num));
       }
-      if (typeof customSettings.showMarketIndexPc === 'boolean')
-        patch.showMarketIndexPc = customSettings.showMarketIndexPc;
-      if (typeof customSettings.showMarketIndexMobile === 'boolean')
+      if (isBoolean(customSettings.showMarketIndexPc)) patch.showMarketIndexPc = customSettings.showMarketIndexPc;
+      if (isBoolean(customSettings.showMarketIndexMobile))
         patch.showMarketIndexMobile = customSettings.showMarketIndexMobile;
-      if (typeof customSettings.showGroupFundSearchPc === 'boolean')
+      if (isBoolean(customSettings.showGroupFundSearchPc))
         patch.showGroupFundSearchPc = customSettings.showGroupFundSearchPc;
-      if (typeof customSettings.showGroupFundSearchMobile === 'boolean')
+      if (isBoolean(customSettings.showGroupFundSearchMobile))
         patch.showGroupFundSearchMobile = customSettings.showGroupFundSearchMobile;
-      if (typeof customSettings.dynamicStylePc === 'boolean') patch.dynamicStylePc = customSettings.dynamicStylePc;
-      if (typeof customSettings.dynamicStyleMobile === 'boolean')
-        patch.dynamicStyleMobile = customSettings.dynamicStyleMobile;
+      if (isBoolean(customSettings.dynamicStylePc)) patch.dynamicStylePc = customSettings.dynamicStylePc;
+      if (isBoolean(customSettings.dynamicStyleMobile)) patch.dynamicStyleMobile = customSettings.dynamicStyleMobile;
 
       if (Object.keys(patch).length > 0) {
         set(patch);

@@ -5,7 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isNumber } from 'lodash';
+import { isNumber, isUndefined } from 'lodash';
 import { fetchFundPingzhongdata, fetchSmartFundNetValue } from '../api/fund';
 import { DatePicker, NumericInput } from './Common';
 import ConfirmModal from './ConfirmModal';
@@ -47,8 +47,8 @@ export default function TradeModal({ type, fund, holding, onClose, onConfirm, pe
   const [calcShare, setCalcShare] = useState(null);
 
   const parseNumberish = (input) => {
-    if (input === null || typeof input === 'undefined') return null;
-    if (typeof input === 'number') return Number.isFinite(input) ? input : null;
+    if (input === null || isUndefined(input)) return null;
+    if (isNumber(input)) return Number.isFinite(input) ? input : null;
     const cleaned = String(input).replace(/[^\d.]/g, '');
     const n = parseFloat(cleaned);
     return Number.isFinite(n) ? n : null;

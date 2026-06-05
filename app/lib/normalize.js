@@ -1,3 +1,4 @@
+import { isArray } from 'lodash';
 /**
  * 通用数据规范化工具函数
  * 从 page.jsx / useSyncManager.js 中提取，消除重复定义。
@@ -19,7 +20,7 @@ export function normalizeCode(value) {
  * @returns {string[]}
  */
 export function cleanCodeArray(input, allowedSet = null) {
-  const arr = Array.isArray(input) ? input : [];
+  const arr = isArray(input) ? input : [];
   const next = [];
   const seen = new Set();
   for (const v of arr) {

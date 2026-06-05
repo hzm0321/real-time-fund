@@ -15,7 +15,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import { isNumber, isString, isPlainObject, isArray } from 'lodash';
+import { isArray, isBoolean, isFunction, isNumber, isObject, isPlainObject, isString } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
 
@@ -175,7 +175,7 @@ export default function HomePage() {
     const out = {};
     const codeSet = new Set((isArray(funds) ? funds : []).map((f) => String(f?.code ?? '').trim()).filter(Boolean));
     for (const r of fundTagRecords || []) {
-      if (!r || typeof r !== 'object') continue;
+      if (!r || !isObject(r)) continue;
       const id = String(r.id ?? '').trim();
       const name = String(r.name ?? '').trim();
       if (!id || !name) continue;
@@ -308,52 +308,45 @@ export default function HomePage() {
   // ---- Modal store setter compatibility wrappers ----
   const _ms = useModalStore.setState;
   const _gs = useModalStore.getState;
-  const setSettingsOpen = (v) => _ms({ settingsOpen: typeof v === 'function' ? v(_gs().settingsOpen) : v });
-  const setGroupModalOpen = (v) => _ms({ groupModalOpen: typeof v === 'function' ? v(_gs().groupModalOpen) : v });
-  const setGroupManageOpen = (v) => _ms({ groupManageOpen: typeof v === 'function' ? v(_gs().groupManageOpen) : v });
-  const setAddFundToGroupOpen = (v) =>
-    _ms({ addFundToGroupOpen: typeof v === 'function' ? v(_gs().addFundToGroupOpen) : v });
-  const setSortSettingOpen = (v) => _ms({ sortSettingOpen: typeof v === 'function' ? v(_gs().sortSettingOpen) : v });
-  const setLoginModalOpen = (v) => _ms({ loginModalOpen: typeof v === 'function' ? v(_gs().loginModalOpen) : v });
-  const setLoginInitialError = (v) =>
-    _ms({ loginInitialError: typeof v === 'function' ? v(_gs().loginInitialError) : v });
-  const setFeedbackOpen = (v) => _ms({ feedbackOpen: typeof v === 'function' ? v(_gs().feedbackOpen) : v });
-  const setFeedbackNonce = (v) => _ms({ feedbackNonce: typeof v === 'function' ? v(_gs().feedbackNonce) : v });
-  const setDonateOpen = (v) => _ms({ donateOpen: typeof v === 'function' ? v(_gs().donateOpen) : v });
-  const setIsLogoutConfirmOpen = (v) =>
-    _ms({ isLogoutConfirmOpen: typeof v === 'function' ? v(_gs().isLogoutConfirmOpen) : v });
+  const setSettingsOpen = (v) => _ms({ settingsOpen: isFunction(v) ? v(_gs().settingsOpen) : v });
+  const setGroupModalOpen = (v) => _ms({ groupModalOpen: isFunction(v) ? v(_gs().groupModalOpen) : v });
+  const setGroupManageOpen = (v) => _ms({ groupManageOpen: isFunction(v) ? v(_gs().groupManageOpen) : v });
+  const setAddFundToGroupOpen = (v) => _ms({ addFundToGroupOpen: isFunction(v) ? v(_gs().addFundToGroupOpen) : v });
+  const setSortSettingOpen = (v) => _ms({ sortSettingOpen: isFunction(v) ? v(_gs().sortSettingOpen) : v });
+  const setLoginModalOpen = (v) => _ms({ loginModalOpen: isFunction(v) ? v(_gs().loginModalOpen) : v });
+  const setLoginInitialError = (v) => _ms({ loginInitialError: isFunction(v) ? v(_gs().loginInitialError) : v });
+  const setFeedbackOpen = (v) => _ms({ feedbackOpen: isFunction(v) ? v(_gs().feedbackOpen) : v });
+  const setFeedbackNonce = (v) => _ms({ feedbackNonce: isFunction(v) ? v(_gs().feedbackNonce) : v });
+  const setDonateOpen = (v) => _ms({ donateOpen: isFunction(v) ? v(_gs().donateOpen) : v });
+  const setIsLogoutConfirmOpen = (v) => _ms({ isLogoutConfirmOpen: isFunction(v) ? v(_gs().isLogoutConfirmOpen) : v });
   const setPortfolioEarningsOpen = (v) =>
-    _ms({ portfolioEarningsOpen: typeof v === 'function' ? v(_gs().portfolioEarningsOpen) : v });
+    _ms({ portfolioEarningsOpen: isFunction(v) ? v(_gs().portfolioEarningsOpen) : v });
   const setMobileFundDrawerOpen = (v) =>
-    _ms({ mobileFundDrawerOpen: typeof v === 'function' ? v(_gs().mobileFundDrawerOpen) : v });
-  const setTutorialDrawerOpen = (v) =>
-    _ms({ tutorialDrawerOpen: typeof v === 'function' ? v(_gs().tutorialDrawerOpen) : v });
-  const setUpdateLogOpen = (v) => _ms({ updateLogOpen: typeof v === 'function' ? v(_gs().updateLogOpen) : v });
+    _ms({ mobileFundDrawerOpen: isFunction(v) ? v(_gs().mobileFundDrawerOpen) : v });
+  const setTutorialDrawerOpen = (v) => _ms({ tutorialDrawerOpen: isFunction(v) ? v(_gs().tutorialDrawerOpen) : v });
+  const setUpdateLogOpen = (v) => _ms({ updateLogOpen: isFunction(v) ? v(_gs().updateLogOpen) : v });
   const setMobileTableSettingModalOpen = (v) =>
-    _ms({ mobileTableSettingModalOpen: typeof v === 'function' ? v(_gs().mobileTableSettingModalOpen) : v });
-  const setIsUpdateModalOpen = (v) =>
-    _ms({ isUpdateModalOpen: typeof v === 'function' ? v(_gs().isUpdateModalOpen) : v });
-  const setHoldingModal = (v) => _ms({ holdingModal: typeof v === 'function' ? v(_gs().holdingModal) : v });
-  const setActionModal = (v) => _ms({ actionModal: typeof v === 'function' ? v(_gs().actionModal) : v });
-  const setTradeModal = (v) => _ms({ tradeModal: typeof v === 'function' ? v(_gs().tradeModal) : v });
-  const setConvertModal = (v) => _ms({ convertModal: typeof v === 'function' ? v(_gs().convertModal) : v });
-  const setDividendMethodModal = (v) =>
-    _ms({ dividendMethodModal: typeof v === 'function' ? v(_gs().dividendMethodModal) : v });
+    _ms({ mobileTableSettingModalOpen: isFunction(v) ? v(_gs().mobileTableSettingModalOpen) : v });
+  const setIsUpdateModalOpen = (v) => _ms({ isUpdateModalOpen: isFunction(v) ? v(_gs().isUpdateModalOpen) : v });
+  const setHoldingModal = (v) => _ms({ holdingModal: isFunction(v) ? v(_gs().holdingModal) : v });
+  const setActionModal = (v) => _ms({ actionModal: isFunction(v) ? v(_gs().actionModal) : v });
+  const setTradeModal = (v) => _ms({ tradeModal: isFunction(v) ? v(_gs().tradeModal) : v });
+  const setConvertModal = (v) => _ms({ convertModal: isFunction(v) ? v(_gs().convertModal) : v });
+  const setDividendMethodModal = (v) => _ms({ dividendMethodModal: isFunction(v) ? v(_gs().dividendMethodModal) : v });
   const setSelectHoldingGroupModal = (v) =>
-    _ms({ selectHoldingGroupModal: typeof v === 'function' ? v(_gs().selectHoldingGroupModal) : v });
-  const setDataSourceModal = (v) => _ms({ dataSourceModal: typeof v === 'function' ? v(_gs().dataSourceModal) : v });
-  const setDcaModal = (v) => _ms({ dcaModal: typeof v === 'function' ? v(_gs().dcaModal) : v });
-  const setClearConfirm = (v) => _ms({ clearConfirm: typeof v === 'function' ? v(_gs().clearConfirm) : v });
+    _ms({ selectHoldingGroupModal: isFunction(v) ? v(_gs().selectHoldingGroupModal) : v });
+  const setDataSourceModal = (v) => _ms({ dataSourceModal: isFunction(v) ? v(_gs().dataSourceModal) : v });
+  const setDcaModal = (v) => _ms({ dcaModal: isFunction(v) ? v(_gs().dcaModal) : v });
+  const setClearConfirm = (v) => _ms({ clearConfirm: isFunction(v) ? v(_gs().clearConfirm) : v });
   const setHoldingMigrateDialog = (v) =>
-    _ms({ holdingMigrateDialog: typeof v === 'function' ? v(_gs().holdingMigrateDialog) : v });
-  const setHistoryModal = (v) => _ms({ historyModal: typeof v === 'function' ? v(_gs().historyModal) : v });
-  const setAddHistoryModal = (v) => _ms({ addHistoryModal: typeof v === 'function' ? v(_gs().addHistoryModal) : v });
-  const setFundDeleteConfirm = (v) =>
-    _ms({ fundDeleteConfirm: typeof v === 'function' ? v(_gs().fundDeleteConfirm) : v });
+    _ms({ holdingMigrateDialog: isFunction(v) ? v(_gs().holdingMigrateDialog) : v });
+  const setHistoryModal = (v) => _ms({ historyModal: isFunction(v) ? v(_gs().historyModal) : v });
+  const setAddHistoryModal = (v) => _ms({ addHistoryModal: isFunction(v) ? v(_gs().addHistoryModal) : v });
+  const setFundDeleteConfirm = (v) => _ms({ fundDeleteConfirm: isFunction(v) ? v(_gs().fundDeleteConfirm) : v });
   const setFundDeleteBulkConfirm = (v) =>
-    _ms({ fundDeleteBulkConfirm: typeof v === 'function' ? v(_gs().fundDeleteBulkConfirm) : v });
-  const setFundTagsEdit = (v) => _ms({ fundTagsEdit: typeof v === 'function' ? v(_gs().fundTagsEdit) : v });
-  const setSuccessModal = (v) => _ms({ successModal: typeof v === 'function' ? v(_gs().successModal) : v });
+    _ms({ fundDeleteBulkConfirm: isFunction(v) ? v(_gs().fundDeleteBulkConfirm) : v });
+  const setFundTagsEdit = (v) => _ms({ fundTagsEdit: isFunction(v) ? v(_gs().fundTagsEdit) : v });
+  const setSuccessModal = (v) => _ms({ successModal: isFunction(v) ? v(_gs().successModal) : v });
 
   const fundDetailDrawerCloseRef = useRef(null); // 由 MobileFundTable 注入，用于确认删除时关闭基金详情 Drawer
   const fundDetailDialogCloseRef = useRef(null); // 由 PcFundTable 注入，用于确认删除时关闭基金详情 Dialog
@@ -536,7 +529,7 @@ export default function HomePage() {
         const scopeKey = source === SUMMARY_SOURCE_GLOBAL ? DAILY_EARNINGS_SCOPE_ALL : source;
         const bucket = getScopeBucket(scopeKey);
         const list = bucket[code];
-        if (Array.isArray(list) && list.length > 0) out[code] = list;
+        if (isArray(list) && list.length > 0) out[code] = list;
       });
       return out;
     }
@@ -556,7 +549,7 @@ export default function HomePage() {
     const groupIdsByCode = linkedHoldingsForAllFav?.groupIdsByCode || {};
 
     for (const code of linkedCodes) {
-      const groupIds = Array.isArray(groupIdsByCode[code]) ? groupIdsByCode[code] : [];
+      const groupIds = isArray(groupIdsByCode[code]) ? groupIdsByCode[code] : [];
       if (groupIds.length === 0) continue;
 
       let fallbackPrincipalCurrent = 0;
@@ -574,7 +567,7 @@ export default function HomePage() {
       for (const gid of groupIds) {
         const bucket = getScopeBucket(gid);
         const list = bucket[code];
-        if (!Array.isArray(list) || list.length === 0) continue;
+        if (!isArray(list) || list.length === 0) continue;
 
         for (const item of list) {
           const date = item?.date ? String(item.date) : '';
@@ -632,7 +625,7 @@ export default function HomePage() {
     Object.values(fundDailyEarnings).forEach((bucket) => {
       if (!isPlainObject(bucket)) return;
       Object.values(bucket).forEach((list) => {
-        if (!Array.isArray(list) || list.length === 0) return;
+        if (!isArray(list) || list.length === 0) return;
         list.forEach((item) => {
           const date = item?.date ? String(item.date) : '';
           const earnings = Number(item?.earnings);
@@ -667,7 +660,7 @@ export default function HomePage() {
     if (!activeGroupId) return transactions;
     const out = {};
     Object.entries(transactions || {}).forEach(([code, list]) => {
-      if (!Array.isArray(list)) return;
+      if (!isArray(list)) return;
       const filtered = list.filter((t) => t.groupId === activeGroupId);
       if (filtered.length) out[code] = filtered;
     });
@@ -719,7 +712,7 @@ export default function HomePage() {
     }
     if (currentTab === 'all' || currentTab === 'fav') return null;
     const group = groupById.get(currentTab);
-    if (!group || !Array.isArray(group.codes)) return null;
+    if (!group || !isArray(group.codes)) return null;
     return new Set(group.codes);
   }, [currentTab, groupById, groupsWithHoldings, funds, holdings, getHoldingProfit]);
 
@@ -939,9 +932,9 @@ export default function HomePage() {
       if (sortBy === 'yesterdayProfit') {
         const getYesterdayProfit = (code, jzrq) => {
           const list = currentFundDailyEarnings?.[code];
-          if (!Array.isArray(list) || list.length === 0) return null;
+          if (!isArray(list) || list.length === 0) return null;
           let matchedDaily = null;
-          if (typeof jzrq === 'string') {
+          if (isString(jzrq)) {
             for (const item of list) {
               if (item?.date === jzrq) {
                 matchedDaily = item;
@@ -1045,7 +1038,7 @@ export default function HomePage() {
         const getTagKey = (fund) => {
           const code = String(fund?.code ?? '').trim();
           const list = code ? fundTagListsByCode?.[code] : null;
-          if (!Array.isArray(list) || list.length === 0) return '';
+          if (!isArray(list) || list.length === 0) return '';
           return list
             .map((t) => (t?.name != null ? String(t.name).trim() : ''))
             .filter(Boolean)
@@ -1092,7 +1085,7 @@ export default function HomePage() {
       const code = f?.code;
       if (!code) continue;
       const list = currentFundDailyEarnings[code];
-      if (!Array.isArray(list) || list.length === 0) continue;
+      if (!isArray(list) || list.length === 0) continue;
       const byDate = new Map();
       for (const item of list) {
         const date = item?.date ? String(item.date) : '';
@@ -1134,15 +1127,11 @@ export default function HomePage() {
     return displayFunds.map((f) => {
       const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
       const latestNav =
-        f.dwjz != null && f.dwjz !== ''
-          ? typeof f.dwjz === 'number'
-            ? Number(f.dwjz).toFixed(4)
-            : String(f.dwjz)
-          : '—';
+        f.dwjz != null && f.dwjz !== '' ? (isNumber(f.dwjz) ? Number(f.dwjz).toFixed(4) : String(f.dwjz)) : '—';
       const estimateNav = f.noValuation
         ? '—'
         : f.gsz != null
-          ? typeof f.gsz === 'number'
+          ? isNumber(f.gsz)
             ? Number(f.gsz).toFixed(4)
             : String(f.gsz)
           : '—';
@@ -1300,14 +1289,14 @@ export default function HomePage() {
       const sinceAddedDate = (() => {
         const raw = sinceAddedDateRaw || '';
         if (!raw) return '';
-        const currentYear = typeof todayStr === 'string' && todayStr.length >= 4 ? todayStr.slice(0, 4) : '';
+        const currentYear = isString(todayStr) && todayStr.length >= 4 ? todayStr.slice(0, 4) : '';
         if (currentYear && raw.startsWith(`${currentYear}-`) && raw.length >= 10) return raw.slice(5);
         return raw;
       })();
 
       const fc = String(f.code ?? '').trim();
       const listFromDerived = fundTagListsByCode[fc];
-      const fundTags = Array.isArray(listFromDerived)
+      const fundTags = isArray(listFromDerived)
         ? listFromDerived.map(({ name, theme }) => ({
             name: String(name ?? '').trim(),
             theme: normalizeFundTagTheme(theme)
@@ -1700,7 +1689,7 @@ export default function HomePage() {
     // 复制“历史交易记录”到当前分组（不改变原记录）
     setTransactions((prev) => {
       const list = prev?.[fundCode] || [];
-      if (!Array.isArray(list) || list.length === 0) return prev;
+      if (!isArray(list) || list.length === 0) return prev;
 
       const existingCurrent = list.filter((t) => t && t.groupId === targetGid);
       const copiedKey = new Set(
@@ -1732,7 +1721,7 @@ export default function HomePage() {
 
     // 复制“待处理队列”到当前分组（不改变原记录）
     setPendingTrades((prev) => {
-      const list = Array.isArray(prev) ? prev : [];
+      const list = isArray(prev) ? prev : [];
       const existingCurrent = list.filter((t) => t && t.fundCode === fundCode && t.groupId === targetGid);
       const copiedKey = new Set(
         existingCurrent.filter((t) => t?.copiedFromId).map((t) => `${t.copiedFromId}|${t.copiedFromGroupId ?? ''}`)
@@ -2044,7 +2033,7 @@ export default function HomePage() {
     (code, tagRows) => {
       if (!code) return;
       const fc = String(code).trim();
-      const rows = Array.isArray(tagRows) ? tagRows : [];
+      const rows = isArray(tagRows) ? tagRows : [];
       const normalized = normalizeFundTagInstanceListFromInput(rows);
 
       setFundTagRecords((prev) => {
@@ -2112,7 +2101,7 @@ export default function HomePage() {
     (payload) => {
       const th = String(payload?.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME;
       const rawNames =
-        Array.isArray(payload?.names) && payload.names.length
+        isArray(payload?.names) && payload.names.length
           ? payload.names
           : payload?.name != null && String(payload.name).trim()
             ? [String(payload.name).trim()]
@@ -2413,7 +2402,7 @@ export default function HomePage() {
       setDcaPlans(nextPlans);
 
       const pendingSnapshot = useStorageStore.getState().pendingTrades;
-      const snapshotIds = new Set((Array.isArray(pendingSnapshot) ? pendingSnapshot : []).map((t) => t.id));
+      const snapshotIds = new Set((isArray(pendingSnapshot) ? pendingSnapshot : []).map((t) => t.id));
       const uniqueNewPending = newPending.filter((t) => !snapshotIds.has(t.id));
 
       setPendingTrades((prev) => {
@@ -2529,7 +2518,7 @@ export default function HomePage() {
         if (cancelled) return;
 
         const saved = storageStore.getItem('funds', []);
-        if (Array.isArray(saved) && saved.length) {
+        if (isArray(saved) && saved.length) {
           const deduped = dedupeByCode(saved);
           const fundCodeSet = new Set(deduped.map((f) => f?.code).filter(Boolean));
           let storedTagRows = [];
@@ -2538,7 +2527,7 @@ export default function HomePage() {
           } catch {
             /* empty */
           }
-          if (!Array.isArray(storedTagRows)) storedTagRows = [];
+          if (!isArray(storedTagRows)) storedTagRows = [];
           const normalizedTags = storedTagRows
             .map((r) => {
               const codes = getFundCodesFromTagRecord(r).filter((c) => fundCodeSet.has(c));
@@ -2557,7 +2546,7 @@ export default function HomePage() {
         } else {
           try {
             const t = storageStore.getItem('tags', []);
-            const arr = Array.isArray(t) ? t : [];
+            const arr = isArray(t) ? t : [];
             const normalized = arr
               .map((r) => {
                 const codes = getFundCodesFromTagRecord(r);
@@ -2588,7 +2577,7 @@ export default function HomePage() {
         }
         // 加载待处理交易
         const savedPending = storageStore.getItem('pendingTrades', []);
-        if (Array.isArray(savedPending)) {
+        if (isArray(savedPending)) {
           setPendingTrades(savedPending);
         }
         // 加载分组状态
@@ -2597,14 +2586,14 @@ export default function HomePage() {
         if (
           savedTab === 'all' ||
           savedTab === 'fav' ||
-          (savedTab && Array.isArray(groups) && groups.some((g) => g?.id === savedTab))
+          (savedTab && isArray(groups) && groups.some((g) => g?.id === savedTab))
         ) {
           setCurrentTab(savedTab);
         } else if (savedTab) {
           setCurrentTab('all');
         }
         // 加载持仓数据
-        const seedGh = seedGroupHoldingsFromGlobal(holdings, Array.isArray(groups) ? groups : [], groupHoldings);
+        const seedGh = seedGroupHoldingsFromGlobal(holdings, isArray(groups) ? groups : [], groupHoldings);
         if (seedGh.changed) {
           setGroupHoldings(seedGh.next);
         }
@@ -3054,7 +3043,7 @@ export default function HomePage() {
 
     setGroupHoldings((prev) => {
       const next = { ...(prev || {}) };
-      const getBucket = (gid) => (next[gid] && typeof next[gid] === 'object' ? { ...next[gid] } : {});
+      const getBucket = (gid) => (next[gid] && isObject(next[gid]) ? { ...next[gid] } : {});
 
       // 读取源持仓
       const sourceBucket = fromGid ? getBucket(fromGid) : null;
@@ -3106,7 +3095,7 @@ export default function HomePage() {
       let changed = false;
       for (const code of list) {
         const arr = out?.[code];
-        if (!Array.isArray(arr) || arr.length === 0) continue;
+        if (!isArray(arr) || arr.length === 0) continue;
         const nextArr = arr.map((tx) => {
           if (!tx) return tx;
           const inFromScope = fromGid ? tx.groupId === fromGid : !tx.groupId;
@@ -3128,8 +3117,8 @@ export default function HomePage() {
       const scoped = migrateDcaPlansToScoped(prev);
       const fromKey = fromGid || DCA_SCOPE_GLOBAL;
       const toKey = toGid || DCA_SCOPE_GLOBAL;
-      const fromBucket = scoped[fromKey] && typeof scoped[fromKey] === 'object' ? { ...scoped[fromKey] } : {};
-      const toBucket = scoped[toKey] && typeof scoped[toKey] === 'object' ? { ...scoped[toKey] } : {};
+      const fromBucket = scoped[fromKey] && isObject(scoped[fromKey]) ? { ...scoped[fromKey] } : {};
+      const toBucket = scoped[toKey] && isObject(scoped[toKey]) ? { ...scoped[toKey] } : {};
       let changed = false;
       for (const code of list) {
         if (fromBucket[code] === undefined) continue;
@@ -3585,32 +3574,29 @@ export default function HomePage() {
     const ms = Math.max(30, Number(seconds)) * 1000;
     setTempSeconds(Math.round(ms / 1000));
     setRefreshMs(ms);
-    const nextShowMarketIndex =
-      typeof showMarketIndexOverride === 'boolean'
-        ? showMarketIndexOverride
-        : isMobileOverride
-          ? showMarketIndexMobile
-          : showMarketIndexPc;
+    const nextShowMarketIndex = isBoolean(showMarketIndexOverride)
+      ? showMarketIndexOverride
+      : isMobileOverride
+        ? showMarketIndexMobile
+        : showMarketIndexPc;
 
     const targetIsMobile = Boolean(isMobileOverride);
     if (targetIsMobile) setShowMarketIndexMobile(nextShowMarketIndex);
     else setShowMarketIndexPc(nextShowMarketIndex);
 
-    const nextShowGroupFundSearch =
-      typeof showGroupFundSearchOverride === 'boolean'
-        ? showGroupFundSearchOverride
-        : targetIsMobile
-          ? showGroupFundSearchMobile
-          : showGroupFundSearchPc;
+    const nextShowGroupFundSearch = isBoolean(showGroupFundSearchOverride)
+      ? showGroupFundSearchOverride
+      : targetIsMobile
+        ? showGroupFundSearchMobile
+        : showGroupFundSearchPc;
     if (targetIsMobile) setShowGroupFundSearchMobile(nextShowGroupFundSearch);
     else setShowGroupFundSearchPc(nextShowGroupFundSearch);
 
-    const nextDynamicStyle =
-      typeof dynamicStyleOverride === 'boolean'
-        ? dynamicStyleOverride
-        : targetIsMobile
-          ? dynamicStyleMobile
-          : dynamicStylePc;
+    const nextDynamicStyle = isBoolean(dynamicStyleOverride)
+      ? dynamicStyleOverride
+      : targetIsMobile
+        ? dynamicStyleMobile
+        : dynamicStylePc;
     if (targetIsMobile) setDynamicStyleMobile(nextDynamicStyle);
     else setDynamicStylePc(nextDynamicStyle);
 
@@ -3735,7 +3721,7 @@ export default function HomePage() {
         let mergedFunds = currentFunds;
         let appendedCodes = [];
 
-        if (Array.isArray(data.funds)) {
+        if (isArray(data.funds)) {
           const incomingFunds = dedupeByCode(data.funds.map(stripLegacyTagsFromFundObject));
           const existingCodes = new Set(currentFunds.map((f) => f.code));
           const newItems = incomingFunds.filter((f) => f && f.code && !existingCodes.has(f.code));
@@ -3744,18 +3730,18 @@ export default function HomePage() {
           setFunds(mergedFunds);
         }
 
-        if (Array.isArray(data.favorites)) {
+        if (isArray(data.favorites)) {
           const fundCodeSet = new Set(mergedFunds.map((f) => f?.code).filter(Boolean));
           const mergedFav = cleanCodeArray([...currentFavorites, ...data.favorites], fundCodeSet);
           setFavorites(new Set(mergedFav));
         }
 
-        if (Array.isArray(data.tags)) {
+        if (isArray(data.tags)) {
           const currentTags = storageStore.getItem('tags', []);
           const fundCodeSet = new Set(mergedFunds.map((f) => f?.code).filter(Boolean));
-          const byId = new Map((Array.isArray(currentTags) ? currentTags : []).map((r) => [String(r.id), r]));
+          const byId = new Map((isArray(currentTags) ? currentTags : []).map((r) => [String(r.id), r]));
           for (const r of data.tags) {
-            if (!r || typeof r !== 'object') continue;
+            if (!r || !isObject(r)) continue;
             const codes = getFundCodesFromTagRecord(r).filter((c) => fundCodeSet.has(c));
             const name = String(r.name ?? '').trim();
             if (!name) continue;
@@ -3782,7 +3768,7 @@ export default function HomePage() {
 
         // fundTagLists 已废弃：导入时无需处理该字段
 
-        if (Array.isArray(data.groups)) {
+        if (isArray(data.groups)) {
           // 合并分组：如果 ID 相同则合并 codes，否则添加新分组
           const mergedGroups = [...currentGroups];
           data.groups.forEach((incomingGroup) => {
@@ -3799,17 +3785,17 @@ export default function HomePage() {
           setGroups(mergedGroups);
         }
 
-        if (Array.isArray(data.collapsedCodes)) {
+        if (isArray(data.collapsedCodes)) {
           const mergedCollapsed = Array.from(new Set([...currentCollapsed, ...data.collapsedCodes]));
           setCollapsedCodes(new Set(mergedCollapsed));
         }
 
-        if (Array.isArray(data.collapsedTrends)) {
+        if (isArray(data.collapsedTrends)) {
           const mergedTrends = Array.from(new Set([...currentTrends, ...data.collapsedTrends]));
           setCollapsedTrends(new Set(mergedTrends));
         }
 
-        if (Array.isArray(data.collapsedEarnings)) {
+        if (isArray(data.collapsedEarnings)) {
           const mergedEarnings = Array.from(new Set([...currentEarnings, ...data.collapsedEarnings]));
           setCollapsedEarnings(new Set(mergedEarnings));
         }
@@ -3840,7 +3826,7 @@ export default function HomePage() {
           const currentTransactions = storageStore.getItem('transactions', {});
           const mergedTransactions = { ...currentTransactions };
           Object.entries(data.transactions).forEach(([code, txs]) => {
-            if (!Array.isArray(txs)) return;
+            if (!isArray(txs)) return;
             const existing = mergedTransactions[code] || [];
             const existingIds = new Set(existing.map((t) => t.id));
             const newTxs = txs.filter((t) => !existingIds.has(t.id));
@@ -3849,8 +3835,8 @@ export default function HomePage() {
           setTransactions(mergedTransactions);
         }
 
-        if (Array.isArray(data.pendingTrades)) {
-          const existingPending = Array.isArray(currentPendingTrades) ? currentPendingTrades : [];
+        if (isArray(data.pendingTrades)) {
+          const existingPending = isArray(currentPendingTrades) ? currentPendingTrades : [];
           const incomingPending = data.pendingTrades.filter((trade) => trade && trade.fundCode);
           const fundCodeSet = new Set(mergedFunds.map((f) => f.code));
           const keyOf = (trade) => {
@@ -3889,7 +3875,7 @@ export default function HomePage() {
               ...data.customSettings
             };
             setCustomSettings(mergedSettings);
-            if (mergedSettings.localSortRules && Array.isArray(mergedSettings.localSortRules)) {
+            if (mergedSettings.localSortRules && isArray(mergedSettings.localSortRules)) {
               setSortRules(mergedSettings.localSortRules);
             }
             if (mergedSettings.localSortDisplayMode && SORT_DISPLAY_MODES.has(mergedSettings.localSortDisplayMode)) {
@@ -3909,20 +3895,16 @@ export default function HomePage() {
                 setMobileSortDisplayMode(mergedSettings.mobileLocalSortDisplayMode);
               }
             }
-            if (
-              typeof mergedSettings.pcContainerWidth === 'number' &&
-              Number.isFinite(mergedSettings.pcContainerWidth)
-            ) {
+            if (isNumber(mergedSettings.pcContainerWidth) && Number.isFinite(mergedSettings.pcContainerWidth)) {
               const maxWidth = window.matchMedia('(max-width: 640px)').matches ? 99999 : window.innerWidth;
               setContainerWidth(Math.min(maxWidth, Math.max(600, mergedSettings.pcContainerWidth)));
             }
-            if (typeof mergedSettings.showMarketIndexPc === 'boolean')
-              setShowMarketIndexPc(mergedSettings.showMarketIndexPc);
-            if (typeof mergedSettings.showMarketIndexMobile === 'boolean')
+            if (isBoolean(mergedSettings.showMarketIndexPc)) setShowMarketIndexPc(mergedSettings.showMarketIndexPc);
+            if (isBoolean(mergedSettings.showMarketIndexMobile))
               setShowMarketIndexMobile(mergedSettings.showMarketIndexMobile);
-            if (typeof mergedSettings.showGroupFundSearchPc === 'boolean')
+            if (isBoolean(mergedSettings.showGroupFundSearchPc))
               setShowGroupFundSearchPc(mergedSettings.showGroupFundSearchPc);
-            if (typeof mergedSettings.showGroupFundSearchMobile === 'boolean')
+            if (isBoolean(mergedSettings.showGroupFundSearchMobile))
               setShowGroupFundSearchMobile(mergedSettings.showGroupFundSearchMobile);
           } catch {}
         }
@@ -3937,8 +3919,8 @@ export default function HomePage() {
               const existingBucket = isPlainObject(mergedDaily[scope]) ? mergedDaily[scope] : {};
               const mergedBucket = { ...existingBucket };
               Object.entries(bucket).forEach(([code, list]) => {
-                if (!Array.isArray(list)) return;
-                const existingList = Array.isArray(mergedBucket[code]) ? mergedBucket[code] : [];
+                if (!isArray(list)) return;
+                const existingList = isArray(mergedBucket[code]) ? mergedBucket[code] : [];
                 const existingByDate = new Map(existingList.map((item) => [item.date, item]));
                 list.forEach((item) => {
                   if (!item || !item.date || !Number.isFinite(item.earnings)) return;
@@ -4344,7 +4326,7 @@ export default function HomePage() {
     setTempSeconds,
     containerWidth,
     setContainerWidth,
-    importMsg: typeof importMsg === 'string' ? importMsg : '',
+    importMsg: isString(importMsg) ? importMsg : '',
     saveSettings,
     exportLocalData,
     handleResetContainerWidth,

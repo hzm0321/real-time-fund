@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isNumber } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 
 function buildTableRows(series) {
-  if (!Array.isArray(series) || series.length === 0) return [];
+  if (!isArray(series) || series.length === 0) return [];
   return [...series].reverse();
 }
 
@@ -42,7 +43,7 @@ export default function FundDailyEarningsDetailModal({
         header: '收益',
         cell: (info) => {
           const v = info.getValue();
-          const isValid = typeof v === 'number' && Number.isFinite(v);
+          const isValid = isNumber(v) && Number.isFinite(v);
           if (masked) return '***';
           if (!isValid) return '—';
           const sign = v > 0 ? '+' : v < 0 ? '-' : '';

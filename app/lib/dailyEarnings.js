@@ -11,14 +11,14 @@
  * - rate: 当日收益率（百分比数值，如 1.23 表示 +1.23%），基于用户成本价计算，即 (当日收益 / 成本金额) × 100
  * - baseCostAmount: 当日成本快照金额（元），用于冻结当日收益率分母
  */
-import { isPlainObject, isString, isNumber } from 'lodash';
+import { isArray, isNumber, isObject, isPlainObject, isString } from 'lodash';
 import { storageStore } from '@/app/stores';
 import { DAILY_EARNINGS_SCOPE_ALL } from '@/app/constants';
 
 const STORAGE_KEY = 'fundDailyEarnings';
 
 function normalizeItem(item) {
-  if (!item || typeof item !== 'object') return null;
+  if (!item || !isObject(item)) return null;
   const date = item.date;
   const earnings = item.earnings;
   const rate = item.rate;
@@ -69,7 +69,7 @@ export function recordDailyEarnings(code, earnings, dateStr) {
 
   const all = getStored();
   const scoped = isPlainObject(all[scope]) ? all[scope] : {};
-  const list = Array.isArray(scoped[code]) ? scoped[code] : [];
+  const list = isArray(scoped[code]) ? scoped[code] : [];
   const existingIndex = list.findIndex((item) => item.date === dateStr);
 
   const baseCostAmount =
@@ -94,7 +94,7 @@ export function recordDailyEarnings(code, earnings, dateStr) {
 export function getDailyEarnings(code, scope = DAILY_EARNINGS_SCOPE_ALL) {
   const all = getStored();
   const scoped = isPlainObject(all[scope]) ? all[scope] : {};
-  const list = Array.isArray(scoped[code]) ? scoped[code] : [];
+  const list = isArray(scoped[code]) ? scoped[code] : [];
   return list.map(normalizeItem).filter(Boolean);
 }
 
@@ -146,7 +146,7 @@ export function aggregatePortfolioDailyEarnings(fundDailyEarningsMap) {
   const byDate = new Map();
   for (const code of Object.keys(fundDailyEarningsMap)) {
     const list = fundDailyEarningsMap[code];
-    if (!Array.isArray(list)) continue;
+    if (!isArray(list)) continue;
     for (const raw of list) {
       const item = normalizeItem(raw);
       if (!item) continue;

@@ -1,4 +1,5 @@
 'use client';
+import { isNumber } from 'lodash';
 
 import * as React from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
@@ -16,7 +17,7 @@ function useScrollLock(open) {
 }
 
 function parseVhToPx(vhStr) {
-  if (typeof vhStr === 'number') return vhStr;
+  if (isNumber(vhStr)) return vhStr;
   const match = String(vhStr).match(/^([\d.]+)\s*vh$/);
   if (!match) return null;
   if (typeof window === 'undefined') return null;

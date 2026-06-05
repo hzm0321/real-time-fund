@@ -1,4 +1,5 @@
 'use client';
+import { isString } from 'lodash';
 
 import { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
@@ -24,7 +25,7 @@ export default function UpdateChecker({ onModalOpenChange }) {
     const checkUpdate = async () => {
       try {
         const data = await fetchLatestRelease();
-        if (!data || !data.tagName || typeof data.tagName !== 'string') return;
+        if (!data || !data.tagName || !isString(data.tagName)) return;
         const remoteVersion = data.tagName.replace(/^v/, '');
         if (remoteVersion !== packageJson.version) {
           setHasUpdate(true);

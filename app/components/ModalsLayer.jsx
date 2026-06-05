@@ -2,7 +2,7 @@
 
 import { AnimatePresence } from 'framer-motion';
 import { RefreshCw, FolderPlusIcon } from 'lucide-react';
-import { isPlainObject } from 'lodash';
+import { isFunction, isPlainObject } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
 import { useModalStore } from '../stores';
@@ -112,58 +112,51 @@ export default function ModalsLayer({ callbacksRef }) {
   // ---- Modal setter 兼容层（直接操作 Zustand，不订阅）----
   const _ms = useModalStore.setState;
   const _gs = useModalStore.getState;
-  const setSettingsOpen = (v) => _ms({ settingsOpen: typeof v === 'function' ? v(_gs().settingsOpen) : v });
-  const setFeedbackOpen = (v) => _ms({ feedbackOpen: typeof v === 'function' ? v(_gs().feedbackOpen) : v });
-  const setWeChatOpen = (v) => _ms({ weChatOpen: typeof v === 'function' ? v(_gs().weChatOpen) : v });
-  const setDonateOpen = (v) => _ms({ donateOpen: typeof v === 'function' ? v(_gs().donateOpen) : v });
-  const setLoginModalOpen = (v) => _ms({ loginModalOpen: typeof v === 'function' ? v(_gs().loginModalOpen) : v });
-  const setLoginInitialError = (v) =>
-    _ms({ loginInitialError: typeof v === 'function' ? v(_gs().loginInitialError) : v });
-  const setTutorialDrawerOpen = (v) =>
-    _ms({ tutorialDrawerOpen: typeof v === 'function' ? v(_gs().tutorialDrawerOpen) : v });
-  const setUpdateLogOpen = (v) => _ms({ updateLogOpen: typeof v === 'function' ? v(_gs().updateLogOpen) : v });
-  const setSortSettingOpen = (v) => _ms({ sortSettingOpen: typeof v === 'function' ? v(_gs().sortSettingOpen) : v });
-  const setAllSectorsModalOpen = (v) =>
-    _ms({ allSectorsModalOpen: typeof v === 'function' ? v(_gs().allSectorsModalOpen) : v });
-  const setGroupModalOpen = (v) => _ms({ groupModalOpen: typeof v === 'function' ? v(_gs().groupModalOpen) : v });
-  const setGroupManageOpen = (v) => _ms({ groupManageOpen: typeof v === 'function' ? v(_gs().groupManageOpen) : v });
-  const setAddFundToGroupOpen = (v) =>
-    _ms({ addFundToGroupOpen: typeof v === 'function' ? v(_gs().addFundToGroupOpen) : v });
+  const setSettingsOpen = (v) => _ms({ settingsOpen: isFunction(v) ? v(_gs().settingsOpen) : v });
+  const setFeedbackOpen = (v) => _ms({ feedbackOpen: isFunction(v) ? v(_gs().feedbackOpen) : v });
+  const setWeChatOpen = (v) => _ms({ weChatOpen: isFunction(v) ? v(_gs().weChatOpen) : v });
+  const setDonateOpen = (v) => _ms({ donateOpen: isFunction(v) ? v(_gs().donateOpen) : v });
+  const setLoginModalOpen = (v) => _ms({ loginModalOpen: isFunction(v) ? v(_gs().loginModalOpen) : v });
+  const setLoginInitialError = (v) => _ms({ loginInitialError: isFunction(v) ? v(_gs().loginInitialError) : v });
+  const setTutorialDrawerOpen = (v) => _ms({ tutorialDrawerOpen: isFunction(v) ? v(_gs().tutorialDrawerOpen) : v });
+  const setUpdateLogOpen = (v) => _ms({ updateLogOpen: isFunction(v) ? v(_gs().updateLogOpen) : v });
+  const setSortSettingOpen = (v) => _ms({ sortSettingOpen: isFunction(v) ? v(_gs().sortSettingOpen) : v });
+  const setAllSectorsModalOpen = (v) => _ms({ allSectorsModalOpen: isFunction(v) ? v(_gs().allSectorsModalOpen) : v });
+  const setGroupModalOpen = (v) => _ms({ groupModalOpen: isFunction(v) ? v(_gs().groupModalOpen) : v });
+  const setGroupManageOpen = (v) => _ms({ groupManageOpen: isFunction(v) ? v(_gs().groupManageOpen) : v });
+  const setAddFundToGroupOpen = (v) => _ms({ addFundToGroupOpen: isFunction(v) ? v(_gs().addFundToGroupOpen) : v });
   const setPortfolioEarningsOpen = (v) =>
-    _ms({ portfolioEarningsOpen: typeof v === 'function' ? v(_gs().portfolioEarningsOpen) : v });
-  const setSuccessModal = (v) => _ms({ successModal: typeof v === 'function' ? v(_gs().successModal) : v });
-  const setCloudConfigModal = (v) => _ms({ cloudConfigModal: typeof v === 'function' ? v(_gs().cloudConfigModal) : v });
-  const setDeviceConflictModal = (v) =>
-    _ms({ deviceConflictModal: typeof v === 'function' ? v(_gs().deviceConflictModal) : v });
-  const setFundDeleteConfirm = (v) =>
-    _ms({ fundDeleteConfirm: typeof v === 'function' ? v(_gs().fundDeleteConfirm) : v });
+    _ms({ portfolioEarningsOpen: isFunction(v) ? v(_gs().portfolioEarningsOpen) : v });
+  const setSuccessModal = (v) => _ms({ successModal: isFunction(v) ? v(_gs().successModal) : v });
+  const setCloudConfigModal = (v) => _ms({ cloudConfigModal: isFunction(v) ? v(_gs().cloudConfigModal) : v });
+  const setDeviceConflictModal = (v) => _ms({ deviceConflictModal: isFunction(v) ? v(_gs().deviceConflictModal) : v });
+  const setFundDeleteConfirm = (v) => _ms({ fundDeleteConfirm: isFunction(v) ? v(_gs().fundDeleteConfirm) : v });
   const setFundDeleteBulkConfirm = (v) =>
-    _ms({ fundDeleteBulkConfirm: typeof v === 'function' ? v(_gs().fundDeleteBulkConfirm) : v });
-  const setHoldingModal = (v) => _ms({ holdingModal: typeof v === 'function' ? v(_gs().holdingModal) : v });
-  const setActionModal = (v) => _ms({ actionModal: typeof v === 'function' ? v(_gs().actionModal) : v });
-  const setTradeModal = (v) => _ms({ tradeModal: typeof v === 'function' ? v(_gs().tradeModal) : v });
-  const setConvertModal = (v) => _ms({ convertModal: typeof v === 'function' ? v(_gs().convertModal) : v });
-  const setDividendMethodModal = (v) =>
-    _ms({ dividendMethodModal: typeof v === 'function' ? v(_gs().dividendMethodModal) : v });
+    _ms({ fundDeleteBulkConfirm: isFunction(v) ? v(_gs().fundDeleteBulkConfirm) : v });
+  const setHoldingModal = (v) => _ms({ holdingModal: isFunction(v) ? v(_gs().holdingModal) : v });
+  const setActionModal = (v) => _ms({ actionModal: isFunction(v) ? v(_gs().actionModal) : v });
+  const setTradeModal = (v) => _ms({ tradeModal: isFunction(v) ? v(_gs().tradeModal) : v });
+  const setConvertModal = (v) => _ms({ convertModal: isFunction(v) ? v(_gs().convertModal) : v });
+  const setDividendMethodModal = (v) => _ms({ dividendMethodModal: isFunction(v) ? v(_gs().dividendMethodModal) : v });
   const setSelectFundSingleModal = (v) =>
-    _ms({ selectFundSingleModal: typeof v === 'function' ? v(_gs().selectFundSingleModal) : v });
+    _ms({ selectFundSingleModal: isFunction(v) ? v(_gs().selectFundSingleModal) : v });
   const setSelectHoldingGroupModal = (v) =>
-    _ms({ selectHoldingGroupModal: typeof v === 'function' ? v(_gs().selectHoldingGroupModal) : v });
-  const setDataSourceModal = (v) => _ms({ dataSourceModal: typeof v === 'function' ? v(_gs().dataSourceModal) : v });
-  const setDcaModal = (v) => _ms({ dcaModal: typeof v === 'function' ? v(_gs().dcaModal) : v });
-  const setClearConfirm = (v) => _ms({ clearConfirm: typeof v === 'function' ? v(_gs().clearConfirm) : v });
+    _ms({ selectHoldingGroupModal: isFunction(v) ? v(_gs().selectHoldingGroupModal) : v });
+  const setDataSourceModal = (v) => _ms({ dataSourceModal: isFunction(v) ? v(_gs().dataSourceModal) : v });
+  const setDcaModal = (v) => _ms({ dcaModal: isFunction(v) ? v(_gs().dcaModal) : v });
+  const setClearConfirm = (v) => _ms({ clearConfirm: isFunction(v) ? v(_gs().clearConfirm) : v });
   const setHoldingMigrateDialog = (v) =>
-    _ms({ holdingMigrateDialog: typeof v === 'function' ? v(_gs().holdingMigrateDialog) : v });
-  const setHistoryModal = (v) => _ms({ historyModal: typeof v === 'function' ? v(_gs().historyModal) : v });
-  const setAddHistoryModal = (v) => _ms({ addHistoryModal: typeof v === 'function' ? v(_gs().addHistoryModal) : v });
-  const setFundTagsEdit = (v) => _ms({ fundTagsEdit: typeof v === 'function' ? v(_gs().fundTagsEdit) : v });
+    _ms({ holdingMigrateDialog: isFunction(v) ? v(_gs().holdingMigrateDialog) : v });
+  const setHistoryModal = (v) => _ms({ historyModal: isFunction(v) ? v(_gs().historyModal) : v });
+  const setAddHistoryModal = (v) => _ms({ addHistoryModal: isFunction(v) ? v(_gs().addHistoryModal) : v });
+  const setFundTagsEdit = (v) => _ms({ fundTagsEdit: isFunction(v) ? v(_gs().fundTagsEdit) : v });
   const setMobileTableSettingModalOpen = (v) =>
-    _ms({ mobileTableSettingModalOpen: typeof v === 'function' ? v(_gs().mobileTableSettingModalOpen) : v });
+    _ms({ mobileTableSettingModalOpen: isFunction(v) ? v(_gs().mobileTableSettingModalOpen) : v });
   const setMobileFundDrawerOpen = (v) =>
-    _ms({ mobileFundDrawerOpen: typeof v === 'function' ? v(_gs().mobileFundDrawerOpen) : v });
-  const setScanModalOpen = (v) => _ms({ scanModalOpen: typeof v === 'function' ? v(_gs().scanModalOpen) : v });
+    _ms({ mobileFundDrawerOpen: isFunction(v) ? v(_gs().mobileFundDrawerOpen) : v });
+  const setScanModalOpen = (v) => _ms({ scanModalOpen: isFunction(v) ? v(_gs().scanModalOpen) : v });
   const setScanConfirmModalOpen = (v) =>
-    _ms({ scanConfirmModalOpen: typeof v === 'function' ? v(_gs().scanConfirmModalOpen) : v });
+    _ms({ scanConfirmModalOpen: isFunction(v) ? v(_gs().scanConfirmModalOpen) : v });
 
   return (
     <>
@@ -586,13 +579,13 @@ export default function ModalsLayer({ callbacksRef }) {
                 excludeCodes={selectFundSingleModal.excludeCodes}
                 initialSelectedCode={selectFundSingleModal.initialSelectedCode}
                 onClose={() => {
-                  if (typeof selectFundSingleModal._resolve === 'function') {
+                  if (isFunction(selectFundSingleModal._resolve)) {
                     selectFundSingleModal._resolve(null);
                   }
                   setSelectFundSingleModal({ open: false, excludeCodes: [], initialSelectedCode: '' });
                 }}
                 onConfirm={(picked) => {
-                  if (typeof selectFundSingleModal._resolve === 'function') {
+                  if (isFunction(selectFundSingleModal._resolve)) {
                     selectFundSingleModal._resolve(picked);
                   }
                   setSelectFundSingleModal({ open: false, excludeCodes: [], initialSelectedCode: '' });

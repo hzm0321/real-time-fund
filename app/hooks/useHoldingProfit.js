@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { isNumber, isString } from 'lodash';
+import { isArray, isNumber, isString } from 'lodash';
 import { useStorageStore } from '../stores';
 import { useTradingDay } from './useTradingDay';
 import { formatDate, toTz, isNavUpdated } from '../lib/fundHelpers';
@@ -31,7 +31,7 @@ export function useHoldingProfit({ activeGroupId } = {}) {
       const cachedDivs = currentStore.fundDividends?.[fund.code]?.list;
       const txs = currentStore.transactions?.[fund.code] || [];
 
-      if (cachedDivs && Array.isArray(cachedDivs)) {
+      if (cachedDivs && isArray(cachedDivs)) {
         let earliestDate = holding.firstPurchaseDate;
         if (!earliestDate) {
           for (const tx of txs) {

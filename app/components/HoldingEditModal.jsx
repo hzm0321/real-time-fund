@@ -1,4 +1,5 @@
 'use client';
+import { isFunction } from 'lodash';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
@@ -182,7 +183,7 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <SettingsIcon width="20" height="20" />
             <span>设置持仓</span>
-            {typeof onOpenTrade === 'function' && (
+            {isFunction(onOpenTrade) && (
               <button
                 type="button"
                 onClick={onOpenTrade}

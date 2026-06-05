@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isObject } from 'lodash';
 
 import { useState, useMemo } from 'react';
 import { Search, Info } from 'lucide-react';
@@ -158,10 +159,10 @@ export default function AddFundToGroupModal({
                     <div style={{ fontWeight: 600 }}>{fund.name}</div>
                     <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
                       <span className="muted">#{fund.code}</span>
-                      {Array.isArray(fundTagListsByCode[fund.code]) && fundTagListsByCode[fund.code].length > 0 && (
+                      {isArray(fundTagListsByCode[fund.code]) && fundTagListsByCode[fund.code].length > 0 && (
                         <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 2 }}>
                           {fundTagListsByCode[fund.code].map((raw, idx) => {
-                            if (!raw || typeof raw !== 'object' || !raw.name) return null;
+                            if (!raw || !isObject(raw) || !raw.name) return null;
                             const name = String(raw.name).trim();
                             if (!name) return null;
                             // 优先取全局标签池中的最新主题，实例快照 theme 作为兜底

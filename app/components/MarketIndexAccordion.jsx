@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isObject } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useState, useRef } from 'react';
@@ -68,7 +69,7 @@ function MiniTrendLine({ changePercent, code, className }) {
       try {
         const raw = window[varName];
         const series =
-          raw && raw.data && raw.data[code] && raw.data[code].data && Array.isArray(raw.data[code].data.data)
+          raw && raw.data && raw.data[code] && raw.data[code].data && isArray(raw.data[code].data.data)
             ? raw.data[code].data.data
             : null;
         if (!series || !series.length) {
@@ -205,7 +206,7 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
     setLoading(true);
     fetchMarketIndices()
       .then((data) => {
-        if (!cancelled) setIndices(Array.isArray(data) ? data : []);
+        if (!cancelled) setIndices(isArray(data) ? data : []);
       })
       .catch(() => {
         if (!cancelled) setIndices([]);
@@ -239,7 +240,7 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
       const parsed = storageStore.getItem('marketIndexSelected');
       const availableCodes = new Set(indices.map((it) => it.code));
       if (parsed) {
-        if (Array.isArray(parsed)) {
+        if (isArray(parsed)) {
           const filtered = parsed.filter((c) => availableCodes.has(c));
           if (filtered.length) {
             setSelectedCodes(filtered);
@@ -272,7 +273,7 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
       }
 
       const next =
-        parsed && typeof parsed === 'object'
+        parsed && isObject(parsed)
           ? { ...parsed, marketIndexSelected: selectedCodes }
           : { marketIndexSelected: selectedCodes };
       storageStore.setItem('customSettings', JSON.stringify(next));

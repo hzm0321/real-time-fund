@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isString } from 'lodash';
+import { isArray, isNumber, isObject, isString } from 'lodash';
 import { storageStore } from '../stores';
 import { withRetry } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
@@ -86,7 +86,7 @@ const processRelatedSectorsQueue = async () => {
       if (error) throw error;
 
       const foundMap = new Map();
-      if (Array.isArray(data)) {
+      if (isArray(data)) {
         data.forEach((item) => {
           const c = String(item.fund_code).trim();
           const v = item.related_sector != null ? String(item.related_sector).trim() : '';
@@ -134,7 +134,7 @@ const processFundSecidsQueue = async () => {
     if (error) throw error;
 
     const foundMap = new Map();
-    if (Array.isArray(data)) {
+    if (isArray(data)) {
       data.forEach((item) => {
         const l = String(item.related_sector).trim();
         const s = item.secid != null ? String(item.secid).trim() : '';
@@ -169,7 +169,7 @@ const processFundSecidsQueue = async () => {
  * @param {string[]} codes
  */
 export const fetchRelatedSectorsBatch = async (codes, { cacheTime = ONE_DAY_MS, authSegment = 'anon' } = {}) => {
-  if (!Array.isArray(codes) || codes.length === 0) return {};
+  if (!isArray(codes) || codes.length === 0) return {};
   if (!isSupabaseConfigured) return {};
 
   const seg = authSegment != null && authSegment !== '' ? String(authSegment) : 'anon';
@@ -237,7 +237,7 @@ const SECTOR_QUOTE_CACHE_MS = 60 * 1000;
  * @param {string[]} labels
  */
 export const fetchFundSecidsBatch = async (labels, { cacheTime = ONE_DAY_MS } = {}) => {
-  if (!Array.isArray(labels) || labels.length === 0) return {};
+  if (!isArray(labels) || labels.length === 0) return {};
   if (!isSupabaseConfigured) return {};
 
   const qc = getQueryClient();
@@ -299,7 +299,7 @@ export const fetchFundSecidsBatch = async (labels, { cacheTime = ONE_DAY_MS } = 
  * @returns {Promise<Record<string, { name: string, code: string, pct: number|null }|null>>}
  */
 export const fetchEastmoneySectorQuotesBatch = async (secids, { cacheTime = SECTOR_QUOTE_CACHE_MS } = {}) => {
-  if (!Array.isArray(secids) || secids.length === 0) return {};
+  if (!isArray(secids) || secids.length === 0) return {};
   if (typeof fetch === 'undefined') return {};
 
   const qc = getQueryClient();
@@ -334,7 +334,7 @@ export const fetchEastmoneySectorQuotesBatch = async (secids, { cacheTime = SECT
           if (!res.ok) return;
           const json = await res.json();
           const diff = json?.data?.diff;
-          if (!Array.isArray(diff)) return;
+          if (!isArray(diff)) return;
 
           for (const item of diff) {
             const code = item.f12 != null ? String(item.f12) : '';
@@ -659,12 +659,10 @@ export const fetchNetValueRangeFromTrend = async (code, sdate, edate, options = 
   try {
     const pz = await fetchFundPingzhongdata(String(code).trim(), { cacheTime });
     const trend = pz?.Data_netWorthTrend;
-    if (!Array.isArray(trend) || trend.length === 0) return [];
+    if (!isArray(trend) || trend.length === 0) return [];
 
     // 过滤出有效数据点并按时间升序排列
-    const valid = trend
-      .filter((d) => d && typeof d.x === 'number' && Number.isFinite(Number(d.y)))
-      .sort((a, b) => a.x - b.x);
+    const valid = trend.filter((d) => d && isNumber(d.x) && Number.isFinite(Number(d.y))).sort((a, b) => a.x - b.x);
 
     // 按日期去重（同一天可能有多个数据点，取最后一条）并转换格式
     const byDate = new Map();
@@ -843,7 +841,7 @@ function ensureJsonpgzDispatcher() {
 
   const dispatcher = (json) => {
     try {
-      if (!json || typeof json !== 'object') {
+      if (!json || !isObject(json)) {
         fundDebugLog('jsonpgz called with invalid payload', json);
         // 部分情况下接口会回调 jsonpgz() 但不给参数（undefined）。
         // 若当前只有 1 个 pending，可视为该请求失败信号，直接触发其 fallback，避免一直等到超时。
@@ -1045,11 +1043,7 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
   if (ds === 2 || ds === 3) {
     fundDebugLog('fetchFundValuationBySource sina', { code: c, dataSource: ds });
     const res = await fetchSinaEstimateNetworthResponse(c);
-    if (
-      !res?.result?.data?.networth ||
-      !Array.isArray(res.result.data.networth) ||
-      res.result.data.networth.length === 0
-    ) {
+    if (!res?.result?.data?.networth || !isArray(res.result.data.networth) || res.result.data.networth.length === 0) {
       throw new Error('sina no data');
     }
     const networth = res.result.data.networth;
@@ -1151,7 +1145,7 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
         fundDebugLog('fetchFundValuationBySource jsonpgz', { code: c, fundcode: json?.fundcode });
         cleanupScript();
 
-        if (!json || typeof json !== 'object') {
+        if (!json || !isObject(json)) {
           trySupabaseFallback(new Error('invalid json'));
           return;
         }
@@ -1231,7 +1225,7 @@ export const fetchFundData = async (c, overrideDataSource) => {
   if (!overrideDataSource) {
     try {
       const arr = storageStore.getItem('funds', []);
-      if (Array.isArray(arr)) {
+      if (isArray(arr)) {
         const f = arr.find((x) => x.code === code);
         if (f) {
           if (f.dataSource) dataSource = f.dataSource;
@@ -1691,7 +1685,7 @@ const MARKET_INDEX_KEYS = [
 ];
 
 function parseIndexRaw(data) {
-  if (!data || typeof data !== 'string') return null;
+  if (!data || !isString(data)) return null;
   const parts = data.split('~');
   if (parts.length < 33) return null;
   const name = parts[1] || '';
@@ -1708,7 +1702,7 @@ function parseIndexRaw(data) {
 }
 
 function parseGlobalIndexRaw(data) {
-  if (!data || typeof data !== 'string') return null;
+  if (!data || !isString(data)) return null;
   const parts = data.split('~');
   if (parts.length < 6) return null;
   const name = parts[1] || '';
@@ -1945,10 +1939,8 @@ function parsePingzhongSylNumber(raw) {
  * pingzhongdata 另提供 syl_6y（近六月）等；近周无独立字段，由走势推算。
  */
 export function computeWeekReturnFromNetWorthTrend(trend) {
-  if (!Array.isArray(trend) || trend.length < 2) return null;
-  const valid = trend
-    .filter((d) => d && typeof d.x === 'number' && Number.isFinite(Number(d.y)))
-    .sort((a, b) => a.x - b.x);
+  if (!isArray(trend) || trend.length < 2) return null;
+  const valid = trend.filter((d) => d && isNumber(d.x) && Number.isFinite(Number(d.y))).sort((a, b) => a.x - b.x);
   if (valid.length < 2) return null;
   const latest = valid[valid.length - 1];
   const latestMs = latest.x;
@@ -1972,10 +1964,8 @@ export function computeWeekReturnFromNetWorthTrend(trend) {
  * @returns {{ type: 'up' | 'down', days: number } | null}
  */
 export function calculateConsecutiveTrend(trend) {
-  if (!Array.isArray(trend) || trend.length < 2) return null;
-  const valid = trend
-    .filter((d) => d && typeof d.x === 'number' && Number.isFinite(Number(d.y)))
-    .sort((a, b) => a.x - b.x);
+  if (!isArray(trend) || trend.length < 2) return null;
+  const valid = trend.filter((d) => d && isNumber(d.x) && Number.isFinite(Number(d.y))).sort((a, b) => a.x - b.x);
   if (valid.length < 2) return null;
 
   let count = 0;
@@ -2062,13 +2052,13 @@ export const fetchFundHistory = async (code, range = '1m') => {
     const trend = pz?.Data_netWorthTrend;
     const grandTotal = pz?.Data_grandTotal;
 
-    if (Array.isArray(trend) && trend.length) {
+    if (isArray(trend) && trend.length) {
       const startMs = start.startOf('day').valueOf();
       const endMs = end.endOf('day').valueOf();
 
       // 若起始日没有净值，则往前推到最近一日有净值的数据作为有效起始
       const validTrend = trend
-        .filter((d) => d && typeof d.x === 'number' && Number.isFinite(Number(d.y)) && d.x <= endMs)
+        .filter((d) => d && isNumber(d.x) && Number.isFinite(Number(d.y)) && d.x <= endMs)
         .sort((a, b) => a.x - b.x);
       const startDayEndMs = startMs + 24 * 60 * 60 * 1000 - 1;
       const hasPointOnStartDay = validTrend.some((d) => d.x >= startMs && d.x <= startDayEndMs);
@@ -2087,13 +2077,13 @@ export const fetchFundHistory = async (code, range = '1m') => {
         });
 
       // 解析 Data_grandTotal 为多条对比曲线，使用同一有效起始日
-      if (Array.isArray(grandTotal) && grandTotal.length) {
+      if (isArray(grandTotal) && grandTotal.length) {
         const grandTotalSeries = grandTotal
           .map((series) => {
-            if (!series || !series.data || !Array.isArray(series.data)) return null;
+            if (!series || !series.data || !isArray(series.data)) return null;
             const name = series.name || '';
             const points = series.data
-              .filter((item) => Array.isArray(item) && typeof item[0] === 'number')
+              .filter((item) => isArray(item) && isNumber(item[0]))
               .map(([ts, val]) => {
                 if (ts < effectiveStartMs || ts > endMs) return null;
                 const numVal = Number(val);
@@ -2134,7 +2124,7 @@ export const parseFundTextWithLLM = async (text) => {
 
     if (error) return null;
     if (!data || data.success !== true) return null;
-    if (!Array.isArray(data.data)) return null;
+    if (!isArray(data.data)) return null;
 
     // 保持与旧实现兼容：返回 JSON 字符串，由调用方 JSON.parse
     return JSON.stringify(data.data);

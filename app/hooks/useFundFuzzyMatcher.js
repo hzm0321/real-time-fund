@@ -1,3 +1,4 @@
+import { isArray, isString } from 'lodash';
 import { useCallback, useRef } from 'react';
 import { getQueryClient } from '../lib/get-query-client';
 import * as qk from '../lib/query-keys';
@@ -6,11 +7,11 @@ const FUND_CODE_SEARCH_URL = 'https://fund.eastmoney.com/js/fundcode_search.js';
 const FUND_LIST_CACHE_TIME = 24 * 60 * 60 * 1000;
 
 const formatEastMoneyFundList = (rawList) => {
-  if (!Array.isArray(rawList)) return [];
+  if (!isArray(rawList)) return [];
 
   return rawList
     .map((item) => {
-      if (!Array.isArray(item)) return null;
+      if (!isArray(item)) return null;
       const code = String(item[0] ?? '').trim();
       const name = String(item[2] ?? '').trim();
       if (!code || !name) return null;
@@ -70,7 +71,7 @@ export const useFundFuzzyMatcher = () => {
 
               script.onload = () => {
                 if (done) return;
-                const snapshot = Array.isArray(window.r) ? JSON.parse(JSON.stringify(window.r)) : [];
+                const snapshot = isArray(window.r) ? JSON.parse(JSON.stringify(window.r)) : [];
                 cleanup();
                 const parsed = formatEastMoneyFundList(snapshot);
                 if (!parsed.length) {
@@ -92,7 +93,7 @@ export const useFundFuzzyMatcher = () => {
         })
       ]);
       const Fuse = fuseModule.default;
-      const fuse = new Fuse(Array.isArray(allFundList) ? allFundList : [], {
+      const fuse = new Fuse(isArray(allFundList) ? allFundList : [], {
         keys: ['name', 'code'],
         includeScore: true,
         threshold: 0.5,
@@ -114,7 +115,7 @@ export const useFundFuzzyMatcher = () => {
   }, []);
 
   const normalizeFundText = useCallback((value) => {
-    if (typeof value !== 'string') return '';
+    if (!isString(value)) return '';
     return value
       .toUpperCase()
       .replace(/[（(]/g, '(')

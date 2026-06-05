@@ -1,4 +1,5 @@
 'use client';
+import { isNumber } from 'lodash';
 
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -9,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
 function formatGszzlEstimate(gszzl) {
-  const n = typeof gszzl === 'number' ? gszzl : Number(gszzl);
+  const n = isNumber(gszzl) ? gszzl : Number(gszzl);
   if (!Number.isFinite(n)) return '--';
   return `${n > 0 ? '+' : ''}${n.toFixed(2)}%`;
 }
@@ -50,7 +51,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
 
     const today = new Date().toISOString().slice(0, 10);
     // 只要有实际涨跌幅，就尝试进行比对
-    const actualZzl = typeof fund.zzl === 'number' && Number.isFinite(fund.zzl) ? fund.zzl : null;
+    const actualZzl = isNumber(fund.zzl) && Number.isFinite(fund.zzl) ? fund.zzl : null;
 
     Promise.all([
       fetchFundValuationBySource(fund.code, 1).catch(() => null),
@@ -74,7 +75,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
           { id: 2, val: v2?.gszzl, date: v2?.gztime?.slice(0, 10) },
           { id: 3, val: v3?.gszzl, date: v3?.gztime?.slice(0, 10) }
         ]
-          .filter((s) => typeof s.val === 'number' && Number.isFinite(s.val))
+          .filter((s) => isNumber(s.val) && Number.isFinite(s.val))
           // 仅比对日期与基金实际净值日期一致的估值数据
           .filter((s) => s.date === fund.jzrq)
           .map((s) => ({ id: s.id, diff: Math.abs(s.val - actualZzl), date: s.date }));

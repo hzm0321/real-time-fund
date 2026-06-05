@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isNumber, isString, isPlainObject, isArray } from 'lodash';
+import { isArray, isNumber, isPlainObject, isString } from 'lodash';
 
 import { useStorageStore, storageStore } from '../stores';
 import { recordValuation, setValuationSeries as persistValuationSeries } from '../lib/valuationTimeseries';
@@ -171,7 +171,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           if (!dailyChanges[scope]) dailyChanges[scope] = {};
           const list =
             dailyChanges[scope][code] ||
-            (currentStore.fundDailyEarnings[scope] && Array.isArray(currentStore.fundDailyEarnings[scope][code])
+            (currentStore.fundDailyEarnings[scope] && isArray(currentStore.fundDailyEarnings[scope][code])
               ? currentStore.fundDailyEarnings[scope][code]
               : []);
           const existingIndex = list.findIndex((item) => item.date === dateStr);
@@ -253,7 +253,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           if (data.code != null && !data.noValuation && Number.isFinite(Number(data.gsz))) {
             if (data.fundValuationTimeseries && isPlainObject(data.fundValuationTimeseries)) {
               for (const [tsCode, tsList] of Object.entries(data.fundValuationTimeseries)) {
-                if (Array.isArray(tsList) && tsList.length > 0) {
+                if (isArray(tsList) && tsList.length > 0) {
                   persistValuationSeries(tsCode, fundDs, tsList);
                   nextValuationSeries[tsCode] = tsList;
                   valuationChanged = true;
@@ -336,8 +336,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
                   : currentStore.groupHoldings[scope][data.code];
               const existing =
                 dailyChanges[scope]?.[data.code] ||
-                (currentStore.fundDailyEarnings[scope] &&
-                Array.isArray(currentStore.fundDailyEarnings[scope][data.code])
+                (currentStore.fundDailyEarnings[scope] && isArray(currentStore.fundDailyEarnings[scope][data.code])
                   ? currentStore.fundDailyEarnings[scope][data.code]
                   : []);
               const lastRecordedDate = existing.length ? existing[existing.length - 1]?.date : null;

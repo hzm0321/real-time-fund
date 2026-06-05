@@ -1,4 +1,4 @@
-import { isPlainObject } from 'lodash';
+import { isArray, isObject, isPlainObject } from 'lodash';
 import { useStorageStore, useModalStore } from '../stores';
 import { migrateDcaPlansToScoped } from '../lib/fundHelpers';
 import { toast as sonnerToast } from 'sonner';
@@ -85,7 +85,7 @@ export function useGroupActions({ currentTab, setCurrentTab }) {
       });
       try {
         const parsed = { ...(customSettings || {}) };
-        if (parsed && typeof parsed === 'object') {
+        if (parsed && isObject(parsed)) {
           let changed = false;
           removedIds.forEach((groupId) => {
             if (parsed[groupId] !== undefined) {
@@ -105,7 +105,7 @@ export function useGroupActions({ currentTab, setCurrentTab }) {
         let changed = false;
         Object.keys(out).forEach((code) => {
           const list = out[code];
-          if (!Array.isArray(list) || list.length === 0) return;
+          if (!isArray(list) || list.length === 0) return;
           const filtered = list.filter((t) => !removedIds.includes(t?.groupId));
           if (filtered.length !== list.length) {
             changed = true;
@@ -150,7 +150,7 @@ export function useGroupActions({ currentTab, setCurrentTab }) {
 
       setGroupHoldings((prev) => {
         const bucket = prev?.[gid];
-        if (!bucket || typeof bucket !== 'object') return prev;
+        if (!bucket || !isObject(bucket)) return prev;
         let changed = false;
         const nextBucket = { ...bucket };
         for (const c of codeSet) {
@@ -176,7 +176,7 @@ export function useGroupActions({ currentTab, setCurrentTab }) {
         let changed = false;
         for (const c of codeSet) {
           const list = out[c];
-          if (!Array.isArray(list) || list.length === 0) continue;
+          if (!isArray(list) || list.length === 0) continue;
           const filtered = list.filter((t) => t?.groupId !== gid);
           if (filtered.length !== list.length) {
             changed = true;
@@ -191,7 +191,7 @@ export function useGroupActions({ currentTab, setCurrentTab }) {
       setDcaPlans((prev) => {
         const scoped = migrateDcaPlansToScoped(prev);
         const bucket = scoped?.[gid];
-        if (!bucket || typeof bucket !== 'object') return prev;
+        if (!bucket || !isObject(bucket)) return prev;
         let changed = false;
         const nextBucket = { ...bucket };
         for (const c of codeSet) {

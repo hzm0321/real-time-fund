@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isBoolean, isNumber } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useMemo, useState, useCallback } from 'react';
@@ -20,13 +21,13 @@ const SWIPE_THRESHOLD = 72;
 
 function formatEarnings(v, masked) {
   if (masked) return '***';
-  if (typeof v !== 'number' || !Number.isFinite(v)) return '—';
+  if (!isNumber(v) || !Number.isFinite(v)) return '—';
   const sign = v > 0 ? '+' : v < 0 ? '-' : '';
   return `${sign}${Math.abs(v).toFixed(2)}`;
 }
 
 function earningsClass(v) {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return '';
+  if (!isNumber(v) || !Number.isFinite(v)) return '';
   if (v > 0) return 'up';
   if (v < 0) return 'down';
   return '';
@@ -38,7 +39,7 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
 
-  const hasData = Array.isArray(series) && series.length > 0;
+  const hasData = isArray(series) && series.length > 0;
 
   const [viewTab, setViewTab] = useState('day');
   const [cursorMonth, setCursorMonth] = useState(() => dayjs().startOf('month'));
@@ -46,9 +47,9 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
 
   const earningsByDate = useMemo(() => {
     const map = new Map();
-    if (!Array.isArray(series)) return map;
+    if (!isArray(series)) return map;
     for (const row of series) {
-      if (row?.date && typeof row.earnings === 'number' && Number.isFinite(row.earnings)) {
+      if (row?.date && isNumber(row.earnings) && Number.isFinite(row.earnings)) {
         map.set(row.date, row.earnings);
       }
     }
@@ -57,9 +58,9 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
 
   const monthTotalsForYear = useMemo(() => {
     const arr = Array.from({ length: 12 }, () => 0);
-    if (!Array.isArray(series)) return arr;
+    if (!isArray(series)) return arr;
     for (const row of series) {
-      if (!row?.date || typeof row.earnings !== 'number' || !Number.isFinite(row.earnings)) continue;
+      if (!row?.date || !isNumber(row.earnings) || !Number.isFinite(row.earnings)) continue;
       const y = parseInt(row.date.slice(0, 4), 10);
       const m = parseInt(row.date.slice(5, 7), 10) - 1;
       if (y === cursorYear && m >= 0 && m < 12) arr[m] += row.earnings;
@@ -69,9 +70,9 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
 
   const yearTotals = useMemo(() => {
     const map = new Map();
-    if (!Array.isArray(series)) return map;
+    if (!isArray(series)) return map;
     for (const row of series) {
-      if (!row?.date || typeof row.earnings !== 'number' || !Number.isFinite(row.earnings)) continue;
+      if (!row?.date || !isNumber(row.earnings) || !Number.isFinite(row.earnings)) continue;
       const y = parseInt(row.date.slice(0, 4), 10);
       if (!Number.isFinite(y)) continue;
       map.set(y, (map.get(y) ?? 0) + row.earnings);
@@ -84,7 +85,7 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
     const prefix = cursorMonth.format('YYYY-MM');
     let sum = 0;
     for (const [d, v] of earningsByDate.entries()) {
-      if (d.startsWith(prefix) && typeof v === 'number' && Number.isFinite(v)) {
+      if (d.startsWith(prefix) && isNumber(v) && Number.isFinite(v)) {
         sum += v;
       }
     }
@@ -135,12 +136,11 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
         ? cursorYear >= now.year()
         : false;
 
-  const resolvedIsMobile =
-    typeof isMobile === 'boolean'
-      ? isMobile
-      : typeof window !== 'undefined'
-        ? window.matchMedia?.('(max-width: 640px)')?.matches
-        : false;
+  const resolvedIsMobile = isBoolean(isMobile)
+    ? isMobile
+    : typeof window !== 'undefined'
+      ? window.matchMedia?.('(max-width: 640px)')?.matches
+      : false;
 
   const pcCellDayFontSize = resolvedIsMobile ? 15 : 16;
   const pcEarningsMaxFontSize = resolvedIsMobile ? 10 : 12;
@@ -322,7 +322,7 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
                           const isFutureDay = dayjs(day.date).startOf('day').isAfter(dayjs().startOf('day'));
 
                           const dayEarnings = !isOutside ? earningsByDate.get(key) : undefined;
-                          const hasEarnings = typeof dayEarnings === 'number' && Number.isFinite(dayEarnings);
+                          const hasEarnings = isNumber(dayEarnings) && Number.isFinite(dayEarnings);
 
                           const earningsTone =
                             hasEarnings && dayEarnings > 0 ? 'up' : hasEarnings && dayEarnings < 0 ? 'down' : 'zero';

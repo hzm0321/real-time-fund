@@ -1,4 +1,5 @@
 'use client';
+import { isArray } from 'lodash';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -61,7 +62,7 @@ export default function MoveGroupModal({
         dryRun: true,
         overwrite: false
       });
-      const nextConflicts = Array.isArray(res?.conflicts) ? res.conflicts : [];
+      const nextConflicts = isArray(res?.conflicts) ? res.conflicts : [];
       if (nextConflicts.length > 0) {
         setConflicts(nextConflicts);
         setConfirmOverwriteOpen(true);

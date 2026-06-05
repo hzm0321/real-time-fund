@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect } from 'react';
-import { isPlainObject, isArray, isNumber } from 'lodash';
+import { isArray, isNumber, isPlainObject } from 'lodash';
 import { useStorageStore } from '../stores';
 import { SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL, DAILY_EARNINGS_SCOPE_ALL } from '@/app/constants';
 import { aggregatePortfolioDailyEarnings } from '../lib/dailyEarnings';
@@ -21,7 +21,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
   const groupsWithHoldings = useMemo(() => {
     const fundByCode = new Map((isArray(funds) ? funds : []).map((f) => [f.code, f]));
     return (groups || []).filter((g) => {
-      if (!g?.id || !Array.isArray(g.codes)) return false;
+      if (!g?.id || !isArray(g.codes)) return false;
       const bucket = groupHoldings[g.id] || {};
       return g.codes.some((code) => {
         const fund = fundByCode.get(code);
@@ -57,7 +57,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
       }
       if (p.profitTotal != null) {
         totalHoldingReturn += p.profitTotal;
-        if (typeof holding.cost === 'number' && typeof holding.share === 'number') {
+        if (isNumber(holding.cost) && isNumber(holding.share)) {
           totalCost += holding.cost * holding.share;
         }
       }
@@ -188,7 +188,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
         }
         if (profit.profitTotal !== null) {
           totalHoldingReturn += profit.profitTotal;
-          if (typeof holding.cost === 'number' && typeof holding.share === 'number') {
+          if (isNumber(holding.cost) && isNumber(holding.share)) {
             totalCost += holding.cost * holding.share;
           }
         }
@@ -252,7 +252,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
             }
             if (profit.profitTotal !== null) {
               totalHoldingReturn += profit.profitTotal;
-              if (holding && typeof holding.cost === 'number' && typeof holding.share === 'number') {
+              if (holding && isNumber(holding.cost) && isNumber(holding.share)) {
                 totalCost += holding.cost * holding.share;
               }
             }

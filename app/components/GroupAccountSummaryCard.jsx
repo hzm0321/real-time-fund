@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isFunction } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
@@ -88,7 +89,7 @@ function GroupCardTitleIcon({ size = 22 }) {
 }
 
 function Sparkline({ series, className = '' }) {
-  if (!Array.isArray(series) || series.length < 2) return null;
+  if (!isArray(series) || series.length < 2) return null;
   const values = series.map((p) => Number(p?.earnings)).filter((n) => Number.isFinite(n));
   if (values.length < 2) return null;
   let min = Math.min(...values);
@@ -145,7 +146,7 @@ export default function GroupAccountSummaryCard({
     ? tonePercent(accountReturnPercent, 2)
     : { className: 'muted', color: 'var(--muted)' };
 
-  const interactive = typeof onActivate === 'function';
+  const interactive = isFunction(onActivate);
 
   return (
     <div

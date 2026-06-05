@@ -1,4 +1,5 @@
 'use client';
+import { isArray } from 'lodash';
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +12,7 @@ import FundHistoryNetValueModal from './FundHistoryNetValueModal';
  * 历史净值表格行：日期、净值、日涨幅（按日期降序，涨红跌绿）
  */
 function buildRows(history) {
-  if (!Array.isArray(history) || history.length === 0) return [];
+  if (!isArray(history) || history.length === 0) return [];
   const reversed = [...history].reverse();
   return reversed.map((item, i) => {
     const prev = reversed[i + 1];

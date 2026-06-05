@@ -1,4 +1,5 @@
 'use client';
+import { isArray, isNumber } from 'lodash';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -117,7 +118,7 @@ export default function FundTrendChart({
 
   const chartData = useMemo(() => {
     // Data_grandTotal：在 fetchFundHistory 中解析为 data.grandTotalSeries 数组
-    const grandTotalSeries = Array.isArray(data.grandTotalSeries) ? data.grandTotalSeries : [];
+    const grandTotalSeries = isArray(data.grandTotalSeries) ? data.grandTotalSeries : [];
 
     // Map transaction dates to chart indices
     const dateToIndex = new Map(data.map((d, i) => [d.date, i]));
@@ -154,7 +155,7 @@ export default function FundTrendChart({
       let baseValue = null;
       for (const date of labels) {
         const v = pointsByDate.get(date);
-        if (typeof v === 'number' && Number.isFinite(v)) {
+        if (isNumber(v) && Number.isFinite(v)) {
           baseValue = v;
           break;
         }
@@ -163,7 +164,7 @@ export default function FundTrendChart({
       const seriesData = labels.map((date) => {
         if (isHidden || baseValue == null) return null;
         const v = pointsByDate.get(date);
-        if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+        if (!isNumber(v) || !Number.isFinite(v)) return null;
         // Data_grandTotal 中的 value 已是百分比，这里按区间首日做“差值”，保持同一坐标含义（相对区间首日的收益率变化）
         return v - baseValue;
       });
@@ -318,9 +319,9 @@ export default function FundTrendChart({
         }
 
         // 记录当前激活的横轴索引，用于图示下方展示对应百分比
-        if (Array.isArray(chartElement) && chartElement.length > 0) {
+        if (isArray(chartElement) && chartElement.length > 0) {
           const idx = chartElement[0].index;
-          setActiveIndex(typeof idx === 'number' ? idx : null);
+          setActiveIndex(isNumber(idx) ? idx : null);
         } else {
           setActiveIndex(null);
         }
@@ -328,9 +329,9 @@ export default function FundTrendChart({
         // 仅用于桌面端 hover 改变光标，不在这里做 2 秒清除，避免移动端 hover 事件不稳定
       },
       onClick: (_event, elements) => {
-        if (Array.isArray(elements) && elements.length > 0) {
+        if (isArray(elements) && elements.length > 0) {
           const idx = elements[0].index;
-          setActiveIndex(typeof idx === 'number' ? idx : null);
+          setActiveIndex(isNumber(idx) ? idx : null);
         }
       }
     };
@@ -510,7 +511,7 @@ export default function FundTrendChart({
             const labels = chart.data.labels;
             const mainDataset = datasets[0];
 
-            if (labels && mainDataset && Array.isArray(mainDataset.data)) {
+            if (labels && mainDataset && isArray(mainDataset.data)) {
               const dateStr = labels[baseIndex];
               const value = mainDataset.data[baseIndex];
 
@@ -529,7 +530,7 @@ export default function FundTrendChart({
                 ctx.fillText(dateStr, labelCenterX, bottomY + 8);
 
                 // Y axis label (value) — 始终基于主线百分比
-                const valueStr = (typeof value === 'number' ? value.toFixed(2) : value) + '%';
+                const valueStr = (isNumber(value) ? value.toFixed(2) : value) + '%';
                 const valWidth = ctx.measureText(valueStr).width + 8;
                 ctx.fillStyle = primaryColor;
                 ctx.fillRect(leftX, y - 8, valWidth, 16);
@@ -601,7 +602,7 @@ export default function FundTrendChart({
             </span>
           )}
         </div>
-        {Array.isArray(data.grandTotalSeries) &&
+        {isArray(data.grandTotalSeries) &&
           !['1y', '3y', 'all'].includes(range) &&
           data.grandTotalSeries
             .filter((_, idx) => idx > 0)
@@ -616,13 +617,13 @@ export default function FundTrendChart({
                 const targetDate = data[currentIndex].date;
 
                 // 与折线一致：对比线显示“相对当前区间首日”的累计收益率变化
-                const pointsArray = Array.isArray(series.points) ? series.points : [];
+                const pointsArray = isArray(series.points) ? series.points : [];
                 const pointsByDate = new Map(pointsArray.map((p) => [p.date, p.value]));
 
                 let baseValue = null;
                 for (const d of data) {
                   const v = pointsByDate.get(d.date);
-                  if (typeof v === 'number' && Number.isFinite(v)) {
+                  if (isNumber(v) && Number.isFinite(v)) {
                     baseValue = v;
                     break;
                   }
@@ -637,14 +638,14 @@ export default function FundTrendChart({
                     const d = data[i];
                     if (!d) continue;
                     const v = pointsByDate.get(d.date);
-                    if (typeof v === 'number' && Number.isFinite(v)) {
+                    if (isNumber(v) && Number.isFinite(v)) {
                       rawPoint = v;
                       break;
                     }
                   }
                 }
 
-                if (baseValue != null && typeof rawPoint === 'number' && Number.isFinite(rawPoint)) {
+                if (baseValue != null && isNumber(rawPoint) && Number.isFinite(rawPoint)) {
                   const normalized = rawPoint - baseValue;
                   valueText = `${normalized.toFixed(2)}%`;
                 }

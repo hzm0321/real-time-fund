@@ -1,4 +1,5 @@
 'use client';
+import { isArray } from 'lodash';
 
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -216,7 +217,7 @@ export default function FundListView({
                     onToggleTrendCollapse={toggleTrendCollapse}
                     onToggleEarningsCollapse={toggleEarningsCollapse}
                     masked={maskAmounts}
-                    fundTags={Array.isArray(fundTagListsByCode[f.code]) ? fundTagListsByCode[f.code] : []}
+                    fundTags={isArray(fundTagListsByCode[f.code]) ? fundTagListsByCode[f.code] : []}
                     onFundTagsClick={openFundTagsEdit}
                     fundExtraData={fundExtraDataByCode[f.code]}
                     groupTotalHoldingAmount={groupTotalHoldingAmount}

@@ -21,7 +21,7 @@ import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, close
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { throttle } from 'lodash';
+import { isArray, isFunction, isObject, isString, throttle } from 'lodash';
 import MobileFundCardDrawer from './MobileFundCardDrawer';
 import MobileSettingModal from './MobileSettingModal';
 import MoveGroupModal from './MoveGroupModal';
@@ -354,7 +354,7 @@ function SortableRow({ row, children, disabled }) {
           activatorProps: sortableRowA11yProps(attributes)
         }}
       >
-        {typeof children === 'function' ? children(setActivatorNodeRef, listeners) : children}
+        {isFunction(children) ? children(setActivatorNodeRef, listeners) : children}
       </RowSortableContext.Provider>
     </motion.div>
   );
@@ -548,12 +548,12 @@ export default function MobileFundTable({
 
   const editLongPressRef = useRef({ timer: null, startX: 0, startY: 0 });
 
-  const selectableCodes = useMemo(() => (Array.isArray(data) ? data.map((d) => d?.code).filter(Boolean) : []), [data]);
+  const selectableCodes = useMemo(() => (isArray(data) ? data.map((d) => d?.code).filter(Boolean) : []), [data]);
 
   /** 全部/自选下「关联汇总持仓」行不参与编辑模式批量选择 */
   const batchSelectableCodes = useMemo(
     () =>
-      Array.isArray(data)
+      isArray(data)
         ? data
             .filter((d) => !d?.isHoldingLinked)
             .map((d) => d?.code)
@@ -607,7 +607,7 @@ export default function MobileFundTable({
 
   useEffect(() => {
     const linkedCodes = new Set(
-      (Array.isArray(data) ? data : []).filter((d) => d && d.isHoldingLinked && d.code).map((d) => d.code)
+      (isArray(data) ? data : []).filter((d) => d && d.isHoldingLinked && d.code).map((d) => d.code)
     );
     if (!linkedCodes.size) return;
     setEditSelectedCodes((prev) => {
@@ -696,7 +696,7 @@ export default function MobileFundTable({
     const baseOptions = [
       { id: 'all', name: '全部', description: '全部分组' },
       { id: 'fav', name: '自选', description: '自选分组' },
-      ...(Array.isArray(groups) ? groups : []).map((group) => ({
+      ...(isArray(groups) ? groups : []).map((group) => ({
         id: group?.id,
         name: group?.name || '未命名',
         description: '自定义分组'
@@ -715,7 +715,7 @@ export default function MobileFundTable({
     if (typeof window === 'undefined') return {};
     try {
       const parsed = storageStore.getItem('customSettings') || {};
-      if (!parsed || typeof parsed !== 'object') return {};
+      if (!parsed || !isObject(parsed)) return {};
       if (
         parsed.pcTableColumnOrder != null ||
         parsed.pcTableColumnVisibility != null ||
@@ -724,7 +724,7 @@ export default function MobileFundTable({
         parsed.mobileTableColumnVisibility != null
       ) {
         const all = {
-          ...(parsed.all && typeof parsed.all === 'object' ? parsed.all : {}),
+          ...(parsed.all && isObject(parsed.all) ? parsed.all : {}),
           pcTableColumnOrder: parsed.pcTableColumnOrder,
           pcTableColumnVisibility: parsed.pcTableColumnVisibility,
           pcTableColumns: parsed.pcTableColumns,
@@ -751,13 +751,13 @@ export default function MobileFundTable({
     Object.keys(parsed).forEach((k) => {
       if (k === 'pcContainerWidth') return;
       const group = parsed[k];
-      if (!group || typeof group !== 'object') return;
+      if (!group || !isObject(group)) return;
       const order =
-        Array.isArray(group.mobileTableColumnOrder) && group.mobileTableColumnOrder.length > 0
+        isArray(group.mobileTableColumnOrder) && group.mobileTableColumnOrder.length > 0
           ? group.mobileTableColumnOrder
           : null;
       const visibility =
-        group.mobileTableColumnVisibility && typeof group.mobileTableColumnVisibility === 'object'
+        group.mobileTableColumnVisibility && isObject(group.mobileTableColumnVisibility)
           ? group.mobileTableColumnVisibility
           : null;
       byGroup[k] = {
@@ -790,14 +790,14 @@ export default function MobileFundTable({
 
   const mobileColumnOrder = (() => {
     const order = currentGroupMobile?.mobileTableColumnOrder ?? defaultOrder;
-    if (!Array.isArray(order) || order.length === 0) return [...MOBILE_NON_FROZEN_COLUMN_IDS];
+    if (!isArray(order) || order.length === 0) return [...MOBILE_NON_FROZEN_COLUMN_IDS];
     const valid = order.filter((id) => MOBILE_NON_FROZEN_COLUMN_IDS.includes(id));
     const missing = MOBILE_NON_FROZEN_COLUMN_IDS.filter((id) => !valid.includes(id));
     return [...valid, ...missing];
   })();
   const mobileColumnVisibility = (() => {
     const vis = currentGroupMobile?.mobileTableColumnVisibility ?? null;
-    if (vis && typeof vis === 'object' && Object.keys(vis).length > 0) {
+    if (vis && isObject(vis) && Object.keys(vis).length > 0) {
       const next = { ...vis };
       MOBILE_NON_FROZEN_COLUMN_IDS.forEach((id) => {
         if (next[id] === undefined) {
@@ -813,7 +813,7 @@ export default function MobileFundTable({
     if (typeof window === 'undefined') return;
     try {
       const parsed = storageStore.getItem('customSettings') || {};
-      const group = parsed[groupKey] && typeof parsed[groupKey] === 'object' ? { ...parsed[groupKey] } : {};
+      const group = parsed[groupKey] && isObject(parsed[groupKey]) ? { ...parsed[groupKey] } : {};
       if (updates.mobileTableColumnOrder !== undefined) group.mobileTableColumnOrder = updates.mobileTableColumnOrder;
       if (updates.mobileTableColumnVisibility !== undefined)
         group.mobileTableColumnVisibility = updates.mobileTableColumnVisibility;
@@ -825,11 +825,11 @@ export default function MobileFundTable({
   };
 
   const setMobileColumnOrder = (nextOrderOrUpdater) => {
-    const next = typeof nextOrderOrUpdater === 'function' ? nextOrderOrUpdater(mobileColumnOrder) : nextOrderOrUpdater;
+    const next = isFunction(nextOrderOrUpdater) ? nextOrderOrUpdater(mobileColumnOrder) : nextOrderOrUpdater;
     persistMobileGroupConfig({ mobileTableColumnOrder: next });
   };
   const setMobileColumnVisibility = (nextOrUpdater) => {
-    const next = typeof nextOrUpdater === 'function' ? nextOrUpdater(mobileColumnVisibility) : nextOrUpdater;
+    const next = isFunction(nextOrUpdater) ? nextOrUpdater(mobileColumnVisibility) : nextOrUpdater;
     persistMobileGroupConfig({ mobileTableColumnVisibility: next });
   };
 
@@ -837,7 +837,7 @@ export default function MobileFundTable({
     if (typeof window === 'undefined') return;
     try {
       const parsed = storageStore.getItem('customSettings') || {};
-      const group = parsed[groupKey] && typeof parsed[groupKey] === 'object' ? { ...parsed[groupKey] } : {};
+      const group = parsed[groupKey] && isObject(parsed[groupKey]) ? { ...parsed[groupKey] } : {};
       group.mobileShowFullFundName = show;
       parsed[groupKey] = group;
       storageStore.setItem('customSettings', JSON.stringify(parsed));
@@ -865,7 +865,7 @@ export default function MobileFundTable({
       const targetUpdates = {};
       targetIds.forEach((targetId) => {
         if (!targetId || targetId === groupKey) return;
-        const group = parsed[targetId] && typeof parsed[targetId] === 'object' ? { ...parsed[targetId] } : {};
+        const group = parsed[targetId] && isObject(parsed[targetId]) ? { ...parsed[targetId] } : {};
         parsed[targetId] = { ...group, ...payload };
         targetUpdates[targetId] = payload;
       });
@@ -1090,7 +1090,7 @@ export default function MobileFundTable({
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;
-    if (!Array.isArray(data) || data.length === 0) return;
+    if (!isArray(data) || data.length === 0) return;
 
     const codes = Array.from(new Set(data.map((d) => d?.code).filter(Boolean)));
     const missing = codes.filter((code) => !relatedSectorCacheRef.current.has(code));
@@ -1128,7 +1128,7 @@ export default function MobileFundTable({
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;
-    if (!Array.isArray(data) || data.length === 0) return;
+    if (!isArray(data) || data.length === 0) return;
 
     const labels = new Set();
     for (const row of data) {
@@ -1224,7 +1224,7 @@ export default function MobileFundTable({
 
   useEffect(() => {
     if (!periodReturnsEnabled) return;
-    if (!Array.isArray(data) || data.length === 0) return;
+    if (!isArray(data) || data.length === 0) return;
 
     const codes = Array.from(new Set(data.map((d) => d?.code).filter(Boolean)));
     const cachedBatch = {};
@@ -1754,7 +1754,7 @@ export default function MobileFundTable({
         header: '基金标签',
         cell: (info) => {
           const original = info.row.original || {};
-          const list = Array.isArray(original.fundTags) ? original.fundTags : [];
+          const list = isArray(original.fundTags) ? original.fundTags : [];
           const hasTags = list.length > 0;
           return (
             <button
@@ -1785,7 +1785,7 @@ export default function MobileFundTable({
                 >
                   {list.map((raw, idx) => {
                     const item =
-                      raw && typeof raw === 'object' && raw.name != null
+                      raw && isObject(raw) && raw.name != null
                         ? {
                             name: String(raw.name).trim(),
                             theme: String(raw.theme ?? 'default').trim() || 'default'
@@ -2107,7 +2107,7 @@ export default function MobileFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           const date = original.latestNavDate ?? '-';
-          const displayDate = typeof date === 'string' && date.length > 5 ? date.slice(5) : date;
+          const displayDate = isString(date) && date.length > 5 ? date.slice(5) : date;
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <span style={{ display: 'block', width: '100%', fontWeight: 700 }}>
@@ -2137,7 +2137,7 @@ export default function MobileFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           const date = original.estimateNavDate ?? '-';
-          const displayDate = typeof date === 'string' && date.length > 5 ? date.slice(5) : date;
+          const displayDate = isString(date) && date.length > 5 ? date.slice(5) : date;
           const estimateNav = info.getValue();
           const hasEstimateNav = estimateNav != null && estimateNav !== '—';
 
@@ -2173,7 +2173,7 @@ export default function MobileFundTable({
           const original = info.row.original || {};
           const value = original.yesterdayChangeValue;
           const date = original.yesterdayDate ?? '-';
-          const displayDate = typeof date === 'string' && date.length > 5 ? date.slice(5) : date;
+          const displayDate = isString(date) && date.length > 5 ? date.slice(5) : date;
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
@@ -2206,7 +2206,7 @@ export default function MobileFundTable({
           const value = original.estimateChangeValue;
           const isMuted = original.estimateChangeMuted;
           const time = original.estimateTime ?? '-';
-          const displayTime = typeof time === 'string' && time.length > 5 ? time.slice(5) : time;
+          const displayTime = isString(time) && time.length > 5 ? time.slice(5) : time;
           const cls = isMuted ? 'muted' : value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = info.getValue();
           const hasText = text != null && text !== '—';
@@ -2541,7 +2541,7 @@ export default function MobileFundTable({
     },
     onColumnOrderChange: (updater) => {
       if (isEditMode) return;
-      const next = typeof updater === 'function' ? updater(['fundName', ...mobileColumnOrder]) : updater;
+      const next = isFunction(updater) ? updater(['fundName', ...mobileColumnOrder]) : updater;
       const newNonFrozen = next.filter(
         (id) => id !== 'fundName' && id !== EDIT_MOVE_TO_FRONT_COL && id !== EDIT_DRAG_COL
       );
@@ -2550,7 +2550,7 @@ export default function MobileFundTable({
       }
     },
     onColumnVisibilityChange: (updater) => {
-      const next = typeof updater === 'function' ? updater({ fundName: true, ...mobileColumnVisibility }) : updater;
+      const next = isFunction(updater) ? updater({ fundName: true, ...mobileColumnVisibility }) : updater;
       const rest = { ...next };
       delete rest.fundName;
       delete rest[EDIT_MOVE_TO_FRONT_COL];

@@ -3,7 +3,7 @@
  * 存储格式：{ [code]: { [dataSource]: [{ time, value, date }] } }
  * 规则：获取到最新日期的数据时，清掉所有老日期的数据，只保留当日分时点。
  */
-import { isPlainObject, isString } from 'lodash';
+import { isArray, isPlainObject, isString } from 'lodash';
 import { storageStore } from '@/app/stores';
 
 const STORAGE_KEY = 'fundValuationTimeseries';
@@ -56,7 +56,7 @@ function getSeriesBySource(code, dataSource) {
   const ds = String(dataSource || 1);
   const fundData = all[code];
   if (!isPlainObject(fundData)) return [];
-  return Array.isArray(fundData[ds]) ? fundData[ds] : [];
+  return isArray(fundData[ds]) ? fundData[ds] : [];
 }
 
 /**
@@ -89,7 +89,7 @@ export function recordValuation(code, payload, dataSource = 1) {
   const all = getStored();
   const ds = String(dataSource || 1);
   if (!isPlainObject(all[code])) all[code] = {};
-  const list = Array.isArray(all[code][ds]) ? all[code][ds] : [];
+  const list = isArray(all[code][ds]) ? all[code][ds] : [];
 
   const existingDates = list.map((p) => p.date).filter(Boolean);
   const latestStoredDate = existingDates.length ? existingDates.reduce((a, b) => (a > b ? a : b), '') : '';
@@ -117,7 +117,7 @@ export function recordValuation(code, payload, dataSource = 1) {
  * @param {Array<{ time: string, value: number, date: string }>} series
  */
 export function setValuationSeries(code, dataSource, series) {
-  if (!code || !Array.isArray(series) || series.length === 0) return;
+  if (!code || !isArray(series) || series.length === 0) return;
   const all = getStored();
   const ds = String(dataSource || 1);
   if (!isPlainObject(all[code])) all[code] = {};
@@ -158,7 +158,7 @@ export function getAllValuationSeries(funds) {
   const result = {};
   // 构建 code -> dataSource 映射
   const dsMap = new Map();
-  if (Array.isArray(funds)) {
+  if (isArray(funds)) {
     for (const f of funds) {
       if (f?.code) dsMap.set(f.code, String(f.dataSource || 1));
     }
@@ -167,13 +167,13 @@ export function getAllValuationSeries(funds) {
     if (!isPlainObject(dsDataMap)) continue;
     // 优先使用基金当前数据源的数据
     const currentDs = dsMap.get(code);
-    if (currentDs && Array.isArray(dsDataMap[currentDs]) && dsDataMap[currentDs].length > 0) {
+    if (currentDs && isArray(dsDataMap[currentDs]) && dsDataMap[currentDs].length > 0) {
       result[code] = dsDataMap[currentDs];
       continue;
     }
     // 回退：取第一个有数据的数据源
     for (const series of Object.values(dsDataMap)) {
-      if (Array.isArray(series) && series.length > 0) {
+      if (isArray(series) && series.length > 0) {
         result[code] = series;
         break;
       }

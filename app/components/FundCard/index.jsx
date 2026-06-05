@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import { isNumber, isString } from 'lodash';
+import { isArray, isNumber, isObject, isString } from 'lodash';
 import { PlusCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
@@ -46,7 +46,7 @@ const formatDisplayDate = (value) => {
   if (!d.isValid()) return value;
 
   // 如果是数字（时间戳）或者字符串中包含显式的时间模式，则展示时分
-  const isTimestamp = typeof value === 'number' || (typeof value === 'string' && /^\d{10,13}$/.test(value));
+  const isTimestamp = isNumber(value) || (isString(value) && /^\d{10,13}$/.test(value));
   const hasTimePattern = /[T\s]\d{1,2}:\d{2}/.test(String(value));
   const showTime = isTimestamp || hasTimePattern;
 
@@ -325,7 +325,7 @@ export default function Index({
   const holding = holdings?.[f?.code];
   const profit = getHoldingProfit?.(f, holding) ?? null;
   const hasHoldings =
-    topHoldings.holdingsIsLastQuarter && Array.isArray(topHoldings.holdings) && topHoldings.holdings.length > 0;
+    topHoldings.holdingsIsLastQuarter && isArray(topHoldings.holdings) && topHoldings.holdings.length > 0;
   // “我的收益”(每日收益)只依赖份额；成本价缺失也应可展示
   const hasHoldingShare = holding && isNumber(holding.share) && holding.share > 0;
 
@@ -336,7 +336,7 @@ export default function Index({
   const dailyEarningsSeries = useMemo(() => {
     if (!hasHoldingShare) return [];
     const list = fundDailyEarnings?.[f?.code];
-    return Array.isArray(list) ? list : [];
+    return isArray(list) ? list : [];
   }, [fundDailyEarnings, f?.code, hasHoldingShare]);
 
   const displayDailyEarningsSeries = useMemo(() => {
@@ -478,7 +478,7 @@ export default function Index({
                 >
                   {fundTags.map((raw, idx) => {
                     const item =
-                      raw && typeof raw === 'object' && raw.name != null
+                      raw && isObject(raw) && raw.name != null
                         ? {
                             name: String(raw.name).trim(),
                             theme: String(raw.theme ?? 'default').trim() || 'default'
@@ -834,7 +834,7 @@ export default function Index({
 
       {(() => {
         const currentSeries = f.fundValuationTimeseries?.[f.code] || valuationSeries?.[f.code];
-        const showIntraday = !f.noValuation && Array.isArray(currentSeries) && currentSeries.length >= 1;
+        const showIntraday = !f.noValuation && isArray(currentSeries) && currentSeries.length >= 1;
         if (!showIntraday) return null;
 
         if (f.gztime && toTz(todayStr).startOf('day').isAfter(toTz(f.gztime).startOf('day'))) {
