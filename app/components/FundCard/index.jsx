@@ -322,6 +322,18 @@ export default function Index({
     };
   }, [fundCode, refreshMs]);
 
+  const top10WeightSum = useMemo(() => {
+    if (!isArray(topHoldings.holdings)) return 0;
+    let sum = 0;
+    topHoldings.holdings.forEach((h) => {
+      if (h.weight) {
+        const val = parseFloat(h.weight);
+        if (!isNaN(val)) sum += val;
+      }
+    });
+    return sum;
+  }, [topHoldings.holdings]);
+
   const holding = holdings?.[f?.code];
   const profit = getHoldingProfit?.(f, holding) ?? null;
   const hasHoldings =
@@ -870,13 +882,30 @@ export default function Index({
           </TabsList>
           {hasHoldings && (
             <TabsContent value="holdings" className="mt-3 outline-none">
+              {topHoldings.assetAllocation && topHoldings.assetAllocation.length > 0 && (
+                <div className="row" style={{ marginBottom: 12 }}>
+                  {topHoldings.assetAllocation.map((item, idx) => (
+                    <Stat
+                      key={idx}
+                      label={item.name}
+                      value={`${item.value.toFixed(2)}%`}
+                      delta={item.name === '股票' ? 1 : undefined}
+                    />
+                  ))}
+                </div>
+              )}
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'flex-end',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   marginBottom: 4
                 }}
               >
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span className="muted">重仓股票：</span>
+                  <span style={{ color: 'var(--foreground)' }}>{top10WeightSum.toFixed(2)}%</span>
+                </div>
                 <span className="muted">涨跌幅 / 占比</span>
               </div>
               <div className="list">
@@ -949,7 +978,6 @@ export default function Index({
                       }}
                     />
                   </div>
-                  <span className="muted">涨跌幅 / 占比</span>
                 </div>
               </div>
               <AnimatePresence>
@@ -961,6 +989,32 @@ export default function Index({
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
                     style={{ overflow: 'hidden' }}
                   >
+                    {topHoldings.assetAllocation && topHoldings.assetAllocation.length > 0 && (
+                      <div className="row" style={{ marginBottom: 12, marginTop: 4 }}>
+                        {topHoldings.assetAllocation.map((item, idx) => (
+                          <Stat
+                            key={idx}
+                            label={item.name}
+                            value={`${item.value.toFixed(2)}%`}
+                            delta={item.name === '股票' ? 1 : undefined}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 4
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span className="muted">重仓股票：</span>
+                        <span style={{ color: 'var(--foreground)' }}>{top10WeightSum.toFixed(2)}%</span>
+                      </div>
+                      <span className="muted">涨跌幅 / 占比</span>
+                    </div>
                     <div className="list">
                       {topHoldings.holdings.map((h, idx) => (
                         <div className="item" key={idx}>

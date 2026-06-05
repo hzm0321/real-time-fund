@@ -1513,7 +1513,33 @@ export const fetchFundHoldings = async (code) => {
             });
           } catch (e) {}
         }
-        resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter });
+
+        let assetAllocation = [];
+        try {
+          const pz = await fetchFundPingzhongdata(code);
+          const rawSeries = pz?.Data_assetAllocation?.series || [];
+          let filtered = rawSeries.filter((s) => s.type !== 'line' && !String(s.name || '').includes('净资产'));
+          let sum = 0;
+          let parsedSeries = [];
+          filtered.forEach((s) => {
+            if (s.data && s.data.length > 0) {
+              const val = Number(s.data[s.data.length - 1]);
+              if (!Number.isNaN(val) && val > 0) {
+                sum += val;
+                parsedSeries.push({ name: String(s.name).replace('占净比', ''), value: val });
+              }
+            }
+          });
+          if (sum < 100 && parsedSeries.length > 0) {
+            const other = 100 - sum;
+            if (other >= 0.01) {
+              parsedSeries.push({ name: '其他', value: other });
+            }
+          }
+          assetAllocation = parsedSeries;
+        } catch (e) {}
+
+        resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter, assetAllocation });
         fundDebugLog('fetchFundHoldings resolved', {
           code,
           holdingsCount: holdings?.length || 0,
@@ -1521,7 +1547,9 @@ export const fetchFundHoldings = async (code) => {
           holdingsIsLastQuarter
         });
       })
-      .catch(() => resolveH({ holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false }));
+      .catch(() =>
+        resolveH({ holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false, assetAllocation: [] })
+      );
   });
 };
 

@@ -88,3 +88,6 @@ fabric.properties
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# CLI
+cli/
