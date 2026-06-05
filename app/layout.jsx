@@ -9,7 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import packageJson from '../package.json';
 
 export const metadata = {
-  title: `基估宝 V${packageJson.version}`,
+  title: `基估宝`,
   description: '输入基金编号添加基金，实时显示估值与前10重仓'
 };
 
@@ -24,7 +24,7 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="apple-touch-icon" href="/Icon-60@3x.png?v=1" />
         <link rel="apple-touch-icon" sizes="180x180" href="/Icon-60@3x.png?v=1" />
-        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="manifest" href="/fund/manifest.webmanifest" />
         {/* 初始为暗色；ThemeColorSync 会按 data-theme 同步为亮/暗 */}
         <meta name="theme-color" content="#0f172a" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
