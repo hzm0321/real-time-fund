@@ -7,7 +7,7 @@ import PcFundTable from './PcFundTable';
 import MobileFundTable from './MobileFundTable';
 import FundCard from './FundCard';
 
-export default function FundListView({
+const FundListView = React.memo(function FundListView({
   viewMode,
   isMobile,
   isGroupSummarySticky,
@@ -230,4 +230,6 @@ export default function FundListView({
       </motion.div>
     </AnimatePresence>
   );
-}
+});
+
+export default FundListView;

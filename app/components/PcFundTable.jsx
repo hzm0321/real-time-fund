@@ -492,7 +492,7 @@ FundNameCell.displayName = 'FundNameCell';
  * @param {string} [props.relatedSectorSessionKey] - 登录用户 id（未登录传空），用于关联板块查询缓存与登录后重新拉取
  * @param {(row: any) => void} [props.onFundTagsClick] - 点击标签列时打开编辑标签
  */
-export default function PcFundTable({
+const PcFundTable = memo(function PcFundTable({
   data = [],
   onRemoveFund,
   onRemoveFunds,
@@ -3006,7 +3006,7 @@ export default function PcFundTable({
       </>
     </EditModeContext.Provider>
   );
-}
+});
 
 function FundDetailDialog({ blockDialogClose, cardDialogRow, getFundCardProps, setCardDialogRow }) {
   return (
@@ -3181,3 +3181,5 @@ function BatchRemoveHeader({
     </div>
   );
 }
+
+export default PcFundTable;

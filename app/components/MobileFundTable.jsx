@@ -509,7 +509,7 @@ MemoizedMobileTableRow.displayName = 'MemoizedMobileTableRow';
  * @param {(open: boolean) => void} [props.onMobileSettingModalOpenChange] - 移动端表格「个性化设置」弹框打开/关闭时通知父级（用于隐藏底栏等）
  * @param {(row: any) => void} [props.onFundTagsClick] - 点击标签列时打开编辑标签
  */
-export default function MobileFundTable({
+const MobileFundTable = memo(function MobileFundTable({
   data = [],
   onRemoveFund,
   currentTab,
@@ -2992,4 +2992,6 @@ export default function MobileFundTable({
   };
 
   return <>{renderContent()}</>;
-}
+});
+
+export default MobileFundTable;
