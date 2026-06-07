@@ -69,7 +69,6 @@ import {
   useStorageStore,
   storageStore,
   useModalStore,
-  useIsAnyModalOpen,
   useSettingsStore
 } from './stores';
 import ModalsLayer from './components/ModalsLayer';
@@ -3954,21 +3953,13 @@ export default function HomePage() {
     }
   };
 
-  const isAnyModalOpen = useIsAnyModalOpen();
-
-  // 用 ref 同步 isAnyModalOpen，避免 scroll listener 因任意弹窗开关而频繁重注册
-  const isAnyModalOpenRef = useRef(false);
-  useEffect(() => {
-    isAnyModalOpenRef.current = isAnyModalOpen;
-  }, [isAnyModalOpen]);
-
   useEffect(() => {
     if (!isMobile || mainTab !== 'home') return;
 
     let ticking = false;
     const handleScroll = () => {
-      // 从 ref 读取，无需将 isAnyModalOpen 加入 deps，listener 不再因弹窗变化重注册
-      if (isAnyModalOpenRef.current) return;
+      // 如果 body 已经被锁定了滚动（说明有弹窗打开），直接忽略滚动事件
+      if (document.body.style.overflow === 'hidden') return;
       if (!ticking) {
         requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
@@ -3993,7 +3984,7 @@ export default function HomePage() {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile, mainTab]); // isAnyModalOpen 已移至 ref，不再触发重注册
+  }, [isMobile, mainTab]);
 
   useEffect(() => {
     if (!isMobile || mainTab !== 'home') {
