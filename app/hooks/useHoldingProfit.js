@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { isArray, isNumber, isString } from 'lodash';
 import { useStorageStore } from '../stores';
 import { useTradingDay } from './useTradingDay';
@@ -12,6 +12,7 @@ import { formatDate, toTz, isNavUpdated } from '../lib/fundHelpers';
 export function useHoldingProfit({ activeGroupId } = {}) {
   const { isTradingDay } = useTradingDay();
   const todayStr = formatDate();
+  const cacheRef = useRef(new Map());
 
   const getHoldingProfit = useCallback(
     (fund, holding, scopeGroupIdOverride) => {
@@ -23,68 +24,142 @@ export function useHoldingProfit({ activeGroupId } = {}) {
       const hasTodayValuation = isString(fund.gztime) && fund.gztime.startsWith(todayStr);
       const canCalcTodayProfit = hasTodayData || hasTodayValuation;
 
-      // 分红计算逻辑
-      let dividendCash = 0;
-      let extraShares = 0;
-      let effectiveShare = holding.share;
+      // 分红与基本份额相关的计算缓存
       const currentStore = useStorageStore.getState();
       const cachedDivs = currentStore.fundDividends?.[fund.code]?.list;
       const txs = currentStore.transactions?.[fund.code] || [];
 
-      if (cachedDivs && isArray(cachedDivs)) {
-        let earliestDate = holding.firstPurchaseDate;
-        if (!earliestDate) {
-          for (const tx of txs) {
-            if (tx.type !== 'buy' || !tx.date) continue;
-            const gid = tx.groupId || null;
-            if (txScope !== undefined ? (txScope ? gid !== txScope : gid) : activeGroupId ? gid !== activeGroupId : gid)
-              continue;
-            if (!earliestDate || tx.date < earliestDate) earliestDate = tx.date;
-          }
-        }
+      const cacheKey = `${fund.code}_${txScope}`;
+      const cached = cacheRef.current.get(cacheKey);
+      const isCacheValid =
+        cached &&
+        cached.txsRef === txs &&
+        cached.cachedDivsRef === cachedDivs &&
+        cached.share === holding.share &&
+        cached.firstPurchaseDate === holding.firstPurchaseDate &&
+        cached.dividendMethod === holding.dividendMethod &&
+        cached.txScope === txScope &&
+        cached.todayStr === todayStr &&
+        cached.canCalcTodayProfit === canCalcTodayProfit;
 
-        if (earliestDate) {
-          const getShareAtDate = (date) => {
-            let s = 0;
-            let hasTx = false;
+      let extraShares = 0;
+      let dividendCash = 0;
+      let shareForTodayProfit = holding.share;
+
+      if (isCacheValid) {
+        extraShares = cached.extraShares;
+        dividendCash = cached.dividendCash;
+        shareForTodayProfit = cached.shareForTodayProfit;
+      } else {
+        // 1. 计算分红逻辑
+        if (cachedDivs && isArray(cachedDivs)) {
+          let earliestDate = holding.firstPurchaseDate;
+          if (!earliestDate) {
             for (const tx of txs) {
+              if (tx.type !== 'buy' || !tx.date) continue;
               const gid = tx.groupId || null;
               if (
                 txScope !== undefined ? (txScope ? gid !== txScope : gid) : activeGroupId ? gid !== activeGroupId : gid
               )
                 continue;
-              if (tx.isHistoryOnly) continue;
-              if (tx.date <= date) {
-                hasTx = true;
-                if (tx.type === 'buy') s += Number(tx.share) || 0;
-                if (tx.type === 'sell') s -= Number(tx.share) || 0;
-              }
+              if (!earliestDate || tx.date < earliestDate) earliestDate = tx.date;
             }
-            if (hasTx) return Math.max(0, s);
-            if (date >= earliestDate) return holding.share;
-            return 0;
-          };
+          }
 
-          const sortedDivs = [...cachedDivs].sort((a, b) => a.date.localeCompare(b.date));
-          for (const div of sortedDivs) {
-            if (div.date < earliestDate) continue;
-            if (div.date > todayStr) continue;
-            const baseShare = getShareAtDate(div.date);
-            if (baseShare > 0) {
-              const actualShare = baseShare + extraShares;
-              if (!holding.dividendMethod || holding.dividendMethod === 'reinvest') {
-                if (div.nav > 0) {
-                  extraShares += (actualShare * div.dividend) / div.nav;
+          if (earliestDate) {
+            const getShareAtDate = (date) => {
+              let s = 0;
+              let hasTx = false;
+              for (const tx of txs) {
+                const gid = tx.groupId || null;
+                if (
+                  txScope !== undefined
+                    ? txScope
+                      ? gid !== txScope
+                      : gid
+                    : activeGroupId
+                      ? gid !== activeGroupId
+                      : gid
+                )
+                  continue;
+                if (tx.isHistoryOnly) continue;
+                if (tx.date <= date) {
+                  hasTx = true;
+                  if (tx.type === 'buy') s += Number(tx.share) || 0;
+                  if (tx.type === 'sell') s -= Number(tx.share) || 0;
                 }
-              } else {
-                // 现金分红 (cash)
-                dividendCash += actualShare * div.dividend;
+              }
+              if (hasTx) return Math.max(0, s);
+              if (date >= earliestDate) return holding.share;
+              return 0;
+            };
+
+            const sortedDivs = [...cachedDivs].sort((a, b) => a.date.localeCompare(b.date));
+            for (const div of sortedDivs) {
+              if (div.date < earliestDate) continue;
+              if (div.date > todayStr) continue;
+              const baseShare = getShareAtDate(div.date);
+              if (baseShare > 0) {
+                const actualShare = baseShare + extraShares;
+                if (!holding.dividendMethod || holding.dividendMethod === 'reinvest') {
+                  if (div.nav > 0) {
+                    extraShares += (actualShare * div.dividend) / div.nav;
+                  }
+                } else {
+                  // 现金分红 (cash)
+                  dividendCash += actualShare * div.dividend;
+                }
               }
             }
           }
         }
+
+        // 2. 计算有效份额及当日收益口径份额
+        let effectiveShare = holding.share;
+        if (!holding.dividendMethod || holding.dividendMethod === 'reinvest') {
+          effectiveShare += extraShares;
+        }
+
+        shareForTodayProfit = effectiveShare;
+
+        if (canCalcTodayProfit) {
+          let buyToday = 0;
+          let sellToday = 0;
+          const list = txs;
+          for (const tx of list) {
+            if (!tx || tx.date !== todayStr) continue;
+            const gid = tx.groupId || null;
+            if (txScope) {
+              if (gid !== txScope) continue;
+            } else {
+              if (gid) continue;
+            }
+            if (tx.isHistoryOnly) continue;
+            const s = Number(tx.share);
+            if (!Number.isFinite(s) || s <= 0) continue;
+            if (tx.type === 'buy') buyToday += s;
+            else if (tx.type === 'sell') sellToday += s;
+          }
+          shareForTodayProfit = Math.max(0, effectiveShare - buyToday + sellToday);
+        }
+
+        // 写入缓存
+        cacheRef.current.set(cacheKey, {
+          txsRef: txs,
+          cachedDivsRef: cachedDivs,
+          share: holding.share,
+          firstPurchaseDate: holding.firstPurchaseDate,
+          dividendMethod: holding.dividendMethod,
+          txScope,
+          todayStr,
+          canCalcTodayProfit,
+          extraShares,
+          dividendCash,
+          shareForTodayProfit
+        });
       }
 
+      let effectiveShare = holding.share;
       if (!holding.dividendMethod || holding.dividendMethod === 'reinvest') {
         effectiveShare += extraShares;
       }
@@ -94,30 +169,6 @@ export function useHoldingProfit({ activeGroupId } = {}) {
 
       let currentNav;
       let profitToday;
-      let shareForTodayProfit = effectiveShare; // 基于有效份额计算当日收益
-
-      if (canCalcTodayProfit) {
-        // 当日收益口径：按“昨日收盘时持有份额”计算，避免把当日买入份额算进当日收益。
-        // 份额基数 = 当前份额 - 当日买入份额 + 当日卖出份额（卖出份额在开盘前仍持有，应计入当日涨跌）
-        let buyToday = 0;
-        let sellToday = 0;
-        const list = txs;
-        for (const tx of list) {
-          if (!tx || tx.date !== todayStr) continue;
-          const gid = tx.groupId || null;
-          if (txScope) {
-            if (gid !== txScope) continue;
-          } else {
-            if (gid) continue;
-          }
-          if (tx.isHistoryOnly) continue;
-          const s = Number(tx.share);
-          if (!Number.isFinite(s) || s <= 0) continue;
-          if (tx.type === 'buy') buyToday += s;
-          else if (tx.type === 'sell') sellToday += s;
-        }
-        shareForTodayProfit = Math.max(0, effectiveShare - buyToday + sellToday);
-      }
 
       if (!useValuation) {
         // 使用确权净值 (dwjz)
