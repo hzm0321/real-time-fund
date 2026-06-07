@@ -810,6 +810,37 @@ export default function HomePage() {
         ? new Map(filtered.map((f) => [f.code, getHoldingProfitForTab(f, holdingsForTabWithLinked[f.code])]))
         : null;
 
+    const estimateProfitByCode =
+      sortBy === 'estimateProfit'
+        ? new Map(
+            filtered.map((f) => {
+              const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
+              const holding = holdingsForTabWithLinked[f.code];
+              const profit = getHoldingProfitForTab(f, holding);
+              const total = profit ? profit.profitTotal : null;
+              if (hasTodayData) return [f.code, total];
+
+              const principal =
+                holding && isNumber(holding.cost) && isNumber(holding.share) ? holding.cost * holding.share : 0;
+              const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
+              const estimateChangeValue = f.noValuation ? null : isNumber(f.gszzl) ? Number(f.gszzl) : null;
+              const holdingProfitPercentValue = total != null && principal > 0 ? (total / principal) * 100 : null;
+              const hasEstimatePercent = hasTodayEstimate && estimateChangeValue != null;
+              const hasHoldingPercent = holdingProfitPercentValue != null;
+              const fallbackEstimateProfitPercentValue =
+                hasEstimatePercent || hasHoldingPercent
+                  ? (hasEstimatePercent ? estimateChangeValue : 0) + (hasHoldingPercent ? holdingProfitPercentValue : 0)
+                  : null;
+
+              const val =
+                fallbackEstimateProfitPercentValue != null && principal > 0
+                  ? principal * (fallbackEstimateProfitPercentValue / 100)
+                  : null;
+              return [f.code, val];
+            })
+          )
+        : null;
+
     return filtered.sort((a, b) => {
       if (sortBy === 'yield') {
         const getYieldValue = (fund) => {
@@ -896,31 +927,8 @@ export default function HomePage() {
         return sortOrder === 'asc' ? valA - valB : valB - valA;
       }
       if (sortBy === 'estimateProfit') {
-        const getEstimateProfitValue = (f) => {
-          const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
-          const holding = holdingsForTabWithLinked[f.code];
-          const profit = getHoldingProfitForTab(f, holding);
-          const total = profit ? profit.profitTotal : null;
-          if (hasTodayData) return total;
-
-          const principal =
-            holding && isNumber(holding.cost) && isNumber(holding.share) ? holding.cost * holding.share : 0;
-          const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
-          const estimateChangeValue = f.noValuation ? null : isNumber(f.gszzl) ? Number(f.gszzl) : null;
-          const holdingProfitPercentValue = total != null && principal > 0 ? (total / principal) * 100 : null;
-          const hasEstimatePercent = hasTodayEstimate && estimateChangeValue != null;
-          const hasHoldingPercent = holdingProfitPercentValue != null;
-          const fallbackEstimateProfitPercentValue =
-            hasEstimatePercent || hasHoldingPercent
-              ? (hasEstimatePercent ? estimateChangeValue : 0) + (hasHoldingPercent ? holdingProfitPercentValue : 0)
-              : null;
-
-          return fallbackEstimateProfitPercentValue != null && principal > 0
-            ? principal * (fallbackEstimateProfitPercentValue / 100)
-            : null;
-        };
-        const valA = getEstimateProfitValue(a);
-        const valB = getEstimateProfitValue(b);
+        const valA = estimateProfitByCode ? estimateProfitByCode.get(a.code) : null;
+        const valB = estimateProfitByCode ? estimateProfitByCode.get(b.code) : null;
         const hasA = valA != null && Number.isFinite(valA);
         const hasB = valB != null && Number.isFinite(valB);
         if (!hasA && !hasB) return 0;
