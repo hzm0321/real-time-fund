@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.0.0';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.1.1';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -109,15 +109,13 @@ export default function Announcement() {
                 paddingRight: '4px'
               }}
             >
-              <p>v2.0.0 大版本更新内容：</p>
-              <p>1. 新增行情页面，开放热门板块和估算涨幅相关表格内容展示。</p>
-              <p>2. 估算涨幅相关基金数据支持添加到首页。</p>
-              <p>3. 新增分红方式收益计算。</p>
-              <p>4. 新增连续涨跌天数排序。</p>
-              <p>5. 编辑模式允许在所有排序下进行。</p>
-              <p>6. 统一 toast 组件。</p>
-              <p>7. 优化拍照识别方案。</p>
-              <p>8. 资产总计金额支持单独隐藏。</p>
+              <p>v2.1.1 版本更新内容：</p>
+              <p>1. 基金标签支持二次编辑。</p>
+              <p>2. 修复 qdii 收益计算偏差问题。</p>
+              <p>3. 前10重仓股票新增股票占比。</p>
+              <p>4. 优化实时估值分时图 y 轴坐标颜色。</p>
+              <p>5. 筛选基金支持按标签。</p>
+              <p>6. 调整添加分组按钮至最后一个分组右侧。</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button
