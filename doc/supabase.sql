@@ -127,11 +127,13 @@ DECLARE
   total_count int;
   beat_count int;
 BEGIN
-  SELECT count(*) INTO total_count FROM public.user_configs WHERE ytd_return_rate IS NOT NULL;
+  SELECT count(*) INTO total_count FROM public.user_configs WHERE user_id <> auth.uid() AND ytd_return_rate IS NOT NULL;
   IF total_count < 10 THEN
     RETURN -1; -- Returns -1 to indicate insufficient data
   END IF;
-  SELECT count(*) INTO beat_count FROM public.user_configs WHERE ytd_return_rate < p_ytd_rate;
+  SELECT count(*) INTO beat_count
+  FROM public.user_configs
+  WHERE user_id <> auth.uid() AND ytd_return_rate IS NOT NULL AND ytd_return_rate < p_ytd_rate;
   RETURN round((beat_count::numeric / total_count::numeric) * 100, 2);
 END;
 $$;

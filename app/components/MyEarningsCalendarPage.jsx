@@ -680,7 +680,7 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
         )}
 
         {isNumber(ytdRate) && (
-          <div className="shrink-0 pt-4 pb-6 px-2">
+          <div className="shrink-0 pt-4 pb-6">
             {isNumber(percentile) && percentile >= 0 ? (
               <div className="my-earnings-calendar-card my-earnings-rank-card relative overflow-hidden p-5 flex flex-col">
                 <div className="my-earnings-rank-heading flex items-center gap-3.5 z-10">
@@ -688,7 +688,13 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
                     <Medal size={22} className="text-[var(--primary)]" />
                   </div>
                   <div className="flex min-w-0 flex-col">
-                    <div className="text-[13px] text-muted-foreground mb-0.5">本年收益率超过了</div>
+                    <div className="text-[13px] text-muted-foreground mb-0.5">
+                      本年收益率
+                      <span className={cn('mx-1 font-medium', earningsClass(ytdRate))}>
+                        {formatEarnings(ytdRate, masked, true)}
+                      </span>
+                      超过了
+                    </div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-[26px] font-bold text-[var(--primary)] leading-none tracking-tight">
                         {percentile}%
@@ -721,9 +727,9 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
                     )}
                   </div>
                   <div className="flex items-center justify-between mt-3 text-[13px]">
-                    <span className="text-[var(--primary)] font-medium">高于你 {percentile}%</span>
+                    <span className="text-[var(--primary)] font-medium">低于你 {percentile}%</span>
                     <span className="text-muted-foreground font-medium">
-                      低于你 {Number((100 - percentile).toFixed(2))}%
+                      高于或等于你 {Number((100 - percentile).toFixed(2))}%
                     </span>
                   </div>
                 </div>
