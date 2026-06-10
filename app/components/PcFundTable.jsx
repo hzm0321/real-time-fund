@@ -18,7 +18,7 @@ import { useModalStore } from '../stores';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
-import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ConfirmModal from './ConfirmModal';
@@ -2731,7 +2731,7 @@ const PcFundTable = memo(function PcFundTable({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
-              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              modifiers={[restrictToVerticalAxis]}
               dropAnimation={null}
               autoScroll={false}
             >
@@ -2800,7 +2800,7 @@ const PcFundTable = memo(function PcFundTable({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
-              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              modifiers={[restrictToVerticalAxis]}
               dropAnimation={null}
               autoScroll={false}
             >
