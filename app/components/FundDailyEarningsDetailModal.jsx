@@ -1,24 +1,16 @@
 'use client';
+import { isArray, isNumber } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { CloseIcon } from './Icons';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
+import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { formatMoney } from '@/lib/utils';
 
 function buildTableRows(series) {
-  if (!Array.isArray(series) || series.length === 0) return [];
+  if (!isArray(series) || series.length === 0) return [];
   return [...series].reverse();
 }
 
@@ -27,7 +19,7 @@ export default function FundDailyEarningsDetailModal({
   onOpenChange,
   series = [],
   title = '收益明细',
-  masked = false,
+  masked = false
 }) {
   const isMobile = useIsMobile();
   const [visibleCount, setVisibleCount] = useState(30);
@@ -45,14 +37,14 @@ export default function FundDailyEarningsDetailModal({
         accessorKey: 'date',
         header: '日期',
         cell: (info) => info.getValue() || '—',
-        meta: { align: 'left' },
+        meta: { align: 'left' }
       },
       {
         accessorKey: 'earnings',
         header: '收益',
         cell: (info) => {
           const v = info.getValue();
-          const isValid = typeof v === 'number' && Number.isFinite(v);
+          const isValid = isNumber(v) && Number.isFinite(v);
           if (masked) return '***';
           if (!isValid) return '—';
           const sign = v > 0 ? '+' : v < 0 ? '-' : '';
@@ -60,11 +52,11 @@ export default function FundDailyEarningsDetailModal({
           return (
             <span className={cls}>
               {sign}
-              {Math.abs(v).toFixed(2)}
+              {formatMoney(Math.abs(v))}
             </span>
           );
         },
-        meta: { align: 'right' },
+        meta: { align: 'right' }
       },
       {
         accessorKey: 'rate',
@@ -78,7 +70,7 @@ export default function FundDailyEarningsDetailModal({
             Number.isFinite(earnings) && Number.isFinite(baseCostAmount) && baseCostAmount > 0
               ? (earnings / baseCostAmount) * 100
               : null;
-          const rateValue = (v != null && Number.isFinite(v)) ? v : derivedRate;
+          const rateValue = v != null && Number.isFinite(v) ? v : derivedRate;
           if (masked) return '***';
           if (rateValue == null || !Number.isFinite(rateValue)) return '—';
           const sign = rateValue > 0 ? '+' : '';
@@ -90,16 +82,16 @@ export default function FundDailyEarningsDetailModal({
             </span>
           );
         },
-        meta: { align: 'right' },
-      },
+        meta: { align: 'right' }
+      }
     ],
-    [masked],
+    [masked]
   );
 
   const table = useReactTable({
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: getCoreRowModel()
   });
 
   const rows = table.getRowModel().rows.slice(0, visibleCount);
@@ -141,16 +133,19 @@ export default function FundDailyEarningsDetailModal({
   const body = (
     <div
       ref={scrollRef}
+      className="scrollbar-y-styled"
       style={{
         maxHeight: '60vh',
         overflowY: 'auto',
-        paddingRight: 4,
+        paddingRight: 4
       }}
       onScroll={handleScroll}
     >
       {data.length === 0 && (
         <div style={{ padding: '16px 0', textAlign: 'center' }}>
-          <span className="muted" style={{ fontSize: 12 }}>暂无数据</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            暂无数据
+          </span>
         </div>
       )}
       {data.length > 0 && (
@@ -159,8 +154,7 @@ export default function FundDailyEarningsDetailModal({
           style={{
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
-            overflow: 'hidden',
-            background: 'var(--card)',
+            background: 'var(--card)'
           }}
         >
           <table
@@ -169,7 +163,7 @@ export default function FundDailyEarningsDetailModal({
               width: '100%',
               borderCollapse: 'collapse',
               fontSize: '13px',
-              color: 'var(--text)',
+              color: 'var(--text)'
             }}
           >
             <thead>
@@ -179,10 +173,10 @@ export default function FundDailyEarningsDetailModal({
                   style={{
                     borderBottom: '1px solid var(--border)',
                     background: 'var(--table-row-alt-bg)',
-                    boxShadow: '0 1px 0 0 var(--border)',
+                    boxShadow: '0 1px 0 0 var(--border)'
                   }}
                 >
-                  {hg.headers.map((h) => (
+                  {hg.headers.map((h, index) => (
                     <th
                       key={h.id}
                       style={{
@@ -194,6 +188,8 @@ export default function FundDailyEarningsDetailModal({
                         position: 'sticky',
                         top: 0,
                         zIndex: 1,
+                        borderTopLeftRadius: index === 0 ? 'var(--radius)' : undefined,
+                        borderTopRightRadius: index === hg.headers.length - 1 ? 'var(--radius)' : undefined
                       }}
                     >
                       {flexRender(h.column.columnDef.header, h.getContext())}
@@ -207,7 +203,7 @@ export default function FundDailyEarningsDetailModal({
                 <tr
                   key={row.id}
                   style={{
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: '1px solid var(--border)'
                   }}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -217,7 +213,7 @@ export default function FundDailyEarningsDetailModal({
                         padding: '8px 12px',
                         color: 'var(--text)',
                         textAlign: cell.column.columnDef.meta?.align || 'left',
-                        fontVariantNumeric: 'tabular-nums',
+                        fontVariantNumeric: 'tabular-nums'
                       }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -231,7 +227,9 @@ export default function FundDailyEarningsDetailModal({
       )}
       {data.length > 0 && hasMore && (
         <div style={{ padding: '12px 0', textAlign: 'center' }}>
-          <span className="muted" style={{ fontSize: 12 }}>向下滚动以加载更多...</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            向下滚动以加载更多...
+          </span>
         </div>
       )}
     </div>
@@ -242,30 +240,22 @@ export default function FundDailyEarningsDetailModal({
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={handleOpenChange} direction="bottom">
-        <DrawerContent
-          className="glass"
-          defaultHeight="70vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
+        <DrawerContent className="glass" defaultHeight="70vh" minHeight="40vh" maxHeight="90vh">
           <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-3">
             <DrawerTitle className="flex items-center gap-2.5 text-left">
               <span>{title}</span>
             </DrawerTitle>
             <DrawerClose
               className="icon-button border-none bg-transparent p-1"
-              title="关闭"
               style={{
                 borderColor: 'transparent',
-                backgroundColor: 'transparent',
+                backgroundColor: 'transparent'
               }}
             >
               <CloseIcon width="20" height="20" />
             </DrawerClose>
           </DrawerHeader>
-          <div className="flex-1 px-4 pb-4">
-            {body}
-          </div>
+          <div className="flex-1 px-4 pb-4">{body}</div>
         </DrawerContent>
       </Drawer>
     );
@@ -284,7 +274,7 @@ export default function FundDailyEarningsDetailModal({
           maxHeight: '80vh',
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 9999,
+          zIndex: 9999
         }}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>

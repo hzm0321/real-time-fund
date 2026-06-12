@@ -1,3 +1,4 @@
+import { isArray, isString } from 'lodash';
 import { useCallback, useRef } from 'react';
 import { getQueryClient } from '../lib/get-query-client';
 import * as qk from '../lib/query-keys';
@@ -6,11 +7,11 @@ const FUND_CODE_SEARCH_URL = 'https://fund.eastmoney.com/js/fundcode_search.js';
 const FUND_LIST_CACHE_TIME = 24 * 60 * 60 * 1000;
 
 const formatEastMoneyFundList = (rawList) => {
-  if (!Array.isArray(rawList)) return [];
+  if (!isArray(rawList)) return [];
 
   return rawList
     .map((item) => {
-      if (!Array.isArray(item)) return null;
+      if (!isArray(item)) return null;
       const code = String(item[0] ?? '').trim();
       const name = String(item[2] ?? '').trim();
       if (!code || !name) return null;
@@ -70,7 +71,7 @@ export const useFundFuzzyMatcher = () => {
 
               script.onload = () => {
                 if (done) return;
-                const snapshot = Array.isArray(window.r) ? JSON.parse(JSON.stringify(window.r)) : [];
+                const snapshot = isArray(window.r) ? JSON.parse(JSON.stringify(window.r)) : [];
                 cleanup();
                 const parsed = formatEastMoneyFundList(snapshot);
                 if (!parsed.length) {
@@ -88,16 +89,16 @@ export const useFundFuzzyMatcher = () => {
 
               document.body.appendChild(script);
             }),
-          staleTime: FUND_LIST_CACHE_TIME,
-        }),
+          staleTime: FUND_LIST_CACHE_TIME
+        })
       ]);
       const Fuse = fuseModule.default;
-      const fuse = new Fuse(Array.isArray(allFundList) ? allFundList : [], {
+      const fuse = new Fuse(isArray(allFundList) ? allFundList : [], {
         keys: ['name', 'code'],
         includeScore: true,
         threshold: 0.5,
         ignoreLocation: true,
-        minMatchCharLength: 2,
+        minMatchCharLength: 2
       });
 
       allFundFuseRef.current = fuse;
@@ -114,7 +115,7 @@ export const useFundFuzzyMatcher = () => {
   }, []);
 
   const normalizeFundText = useCallback((value) => {
-    if (typeof value !== 'string') return '';
+    if (!isString(value)) return '';
     return value
       .toUpperCase()
       .replace(/[（(]/g, '(')
@@ -124,91 +125,112 @@ export const useFundFuzzyMatcher = () => {
       .replace(/[^\u4e00-\u9fa5A-Z0-9()]/g, '');
   }, []);
 
-  const parseFundQuerySignals = useCallback((rawName) => {
-    const normalized = normalizeFundText(rawName);
-    const hasETF = normalized.includes('ETF');
-    const hasLOF = normalized.includes('LOF');
-    const hasLink = normalized.includes('联接');
-    const shareMatch = normalized.match(/([A-Z])(?:类)?$/i);
-    const shareClass = shareMatch ? shareMatch[1].toUpperCase() : null;
+  const parseFundQuerySignals = useCallback(
+    (rawName) => {
+      const normalized = normalizeFundText(rawName);
+      const hasETF = normalized.includes('ETF');
+      const hasLOF = normalized.includes('LOF');
+      const hasLink = normalized.includes('联接');
+      const shareMatch = normalized.match(/([A-Z])(?:类)?$/i);
+      const shareClass = shareMatch ? shareMatch[1].toUpperCase() : null;
 
-    const core = normalized
-      .replace(/基金/g, '')
-      .replace(/ETF联接/g, '')
-      .replace(/联接[A-Z]?/g, '')
-      .replace(/ETF/g, '')
-      .replace(/LOF/g, '')
-      .replace(/[A-Z](?:类)?$/g, '');
+      const core = normalized
+        .replace(/基金/g, '')
+        .replace(/ETF联接/g, '')
+        .replace(/联接[A-Z]?/g, '')
+        .replace(/ETF/g, '')
+        .replace(/LOF/g, '')
+        .replace(/[A-Z](?:类)?$/g, '');
 
-    return {
-      normalized,
-      core,
-      hasETF,
-      hasLOF,
-      hasLink,
-      shareClass,
-    };
-  }, [normalizeFundText]);
+      return {
+        normalized,
+        core,
+        hasETF,
+        hasLOF,
+        hasLink,
+        shareClass
+      };
+    },
+    [normalizeFundText]
+  );
 
-  const resolveFundCodeByFuzzy = useCallback(async (name) => {
-    const querySignals = parseFundQuerySignals(name);
-    if (!querySignals.normalized) return null;
+  const resolveFundCodeByFuzzy = useCallback(
+    async (name) => {
+      const querySignals = parseFundQuerySignals(name);
+      if (!querySignals.normalized) return null;
 
-    const len = querySignals.normalized.length;
-    const strictThreshold = len <= 4 ? 0.16 : len <= 8 ? 0.22 : 0.28;
-    const relaxedThreshold = Math.min(0.45, strictThreshold + 0.16);
-    const scoreGapThreshold = len <= 5 ? 0.08 : 0.06;
+      const len = querySignals.normalized.length;
+      const strictThreshold = len <= 4 ? 0.16 : len <= 8 ? 0.22 : 0.28;
+      const relaxedThreshold = Math.min(0.45, strictThreshold + 0.16);
+      const scoreGapThreshold = len <= 5 ? 0.08 : 0.06;
 
-    const fuse = await getAllFundFuse();
-    const recalled = fuse.search(name, { limit: 50 });
-    if (!recalled.length) return null;
+      const fuse = await getAllFundFuse();
+      const recalled = fuse.search(name, { limit: 50 });
+      if (!recalled.length) return null;
 
-    const stage1 = recalled.filter((item) => (item.score ?? 1) <= relaxedThreshold);
-    if (!stage1.length) return null;
+      const stage1 = recalled.filter((item) => (item.score ?? 1) <= relaxedThreshold);
+      if (!stage1.length) return null;
 
-    const ranked = stage1
-      .map((item) => {
-        const candidateSignals = parseFundQuerySignals(item?.item?.name || '');
-        let finalScore = item.score ?? 1;
+      const ranked = stage1
+        .map((item) => {
+          const candidateSignals = parseFundQuerySignals(item?.item?.name || '');
+          let finalScore = item.score ?? 1;
 
-        if (querySignals.hasETF) {
-          finalScore += candidateSignals.hasETF ? -0.04 : 0.2;
-        }
-        if (querySignals.hasLOF) {
-          finalScore += candidateSignals.hasLOF ? -0.04 : 0.2;
-        }
-        if (querySignals.hasLink) {
-          finalScore += candidateSignals.hasLink ? -0.03 : 0.18;
-        }
-        if (querySignals.shareClass) {
-          finalScore += candidateSignals.shareClass === querySignals.shareClass ? -0.03 : 0.18;
-        }
-
-        if (querySignals.core && candidateSignals.core) {
-          if (candidateSignals.core.includes(querySignals.core)) {
-            finalScore -= 0.06;
-          } else if (!querySignals.core.includes(candidateSignals.core)) {
-            finalScore += 0.06;
+          if (querySignals.hasETF) {
+            finalScore += candidateSignals.hasETF ? -0.04 : 0.2;
           }
-        }
+          if (querySignals.hasLOF) {
+            finalScore += candidateSignals.hasLOF ? -0.04 : 0.2;
+          }
+          if (querySignals.hasLink) {
+            finalScore += candidateSignals.hasLink ? -0.03 : 0.18;
+          }
+          if (querySignals.shareClass) {
+            finalScore += candidateSignals.shareClass === querySignals.shareClass ? -0.03 : 0.18;
+          }
 
-        return { ...item, finalScore };
-      })
-      .sort((a, b) => a.finalScore - b.finalScore);
+          if (querySignals.core && candidateSignals.core) {
+            if (candidateSignals.core.includes(querySignals.core)) {
+              finalScore -= 0.06;
+            } else if (!querySignals.core.includes(candidateSignals.core)) {
+              finalScore += 0.06;
+            }
+          }
 
-    const top1 = ranked[0];
-    if (!top1 || top1.finalScore > strictThreshold) return null;
+          return { ...item, finalScore };
+        })
+        .sort((a, b) => a.finalScore - b.finalScore);
 
-    const top2 = ranked[1];
-    if (top2 && (top2.finalScore - top1.finalScore) < scoreGapThreshold) {
-      return null;
-    }
+      const top1 = ranked[0];
+      if (!top1 || top1.finalScore > strictThreshold) return null;
 
-    return top1?.item?.code || null;
-  }, [getAllFundFuse, parseFundQuerySignals]);
+      const top2 = ranked[1];
+      if (top2 && top2.finalScore - top1.finalScore < scoreGapThreshold) {
+        return null;
+      }
+
+      return top1?.item?.code || null;
+    },
+    [getAllFundFuse, parseFundQuerySignals]
+  );
+
+  const searchFundsLocal = useCallback(
+    async (query) => {
+      if (!query || String(query).trim().length < 2) return [];
+      const fuse = await getAllFundFuse();
+      const results = fuse.search(query, { limit: 20 });
+      return results.map((r) => ({
+        CODE: r.item.code,
+        NAME: r.item.name,
+        TYPE: '基金' // 本地列表通常只有名称和代码
+      }));
+    },
+    [getAllFundFuse]
+  );
 
   return {
     resolveFundCodeByFuzzy,
+    searchFundsLocal
   };
 };
 

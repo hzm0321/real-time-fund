@@ -12,7 +12,7 @@ export default function SuccessModal({ message, onClose, overlayStyle, cardStyle
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      exit={{ opacity: 0, pointerEvents: 'none' }}
       style={{ pointerEvents: 'auto', ...overlayStyle }}
     >
       <motion.div
@@ -29,16 +29,27 @@ export default function SuccessModal({ message, onClose, overlayStyle, cardStyle
           <div style={{ fontSize: '48px', marginBottom: 16 }}>🎉</div>
           <h3 style={{ marginBottom: 8 }}>{message}</h3>
           <p className="muted">操作已完成，您可以继续使用。</p>
-          <button
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.01 }}
             type="button"
             className="button"
-            onClick={onClose}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            style={{ marginTop: 24, width: '100%', pointerEvents: 'auto' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            style={{
+              marginTop: 24,
+              width: '100%',
+              pointerEvents: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'none'
+            }}
           >
             关闭
-          </button>
+          </motion.button>
         </div>
       </motion.div>
     </motion.div>

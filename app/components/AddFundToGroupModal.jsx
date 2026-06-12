@@ -1,35 +1,40 @@
 'use client';
+import { isArray, isObject } from 'lodash';
 
 import { useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Info } from 'lucide-react';
 import { CloseIcon, PlusIcon } from './Icons';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { getTagThemeBadgeProps } from './AddTagDialog';
-import { cn } from '@/lib/utils';
+import { cn, formatMoney } from '@/lib/utils';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdings = {}, fundTagListsByCode = {}, fundTagRecords = [], onClose, onAdd }) {
+export default function AddFundToGroupModal({
+  allFunds,
+  currentGroupCodes,
+  holdings = {},
+  fundTagListsByCode = {},
+  fundTagRecords = [],
+  onClose,
+  onAdd
+}) {
   const [selected, setSelected] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
   const availableFunds = useMemo(() => {
-    const base = (allFunds || []).filter(f => !(currentGroupCodes || []).includes(f.code));
-    if (!searchQuery.trim()) return base;
-    const query = searchQuery.trim().toLowerCase();
-    return base.filter(f =>
-      (f.name && f.name.toLowerCase().includes(query)) ||
-      (f.code && f.code.includes(query))
-    );
+    const base = (allFunds || []).filter((f) => !(currentGroupCodes || []).includes(f.code));
+    const query = String(searchQuery ?? '')
+      .trim()
+      .toLowerCase();
+    if (!query) return base;
+    return base.filter((f) => (f.name && f.name.toLowerCase().includes(query)) || (f.code && f.code.includes(query)));
   }, [allFunds, currentGroupCodes, searchQuery]);
 
   /** 全局标签池 id → theme 查找表，确保渲染主题与用户最新配置一致 */
   const tagThemeById = useMemo(() => {
     const map = {};
-    for (const r of (fundTagRecords || [])) {
+    for (const r of fundTagRecords || []) {
       if (r?.id) map[String(r.id)] = String(r.theme ?? 'default').trim() || 'default';
     }
     return map;
@@ -38,13 +43,13 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
   const getHoldingAmount = (fund) => {
     const holding = holdings[fund?.code];
     if (!holding || !holding.share || holding.share <= 0) return null;
-    const nav = Number(fund?.dwjz) || Number(fund?.gsz) || Number(fund?.estGsz) || 0;
+    const nav = Number(fund?.dwjz) || Number(fund?.gsz) || 0;
     if (!nav) return null;
     return holding.share * nav;
   };
 
   const toggleSelect = (code) => {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(code)) next.delete(code);
       else next.add(code);
@@ -93,6 +98,13 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
           </button>
         </div>
 
+        <Alert style={{ marginBottom: 16 }}>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            在此添加的基金不会代入原有持仓金额。如需带金额迁移，请使用「分组迁移」功能。
+          </AlertDescription>
+        </Alert>
+
         <div style={{ marginBottom: 16, position: 'relative' }}>
           <Search
             width="16"
@@ -103,7 +115,7 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
               left: 12,
               top: '50%',
               transform: 'translateY(-50%)',
-              pointerEvents: 'none',
+              pointerEvents: 'none'
             }}
           />
           <input
@@ -114,19 +126,17 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
             placeholder="搜索基金名称或编号"
             style={{
               width: '100%',
-              paddingLeft: 36,
+              paddingLeft: 36
             }}
           />
         </div>
 
         <div
-          className="group-manage-list-container"
+          className="group-manage-list-container scrollbar-y-styled"
           style={{
             maxHeight: '50vh',
             overflowY: 'auto',
-            paddingRight: '4px',
-            scrollbarWidth: 'thin',
-            scrollbarColor: 'var(--border) transparent',
+            paddingRight: '4px'
           }}
         >
           {availableFunds.length === 0 ? (
@@ -149,16 +159,17 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
                     <div style={{ fontWeight: 600 }}>{fund.name}</div>
                     <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
                       <span className="muted">#{fund.code}</span>
-                      {Array.isArray(fundTagListsByCode[fund.code]) && fundTagListsByCode[fund.code].length > 0 && (
+                      {isArray(fundTagListsByCode[fund.code]) && fundTagListsByCode[fund.code].length > 0 && (
                         <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 2 }}>
                           {fundTagListsByCode[fund.code].map((raw, idx) => {
-                            if (!raw || typeof raw !== 'object' || !raw.name) return null;
+                            if (!raw || !isObject(raw) || !raw.name) return null;
                             const name = String(raw.name).trim();
                             if (!name) return null;
                             // 优先取全局标签池中的最新主题，实例快照 theme 作为兜底
-                            const theme = (raw.id && tagThemeById[String(raw.id)])
-                              ? tagThemeById[String(raw.id)]
-                              : String(raw.theme ?? 'default').trim() || 'default';
+                            const theme =
+                              raw.id && tagThemeById[String(raw.id)]
+                                ? tagThemeById[String(raw.id)]
+                                : String(raw.theme ?? 'default').trim() || 'default';
                             const { variant, className: themeCls } = getTagThemeBadgeProps(theme);
                             return (
                               <Badge
@@ -175,7 +186,10 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
                     </div>
                     {getHoldingAmount(fund) != null && (
                       <div className="muted" style={{ fontSize: '12px', marginTop: 2 }}>
-                        持仓金额：<span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{getHoldingAmount(fund).toFixed(2)}</span>
+                        持仓金额：
+                        <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>
+                          {formatMoney(getHoldingAmount(fund))}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -186,7 +200,13 @@ export default function AddFundToGroupModal({ allFunds, currentGroupCodes, holdi
         </div>
 
         <div className="row" style={{ marginTop: 24, gap: 12 }}>
-          <button className="button secondary" onClick={onClose} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}>取消</button>
+          <button
+            className="button secondary"
+            onClick={onClose}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}
+          >
+            取消
+          </button>
           <button
             className="button"
             onClick={() => onAdd(Array.from(selected))}

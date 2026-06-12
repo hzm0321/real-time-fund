@@ -1,73 +1,46 @@
-"use client";
+'use client';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from "@dnd-kit/core";
-import { restrictToParentElement } from "@dnd-kit/modifiers";
-import {
-  SortableContext,
-  rectSortingStrategy,
-  useSortable,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerClose,
-} from "@/components/ui/drawer";
-import { CloseIcon, MinusIcon, ResetIcon, SettingsIcon } from "./Icons";
-import ConfirmModal from "./ConfirmModal";
-import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@/components/ui/drawer';
+import { CloseIcon, MinusIcon, ResetIcon, SettingsIcon } from './Icons';
+import ConfirmModal from './ConfirmModal';
+import { cn } from '@/lib/utils';
 
 function SortableIndexItem({ item, canRemove, onRemove }) {
   const isMobile = useIsMobile();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.code });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.code });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    cursor: isDragging ? "grabbing" : "grab",
-    flex: isMobile
-      ? "0 0 calc((100% - 24px) / 3)"
-      : "0 0 calc((100% - 48px) / 5)",
-    touchAction: "none",
+    cursor: isDragging ? 'grabbing' : 'grab',
+    flex: isMobile ? '0 0 calc((100% - 24px) / 3)' : '0 0 calc((100% - 48px) / 5)',
+    touchAction: 'none',
     ...(isDragging && {
-      position: "relative",
+      position: 'relative',
       zIndex: 10,
       opacity: 0.9,
-      boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-    }),
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+    })
   };
 
   const isUp = item.change >= 0;
-  const color = isUp ? "var(--danger)" : "var(--success)";
+  const color = isUp ? 'var(--danger)' : 'var(--success)';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "glass card",
-        "relative flex flex-col gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2"
+        'glass card',
+        'relative flex flex-col gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2'
       )}
       {...attributes}
       {...listeners}
@@ -81,18 +54,18 @@ function SortableIndexItem({ item, canRemove, onRemove }) {
           }}
           className="icon-button"
           style={{
-            position: "absolute",
+            position: 'absolute',
             top: 4,
             right: 4,
             width: 18,
             height: 18,
-            borderRadius: "999px",
-            backgroundColor: "rgba(255,96,96,0.1)",
-            color: "var(--danger)",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            borderRadius: '999px',
+            backgroundColor: 'rgba(255,96,96,0.1)',
+            color: 'var(--danger)',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
           aria-label={`移除 ${item.name}`}
         >
@@ -104,19 +77,19 @@ function SortableIndexItem({ item, canRemove, onRemove }) {
           fontSize: 13,
           fontWeight: 500,
           paddingRight: 18,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }}
       >
         {item.name}
       </div>
       <div style={{ fontSize: 18, fontWeight: 600, color }}>
-        {item.price?.toFixed ? item.price.toFixed(2) : String(item.price ?? "-")}
+        {item.price?.toFixed ? item.price.toFixed(2) : String(item.price ?? '-')}
       </div>
       <div style={{ fontSize: 12, color }}>
-        {(item.change >= 0 ? "+" : "") + item.change.toFixed(2)}{" "}
-        {(item.changePercent >= 0 ? "+" : "") + item.changePercent.toFixed(2)}%
+        {(item.change >= 0 ? '+' : '') + item.change.toFixed(2)}{' '}
+        {(item.changePercent >= 0 ? '+' : '') + item.changePercent.toFixed(2)}%
       </div>
     </div>
   );
@@ -137,26 +110,23 @@ function SortableIndexItem({ item, canRemove, onRemove }) {
  * @param {(codes: string[]) => void} props.onChangeSelected - 更新选中指数集合
  * @param {() => void} props.onResetDefault - 恢复默认选中集合
  */
-export default function MarketSettingModal({open,
+export default function MarketSettingModal({
+  open,
   onClose,
   indices = [],
   selectedCodes = [],
   onChangeSelected,
-  onResetDefault}) {
+  onResetDefault
+}) {
   const isMobile = useIsMobile();
   const selectedList = useMemo(() => {
     if (!indices?.length || !selectedCodes?.length) return [];
     const map = new Map(indices.map((it) => [it.code, it]));
-    return selectedCodes
-      .map((code) => map.get(code))
-      .filter(Boolean);
+    return selectedCodes.map((code) => map.get(code)).filter(Boolean);
   }, [indices, selectedCodes]);
 
   const allIndices = indices || [];
-  const selectedSet = useMemo(
-    () => new Set(selectedCodes || []),
-    [selectedCodes]
-  );
+  const selectedSet = useMemo(() => new Set(selectedCodes || []), [selectedCodes]);
 
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
@@ -167,7 +137,7 @@ export default function MarketSettingModal({open,
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
@@ -206,19 +176,16 @@ export default function MarketSettingModal({open,
       <div>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 8,
-            marginBottom: 8,
+            marginBottom: 8
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>已添加指数</div>
-            <div
-              className="muted"
-              style={{ fontSize: 12, color: "var(--muted-foreground)" }}
-            >
+            <div className="muted" style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
               拖动下方指数即可排序
             </div>
           </div>
@@ -229,8 +196,8 @@ export default function MarketSettingModal({open,
             className="muted"
             style={{
               fontSize: 13,
-              color: "var(--muted-foreground)",
-              padding: "12px 0 4px",
+              color: 'var(--muted-foreground)',
+              padding: '12px 0 4px'
             }}
           >
             暂未添加指数，请在下方选择想要关注的指数。
@@ -242,10 +209,7 @@ export default function MarketSettingModal({open,
             onDragEnd={handleDragEnd}
             modifiers={[restrictToParentElement]}
           >
-            <SortableContext
-              items={selectedCodes}
-              strategy={rectSortingStrategy}
-            >
+            <SortableContext items={selectedCodes} strategy={rectSortingStrategy}>
               <div className="flex flex-wrap gap-3">
                 {selectedList.map((item) => (
                   <SortableIndexItem
@@ -264,18 +228,18 @@ export default function MarketSettingModal({open,
       <div>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 8,
-            marginBottom: 10,
+            marginBottom: 10
           }}
         >
           <div
             className="muted"
             style={{
               fontSize: 13,
-              color: "var(--muted-foreground)",
+              color: 'var(--muted-foreground)'
             }}
           >
             点击即可选指数
@@ -286,14 +250,14 @@ export default function MarketSettingModal({open,
               className="icon-button"
               onClick={() => setResetConfirmOpen(true)}
               style={{
-                border: "none",
+                border: 'none',
                 width: 28,
                 height: 28,
-                backgroundColor: "transparent",
-                color: "var(--muted-foreground)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
+                backgroundColor: 'transparent',
+                color: 'var(--muted-foreground)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
               aria-label="恢复默认指数"
             >
@@ -305,9 +269,9 @@ export default function MarketSettingModal({open,
         <div
           className="chips"
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8
           }}
         >
           {allIndices.map((item) => {
@@ -317,15 +281,15 @@ export default function MarketSettingModal({open,
                 key={item.code || item.name}
                 type="button"
                 onClick={() => handleToggleCode(item.code)}
-                className={cn("chip", active && "active")}
+                className={cn('chip', active && 'active')}
                 style={{
                   height: 30,
                   fontSize: 12,
-                  padding: "0 12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 16,
+                  padding: '0 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 16
                 }}
               >
                 {item.name}
@@ -348,12 +312,7 @@ export default function MarketSettingModal({open,
         }}
         direction="bottom"
       >
-        <DrawerContent
-          className="glass"
-          defaultHeight="77vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
+        <DrawerContent className="glass" defaultHeight="77vh" minHeight="40vh" maxHeight="90vh">
           <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-4">
             <DrawerTitle className="flex items-center gap-2.5 text-left">
               <SettingsIcon width="20" height="20" />
@@ -361,10 +320,9 @@ export default function MarketSettingModal({open,
             </DrawerTitle>
             <DrawerClose
               className="icon-button border-none bg-transparent p-1"
-              title="关闭"
               style={{
-                borderColor: "transparent",
-                backgroundColor: "transparent",
+                borderColor: 'transparent',
+                backgroundColor: 'transparent'
               }}
             >
               <CloseIcon width="20" height="20" />
@@ -378,13 +336,7 @@ export default function MarketSettingModal({open,
               key="mobile-index-reset-confirm"
               title="恢复默认指数"
               message="是否恢复已添加指数为默认配置？"
-              icon={
-                <ResetIcon
-                  width="20"
-                  height="20"
-                  className="shrink-0 text-[var(--primary)]"
-                />
-              }
+              icon={<ResetIcon width="20" height="20" className="shrink-0 text-[var(--primary)]" />}
               confirmVariant="primary"
               confirmText="恢复默认"
               onConfirm={() => {
@@ -417,15 +369,15 @@ export default function MarketSettingModal({open,
         >
           <motion.aside
             className="pc-market-setting-drawer pc-table-setting-drawer glass"
-            initial={{ x: "100%" }}
+            initial={{ x: '100%' }}
             animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
             style={{ width: 690 }}
           >
             <div className="pc-table-setting-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <SettingsIcon width="20" height="20" />
                 <span>指数个性化设置</span>
               </div>
@@ -433,8 +385,7 @@ export default function MarketSettingModal({open,
                 type="button"
                 className="icon-button"
                 onClick={onClose}
-                title="关闭"
-                style={{ border: "none", background: "transparent" }}
+                style={{ border: 'none', background: 'transparent' }}
               >
                 <CloseIcon width="20" height="20" />
               </button>
@@ -448,13 +399,7 @@ export default function MarketSettingModal({open,
           key="pc-index-reset-confirm"
           title="恢复默认指数"
           message="是否恢复已添加指数为默认配置？"
-          icon={
-            <ResetIcon
-              width="20"
-              height="20"
-              className="shrink-0 text-[var(--primary)]"
-            />
-          }
+          icon={<ResetIcon width="20" height="20" className="shrink-0 text-[var(--primary)]" />}
           confirmVariant="primary"
           confirmText="恢复默认"
           onConfirm={() => {
@@ -467,7 +412,6 @@ export default function MarketSettingModal({open,
     </AnimatePresence>
   );
 
-  if (typeof document === "undefined") return null;
+  if (typeof document === 'undefined') return null;
   return createPortal(pcContent, document.body);
 }
-

@@ -3,14 +3,20 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import { isNumber, isString, isPlainObject } from 'lodash';
-import { TAG_THEME_OPTIONS } from '../components/AddTagDialog';
+import { isArray, isFunction, isNumber, isObject, isPlainObject, isString } from 'lodash';
+import {
+  DEFAULT_TZ,
+  TAG_THEME_OPTIONS,
+  DCA_SCOPE_GLOBAL,
+  SUMMARY_TAB_ID,
+  SUMMARY_SOURCE_GLOBAL,
+  DEFAULT_FUND_TAG_THEME
+} from '@/app/constants';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(isSameOrAfter);
 
-const DEFAULT_TZ = 'Asia/Shanghai';
 export const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -25,16 +31,8 @@ export const nowInTz = () => dayjs().tz(TZ);
 export const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 export const formatDate = (input) => toTz(input).format('YYYY-MM-DD');
 
-/** 定投计划分桶：全局与其它自定义分组 */
-export const DCA_SCOPE_GLOBAL = '__global__';
-/** 虚拟 Tab：多分组有持仓时的汇总视图（非真实分组 id） */
-export const SUMMARY_TAB_ID = '__portfolio_groups_summary__';
-/** 汇总合并持仓映射中：表示该笔展示来自「全部」全局持仓（非真实分组 id） */
-export const SUMMARY_SOURCE_GLOBAL = '__portfolio_summary_global__';
+export { DCA_SCOPE_GLOBAL, SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL, DEFAULT_FUND_TAG_THEME };
 export const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-
-/** 独立存储的基金标签默认主题（localStorage `tags`） */
-export const DEFAULT_FUND_TAG_THEME = 'default';
 
 /** 与 AddTagDialog TAG_THEME_OPTIONS 的 key 一致（单一数据源，避免漏改） */
 const ALLOWED_FUND_TAG_THEMES = new Set(TAG_THEME_OPTIONS.map((o) => o.key));
@@ -52,7 +50,7 @@ export function normalizeFundTagInstanceListFromInput(rows) {
   const out = [];
   const usedIds = new Set();
   for (const r of rows || []) {
-    if (!r || typeof r !== 'object') continue;
+    if (!r || !isObject(r)) continue;
     const name = String(r.name ?? '').trim();
     if (!name || name.length > 24) continue;
     let id = String(r.id ?? '').trim();
@@ -61,7 +59,7 @@ export function normalizeFundTagInstanceListFromInput(rows) {
     out.push({
       id,
       name,
-      theme: normalizeFundTagTheme(r.theme),
+      theme: normalizeFundTagTheme(r.theme)
     });
     if (out.length >= 30) break;
   }
@@ -70,20 +68,20 @@ export function normalizeFundTagInstanceListFromInput(rows) {
 
 /** 从基金对象中移除旧版内联字段 `tags`（已迁移到独立 `tags` 存储） */
 export function stripLegacyTagsFromFundObject(f) {
-  if (!f || typeof f !== 'object' || !hasOwn(f, 'tags')) return f;
+  if (!f || !isObject(f) || !hasOwn(f, 'tags')) return f;
   const { tags: _removed, ...rest } = f;
   return rest;
 }
 
 /** 从标签记录读取基金代码列表（仅 `fundCodes`） */
 export function getFundCodesFromTagRecord(r) {
-  if (!r || typeof r !== 'object' || !Array.isArray(r.fundCodes)) return [];
+  if (!r || !isObject(r) || !isArray(r.fundCodes)) return [];
   return [...new Set(r.fundCodes.map((c) => String(c).trim()).filter(Boolean))];
 }
 
 /** 仅保留 id / name / theme / fundCodes（fundCodes 可为空：仅存在于可选池、尚未挂到任何基金） */
 export function sanitizeTagRowForStorage(r) {
-  if (!r || typeof r !== 'object') return null;
+  if (!r || !isObject(r)) return null;
   const name = String(r.name ?? '').trim();
   const codes = getFundCodesFromTagRecord(r);
   if (!name) return null;
@@ -91,7 +89,7 @@ export function sanitizeTagRowForStorage(r) {
     id: String(r.id ?? '').trim() || uuidv4(),
     name,
     theme: String(r.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-    fundCodes: codes.sort(),
+    fundCodes: codes.sort()
   };
 }
 
@@ -103,9 +101,9 @@ export function serializeTagRecordsForCompare(rows) {
         id: String(r?.id ?? ''),
         name: String(r?.name ?? '').trim(),
         theme: String(r?.theme ?? '').trim(),
-        fundCodes: getFundCodesFromTagRecord(r).slice().sort(),
+        fundCodes: getFundCodesFromTagRecord(r).slice().sort()
       }))
-      .sort((a, b) => a.id.localeCompare(b.id)),
+      .sort((a, b) => a.id.localeCompare(b.id))
   );
 }
 
@@ -113,7 +111,7 @@ export function serializeTagRecordsForCompare(rows) {
 export function mergeTagRowsByName(rows) {
   const byName = new Map();
   for (const row of rows || []) {
-    if (!row || typeof row !== 'object') continue;
+    if (!row || !isObject(row)) continue;
     const nm = String(row.name ?? '').trim();
     if (!nm) continue;
     const codes = getFundCodesFromTagRecord(row);
@@ -125,7 +123,7 @@ export function mergeTagRowsByName(rows) {
         id: String(row.id ?? '').trim(),
         name: nm,
         theme: String(row.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-        fundCodes: [...codes].sort(),
+        fundCodes: [...codes].sort()
       });
     }
   }
@@ -135,7 +133,7 @@ export function mergeTagRowsByName(rows) {
 export function cloneHoldingDeep(src) {
   if (!isPlainObject(src)) return null;
   try {
-    return typeof structuredClone === 'function' ? structuredClone(src) : JSON.parse(JSON.stringify(src));
+    return isFunction(structuredClone) ? structuredClone(src) : JSON.parse(JSON.stringify(src));
   } catch {
     return { ...src };
   }
@@ -144,16 +142,8 @@ export function cloneHoldingDeep(src) {
 /** 规范化单条持仓（与 collectLocalPayload 清洗逻辑对齐） */
 export function normalizeHoldingEntryForSeed(value) {
   if (!isPlainObject(value)) return null;
-  const parsedShare = isNumber(value.share)
-    ? value.share
-    : isString(value.share)
-      ? Number(value.share)
-      : NaN;
-  const parsedCost = isNumber(value.cost)
-    ? value.cost
-    : isString(value.cost)
-      ? Number(value.cost)
-      : NaN;
+  const parsedShare = isNumber(value.share) ? value.share : isString(value.share) ? Number(value.share) : NaN;
+  const parsedCost = isNumber(value.cost) ? value.cost : isString(value.cost) ? Number(value.cost) : NaN;
   const nextShare = Number.isFinite(parsedShare) ? parsedShare : null;
   const nextCost = Number.isFinite(parsedCost) ? parsedCost : null;
   if (nextShare === null && nextCost === null) return null;
@@ -213,4 +203,26 @@ export function migrateDcaPlansToScoped(raw) {
     return raw;
   }
   return { [DCA_SCOPE_GLOBAL]: { ...raw } };
+}
+
+/**
+ * 判断基金净值是否"已更新"（结合确认天数）。
+ *
+ * - confirmDays = 1（普通 A 股基金）：严格要求 jzrq === todayStr
+ * - confirmDays >= 2（QDII 等跨境基金）：净值日期在 (confirmDays + 2) 个自然日内
+ *   视为"已更新"，+2 用于覆盖周末（如周一查看周五出的净值，日历间隔 3 天）。
+ *
+ * @param {string} jzrq - 基金净值日期，格式 YYYY-MM-DD
+ * @param {string} todayStr - 今天日期，格式 YYYY-MM-DD
+ * @param {number} [confirmDays=1] - 申赎确认天数（SSBCFMDATA）
+ * @returns {boolean}
+ */
+export function isNavUpdated(jzrq, todayStr, confirmDays) {
+  if (!isString(jzrq) || !jzrq) return false;
+  if (jzrq === todayStr) return true;
+  const days = Number(confirmDays) || 1;
+  if (days <= 1) return false;
+  // QDII 等延迟出净值的基金，允许净值日期落后 (confirmDays + 2) 个自然日
+  const diff = toTz(todayStr).diff(toTz(jzrq), 'day');
+  return diff > 0 && diff <= days + 2;
 }

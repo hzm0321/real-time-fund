@@ -2,15 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { RefreshCw } from 'lucide-react';
 import { CloseIcon } from './Icons';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { formatMoney } from '@/lib/utils';
 
 export default function ScanImportConfirmModal({
   scannedFunds,
@@ -18,13 +14,15 @@ export default function ScanImportConfirmModal({
   onClose,
   onToggle,
   onConfirm,
+  onRetryOcr,
   refreshing,
   groups = [],
   existingAllCodes = [],
   existingFavCodes = [],
-  isOcrScan = false
+  isOcrScan = false,
+  currentGroup = 'all'
 }) {
-  const [selectedGroupId, setSelectedGroupId] = useState('all');
+  const [selectedGroupId, setSelectedGroupId] = useState(currentGroup);
   const [expandAfterAdd, setExpandAfterAdd] = useState(true);
   const allCodeSet = useMemo(() => new Set((existingAllCodes || []).filter(Boolean)), [existingAllCodes]);
   const favCodeSet = useMemo(() => new Set((existingFavCodes || []).filter(Boolean)), [existingFavCodes]);
@@ -59,8 +57,32 @@ export default function ScanImportConfirmModal({
         onClick={(e) => e.stopPropagation()}
         style={{ width: 480, maxWidth: '90vw' }}
       >
-        <div className="title" style={{ marginBottom: 12, justifyContent: 'space-between' }}>
-          <span>确认导入基金</span>
+        <div
+          className="title"
+          style={{ marginBottom: 12, justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span>确认导入基金</span>
+            {isOcrScan && (
+              <button
+                onClick={onRetryOcr}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                <RefreshCw width="14" height="14" />
+                重新识别
+              </button>
+            )}
+          </div>
           <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
           </button>
@@ -76,28 +98,28 @@ export default function ScanImportConfirmModal({
           </div>
         ) : (
           <>
-            <div className="search-results pending-list" style={{ maxHeight: 360, overflowY: 'auto' }}>
+            <div
+              className="search-results pending-list scrollbar-y-styled"
+              style={{ maxHeight: 360, overflowY: 'auto' }}
+            >
               {scannedFunds.map((item) => {
                 const isSelected = selectedScannedCodes.has(item.code);
                 const isInvalid = item.status === 'invalid';
                 const targetGroup = selectedGroupId;
                 const inAll = allCodeSet.has(item.code);
                 const inFav = favCodeSet.has(item.code);
-                const groupCodes = targetGroup && targetGroup !== 'all' && targetGroup !== 'fav'
-                  ? (groups.find((g) => g.id === targetGroup)?.codes || [])
-                  : [];
-                const inGroup = targetGroup && targetGroup !== 'all' && targetGroup !== 'fav'
-                  ? groupCodes.includes(item.code)
-                  : false;
+                const groupCodes =
+                  targetGroup && targetGroup !== 'all' && targetGroup !== 'fav'
+                    ? groups.find((g) => g.id === targetGroup)?.codes || []
+                    : [];
+                const inGroup =
+                  targetGroup && targetGroup !== 'all' && targetGroup !== 'fav'
+                    ? groupCodes.includes(item.code)
+                    : false;
                 const holdAmounts = formatAmount(item.holdAmounts);
                 const holdGains = formatAmount(item.holdGains);
                 const hasHoldingData = holdAmounts !== null && holdGains !== null;
-                const isAlreadyInTarget =
-                  targetGroup === 'all'
-                    ? inAll
-                    : targetGroup === 'fav'
-                      ? inFav
-                      : inGroup;
+                const isAlreadyInTarget = targetGroup === 'all' ? inAll : targetGroup === 'fav' ? inFav : inGroup;
                 const isDisabled = (isAlreadyInTarget && !hasHoldingData) || isInvalid;
                 const displayName = item.name || (isInvalid ? '未找到基金' : '未知基金');
                 return (
@@ -109,7 +131,11 @@ export default function ScanImportConfirmModal({
                       if (isDisabled) return;
                       onToggle(item.code);
                     }}
-                    style={{ cursor: isDisabled ? 'not-allowed' : 'pointer', flexDirection: 'column', alignItems: 'stretch' }}
+                    style={{
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      flexDirection: 'column',
+                      alignItems: 'stretch'
+                    }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div className="fund-info">
@@ -121,27 +147,39 @@ export default function ScanImportConfirmModal({
                       ) : isInvalid ? (
                         <span className="added-label">未找到</span>
                       ) : (
-                        <div className="checkbox">
-                          {isSelected && <div className="checked-mark" />}
-                        </div>
+                        <div className="checkbox">{isSelected && <div className="checked-mark" />}</div>
                       )}
                     </div>
                     {hasHoldingData && !isDisabled && (
                       <div style={{ display: 'flex', gap: 16, marginTop: 6, paddingLeft: 0, alignItems: 'center' }}>
                         {holdAmounts !== null && (
                           <span className="muted" style={{ fontSize: 12 }}>
-                            持有金额：<span style={{ color: 'var(--text)', fontWeight: 500 }}>{holdAmounts.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            持有金额：
+                            <span style={{ color: 'var(--text)', fontWeight: 500 }}>{formatMoney(holdAmounts)}</span>
                           </span>
                         )}
                         {holdGains !== null && (
                           <span className="muted" style={{ fontSize: 12 }}>
-                            持有收益：<span style={{ color: holdGains >= 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 500 }}>
-                              {holdGains >= 0 ? '+' : '-'}{Math.abs(holdGains).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            持有收益：
+                            <span
+                              style={{ color: holdGains >= 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 500 }}
+                            >
+                              {holdGains >= 0 ? '+' : '-'}
+                              {formatMoney(Math.abs(holdGains))}
                             </span>
                           </span>
                         )}
                         {isAlreadyInTarget && (
-                          <span className="added-label" style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 15%, transparent)', marginLeft: 'auto' }}>已存在</span>
+                          <span
+                            className="added-label"
+                            style={{
+                              color: 'var(--danger)',
+                              background: 'color-mix(in srgb, var(--danger) 15%, transparent)',
+                              marginLeft: 'auto'
+                            }}
+                          >
+                            已存在
+                          </span>
                         )}
                       </div>
                     )}
@@ -149,15 +187,18 @@ export default function ScanImportConfirmModal({
                 );
               })}
             </div>
-            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <span className="muted" style={{ fontSize: 13 }}>添加后展开详情</span>
-              <Switch
-                checked={expandAfterAdd}
-                onCheckedChange={(checked) => setExpandAfterAdd(!!checked)}
-              />
+            <div
+              style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+            >
+              <span className="muted" style={{ fontSize: 13 }}>
+                添加后展开详情
+              </span>
+              <Switch checked={expandAfterAdd} onCheckedChange={(checked) => setExpandAfterAdd(!!checked)} />
             </div>
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>添加到分组：</span>
+              <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+                添加到分组：
+              </span>
               <Select value={selectedGroupId} onValueChange={(value) => setSelectedGroupId(value)}>
                 <SelectTrigger className="flex-1">
                   <SelectValue placeholder="选择分组" />
@@ -165,17 +206,25 @@ export default function ScanImportConfirmModal({
                 <SelectContent>
                   <SelectItem value="all">全部</SelectItem>
                   <SelectItem value="fav">自选</SelectItem>
-                  {groups.filter(g => g.id !== 'all' && g.id !== 'fav').map(g => (
-                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                  ))}
+                  {groups
+                    .filter((g) => g.id !== 'all' && g.id !== 'fav')
+                    .map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
           </>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-          <button className="button secondary" onClick={onClose}>取消</button>
-          <button className="button" onClick={handleConfirm} disabled={selectedScannedCodes.size === 0}>确认导入</button>
+          <button className="button secondary" onClick={onClose}>
+            取消
+          </button>
+          <button className="button" onClick={handleConfirm} disabled={selectedScannedCodes.size === 0}>
+            确认导入
+          </button>
         </div>
       </motion.div>
     </motion.div>

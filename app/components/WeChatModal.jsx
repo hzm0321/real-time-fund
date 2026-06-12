@@ -34,9 +34,7 @@ export default function WeChatModal({ onClose }) {
             <CloseIcon width="20" height="20" />
           </button>
         </div>
-        <div
-          className="trade-pending-alert"
-        >
+        <div className="trade-pending-alert">
           <span>⚠️ 入群须知：禁止讨论和基金买卖以及投资的有关内容，可反馈软件相关需求和问题。</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center' }}>

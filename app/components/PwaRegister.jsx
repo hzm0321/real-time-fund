@@ -7,16 +7,11 @@ import { useEffect } from 'react';
  * 仅在生产环境且浏览器支持时注册。
  */
 export default function PwaRegister() {
-  useEffect(() => {// 检测核心能力
-    const isPwaSupported =
-      'serviceWorker' in navigator &&
-      'BeforeInstallPromptEvent' in window;
+  useEffect(() => {
+    // 检测核心能力
+    const isPwaSupported = 'serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window;
     console.log('PWA 支持:', isPwaSupported);
-    if (
-      typeof window === 'undefined' ||
-      !('serviceWorker' in navigator) ||
-      process.env.NODE_ENV !== 'production'
-    ) {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') {
       return;
     }
     navigator.serviceWorker

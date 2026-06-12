@@ -7,21 +7,16 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  Tooltip,
+  Tooltip as ChartTooltip,
   Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { isNumber } from 'lodash';
+import { isArray, isNumber } from 'lodash';
 import FundDailyEarningsDetailModal from './FundDailyEarningsDetailModal';
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { formatMoney } from '@/lib/utils';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Filler
-);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTooltip, Filler);
 
 const CHART_COLORS = {
   dark: {
@@ -31,7 +26,7 @@ const CHART_COLORS = {
     muted: '#9ca3af',
     border: '#1f2937',
     text: '#e5e7eb',
-    crosshairText: '#0f172a',
+    crosshairText: '#0f172a'
   },
   light: {
     danger: '#dc2626',
@@ -40,7 +35,7 @@ const CHART_COLORS = {
     muted: '#475569',
     border: '#e2e8f0',
     text: '#0f172a',
-    crosshairText: '#ffffff',
+    crosshairText: '#ffffff'
   }
 };
 
@@ -55,19 +50,22 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
   const hoverTimeoutRef = useRef(null);
   const chartColors = useMemo(() => getChartThemeColors(theme), [theme]);
 
-  const ranges = useMemo(() => ([
-    { label: '近1月', value: '1m', days: 31 },
-    { label: '近3月', value: '3m', days: 93 },
-    { label: '近6月', value: '6m', days: 186 },
-    { label: '近1年', value: '1y', days: 366 },
-    { label: '全部', value: 'all' },
-  ]), []);
+  const ranges = useMemo(
+    () => [
+      { label: '近1月', value: '1m', days: 31 },
+      { label: '近3月', value: '3m', days: 93 },
+      { label: '近6月', value: '6m', days: 186 },
+      { label: '近1年', value: '1y', days: 366 },
+      { label: '全部', value: 'all' }
+    ],
+    []
+  );
 
   const filteredSeries = useMemo(() => {
-    if (!Array.isArray(series) || series.length === 0) return [];
+    if (!isArray(series) || series.length === 0) return [];
     if (range === 'all') return series;
 
-    const cfg = ranges.find(r => r.value === range);
+    const cfg = ranges.find((r) => r.value === range);
     const days = cfg?.days;
     if (!days) return series;
 
@@ -81,18 +79,18 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
     cutoff.setDate(cutoff.getDate() - days + 1);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-    return series.filter(d => d?.date && d.date >= cutoffStr);
+    return series.filter((d) => d?.date && d.date >= cutoffStr);
   }, [series, range, ranges]);
 
   const rangeLabel = useMemo(() => {
-    return ranges.find(r => r.value === range)?.label || '全部';
+    return ranges.find((r) => r.value === range)?.label || '全部';
   }, [ranges, range]);
 
   const totalEarnings = useMemo(() => {
     if (!filteredSeries.length) return 0;
     return filteredSeries.reduce((sum, d) => {
       const v = d?.earnings;
-      return (typeof v === 'number' && Number.isFinite(v)) ? sum + v : sum;
+      return isNumber(v) && Number.isFinite(v) ? sum + v : sum;
     }, 0);
   }, [filteredSeries]);
 
@@ -104,8 +102,8 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
   const chartData = useMemo(() => {
     if (!filteredSeries.length) return { labels: [], datasets: [] };
 
-    const labels = filteredSeries.map(d => d.date.slice(5));
-    const values = filteredSeries.map(d => d.earnings);
+    const labels = filteredSeries.map((d) => d.date.slice(5));
+    const values = filteredSeries.map((d) => d.earnings);
     const lastValue = values[values.length - 1];
     const lineColor = lastValue >= 0 ? chartColors.danger : chartColors.success;
 
@@ -181,9 +179,7 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
         if (!currentChart) return;
 
         const tooltipActive = currentChart.tooltip?._active ?? [];
-        const activeElements = currentChart.getActiveElements
-          ? currentChart.getActiveElements()
-          : [];
+        const activeElements = currentChart.getActiveElements ? currentChart.getActiveElements() : [];
         const hasActive =
           (chartElement && chartElement.length > 0) ||
           (tooltipActive && tooltipActive.length > 0) ||
@@ -226,80 +222,90 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
 
   const plugins = useMemo(() => {
     const colors = getChartThemeColors(theme);
-    return [{
-      id: 'crosshair',
-      afterDraw: (chart) => {
-        const ctx = chart.ctx;
-        const activeElements = chart.tooltip?._active?.length
-          ? chart.tooltip._active
-          : chart.getActiveElements();
-        if (!activeElements?.length) return;
+    return [
+      {
+        id: 'crosshair',
+        afterDraw: (chart) => {
+          const ctx = chart.ctx;
+          const activeElements = chart.tooltip?._active?.length ? chart.tooltip._active : chart.getActiveElements();
+          if (!activeElements?.length) return;
 
-        const activePoint = activeElements[0];
-        const x = activePoint.element.x;
-        const y = activePoint.element.y;
-        const topY = chart.scales.y.top;
-        const bottomY = chart.scales.y.bottom;
-        const leftX = chart.scales.x.left;
-        const rightX = chart.scales.x.right;
-        const index = activePoint.index;
-        const labels = chart.data.labels;
-        const data = chart.data.datasets[0]?.data;
+          const activePoint = activeElements[0];
+          const x = activePoint.element.x;
+          const y = activePoint.element.y;
+          const topY = chart.scales.y.top;
+          const bottomY = chart.scales.y.bottom;
+          const leftX = chart.scales.x.left;
+          const rightX = chart.scales.x.right;
+          const index = activePoint.index;
+          const labels = chart.data.labels;
+          const data = chart.data.datasets[0]?.data;
 
-        ctx.save();
-        ctx.setLineDash([3, 3]);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = colors.muted;
-        ctx.moveTo(x, topY);
-        ctx.lineTo(x, bottomY);
-        ctx.moveTo(leftX, y);
-        ctx.lineTo(rightX, y);
-        ctx.stroke();
+          ctx.save();
+          ctx.setLineDash([3, 3]);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = colors.muted;
+          ctx.moveTo(x, topY);
+          ctx.lineTo(x, bottomY);
+          ctx.moveTo(leftX, y);
+          ctx.lineTo(rightX, y);
+          ctx.stroke();
 
-        const prim = colors.primary;
-        const textCol = colors.crosshairText;
+          const prim = colors.primary;
+          const textCol = colors.crosshairText;
 
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
 
-        if (labels && index in labels) {
-          const dateStr = String(labels[index]);
-          const tw = ctx.measureText(dateStr).width + 8;
-          const chartLeft = chart.scales.x.left;
-          const chartRight = chart.scales.x.right;
-          let labelLeft = x - tw / 2;
-          if (labelLeft < chartLeft) labelLeft = chartLeft;
-          if (labelLeft + tw > chartRight) labelLeft = chartRight - tw;
-          const labelCenterX = labelLeft + tw / 2;
-          ctx.fillStyle = prim;
-          ctx.fillRect(labelLeft, bottomY, tw, 16);
-          ctx.fillStyle = textCol;
-          ctx.fillText(dateStr, labelCenterX, bottomY + 8);
+          if (labels && index in labels) {
+            const dateStr = String(labels[index]);
+            const tw = ctx.measureText(dateStr).width + 8;
+            const chartLeft = chart.scales.x.left;
+            const chartRight = chart.scales.x.right;
+            let labelLeft = x - tw / 2;
+            if (labelLeft < chartLeft) labelLeft = chartLeft;
+            if (labelLeft + tw > chartRight) labelLeft = chartRight - tw;
+            const labelCenterX = labelLeft + tw / 2;
+            ctx.fillStyle = prim;
+            ctx.fillRect(labelLeft, bottomY, tw, 16);
+            ctx.fillStyle = textCol;
+            ctx.fillText(dateStr, labelCenterX, bottomY + 8);
+          }
+          if (data && index in data) {
+            const val = data[index];
+            const valueStr = masked
+              ? '***'
+              : isNumber(val)
+                ? `${val >= 0 ? '+' : '-'}${Math.abs(val).toFixed(2)}`
+                : String(val);
+            const vw = ctx.measureText(valueStr).width + 8;
+            ctx.fillStyle = prim;
+            ctx.fillRect(leftX, y - 8, vw, 16);
+            ctx.fillStyle = textCol;
+            ctx.fillText(valueStr, leftX + vw / 2, y);
+          }
+          ctx.restore();
         }
-        if (data && index in data) {
-          const val = data[index];
-          const valueStr = masked
-            ? '***'
-            : isNumber(val)
-              ? `${val >= 0 ? '+' : '-'}${Math.abs(val).toFixed(2)}`
-              : String(val);
-          const vw = ctx.measureText(valueStr).width + 8;
-          ctx.fillStyle = prim;
-          ctx.fillRect(leftX, y - 8, vw, 16);
-          ctx.fillStyle = textCol;
-          ctx.fillText(valueStr, leftX + vw / 2, y);
-        }
-        ctx.restore();
       }
-    }];
+    ];
   }, [theme, masked]);
 
   if (!series.length) return null;
 
   return (
     <div style={{ marginTop: 12, marginBottom: 4 }}>
-      <div className="muted" style={{ fontSize: 12, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+      <div
+        className="muted"
+        style={{
+          fontSize: 12,
+          marginBottom: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 6
+        }}
+      >
         <span>
           {rangeLabel}累计收益{' '}
           <span
@@ -307,14 +313,10 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
               fontVariantNumeric: 'tabular-nums',
               fontSize: 13,
               fontWeight: 600,
-              color: masked
-                ? 'inherit'
-                : totalEarnings >= 0
-                  ? chartColors.danger
-                  : chartColors.success,
+              color: masked ? 'inherit' : totalEarnings >= 0 ? chartColors.danger : chartColors.success
             }}
           >
-            {masked ? '***' : `${totalEarnings >= 0 ? '+' : '-'}${Math.abs(totalEarnings).toFixed(2)}`}
+            {masked ? '***' : `${totalEarnings >= 0 ? '+' : '-'}${formatMoney(Math.abs(totalEarnings))}`}
           </span>
         </span>
       </div>
@@ -322,12 +324,15 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
         <Line ref={chartRef} data={chartData} options={options} plugins={plugins} />
       </div>
       <div className="trend-range-bar" style={{ marginTop: 6 }}>
-        {ranges.map(r => (
+        {ranges.map((r) => (
           <button
             key={r.value}
             type="button"
             className={`trend-range-btn ${range === r.value ? 'active' : ''}`}
-            onClick={(e) => { e.stopPropagation(); setRange(r.value); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setRange(r.value);
+            }}
           >
             {r.label}
           </button>
@@ -340,7 +345,7 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius)',
           overflow: 'hidden',
-          background: 'var(--card)',
+          background: 'var(--card)'
         }}
       >
         <table
@@ -348,49 +353,55 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
             width: '100%',
             borderCollapse: 'collapse',
             fontSize: '13px',
-            color: 'var(--text)',
+            color: 'var(--text)'
           }}
         >
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-row-alt-bg)' }}>
               <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--muted)', textAlign: 'left' }}>日期</th>
               <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--muted)', textAlign: 'right' }}>收益</th>
-              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--muted)', textAlign: 'right' }}>收益率</th>
+              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--muted)', textAlign: 'right' }}>
+                收益率
+              </th>
             </tr>
           </thead>
           <tbody>
             {visibleRows.map((row, idx) => {
               const v = row?.earnings;
-              const isValid = typeof v === 'number' && Number.isFinite(v);
+              const isValid = isNumber(v) && Number.isFinite(v);
               const sign = isValid && v > 0 ? '+' : isValid && v < 0 ? '-' : '';
               const cls = !isValid || masked ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '';
-              const text = masked ? '***' : isValid ? `${sign}${Math.abs(v).toFixed(2)}` : '—';
+              const text = masked ? '***' : isValid ? `${sign}${formatMoney(Math.abs(v))}` : '—';
               const rv = row?.rate;
               const snapshotCost = Number(row?.baseCostAmount);
-              const derivedRate = isValid && Number.isFinite(snapshotCost) && snapshotCost > 0
-                ? (v / snapshotCost) * 100
-                : null;
-              const rateValue =
-                typeof rv === 'number' && Number.isFinite(rv)
-                  ? rv
-                  : derivedRate;
-              const rateValid = typeof rateValue === 'number' && Number.isFinite(rateValue);
+              const derivedRate =
+                isValid && Number.isFinite(snapshotCost) && snapshotCost > 0 ? (v / snapshotCost) * 100 : null;
+              const rateValue = isNumber(rv) && Number.isFinite(rv) ? rv : derivedRate;
+              const rateValid = isNumber(rateValue) && Number.isFinite(rateValue);
               const rateSign = rateValid && rateValue > 0 ? '+' : '';
               const rateCls = masked || !rateValid ? '' : rateValue > 0 ? 'up' : rateValue < 0 ? 'down' : '';
-              const rateText = masked
-                ? '***'
-                : rateValid
-                  ? `${rateSign}${rateValue.toFixed(2)}%`
-                  : '—';
+              const rateText = masked ? '***' : rateValid ? `${rateSign}${rateValue.toFixed(2)}%` : '—';
               return (
                 <tr key={`${row?.date || 'row'}_${idx}`} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text)' }}>
-                    {row?.date || '—'}
-                  </td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                  <td style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text)' }}>{row?.date || '—'}</td>
+                  <td
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'right',
+                      color: 'var(--text)',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}
+                  >
                     <span className={cls}>{text}</span>
                   </td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                  <td
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'right',
+                      color: 'var(--text)',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}
+                  >
                     <span className={rateCls}>{rateText}</span>
                   </td>
                 </tr>
@@ -409,7 +420,7 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
             padding: 0,
             border: 'none',
             background: 'none',
-            cursor: 'pointer',
+            cursor: 'pointer'
           }}
           onClick={() => setDetailOpen(true)}
         >
@@ -418,13 +429,19 @@ export default function FundDailyEarnings({ series = [], theme = 'dark', masked 
       </div>
 
       {detailOpen && (
-        <FundDailyEarningsDetailModal
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-          series={filteredSeries}
-          masked={masked}
-          title={`${rangeLabel}收益明细`}
-        />
+        <UITooltip>
+          <TooltipTrigger asChild>
+            <FundDailyEarningsDetailModal
+              open={detailOpen}
+              onOpenChange={setDetailOpen}
+              series={filteredSeries}
+              masked={masked}
+            />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{`${rangeLabel}收益明细`}</p>
+          </TooltipContent>
+        </UITooltip>
       )}
     </div>
   );

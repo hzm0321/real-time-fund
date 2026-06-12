@@ -1,27 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { CloseIcon, RefreshIcon } from './Icons';
 
-export default function SyncPersonalSettingsModal({
-  open,
-  onClose,
-  options = [],
-  sourceName = '当前',
-  onConfirm,
-}) {
+export default function SyncPersonalSettingsModal({ open, onClose, options = [], sourceName = '当前', onConfirm }) {
   const [selected, setSelected] = useState(() => new Set());
 
   const selectedNames = useMemo(
-    () => options
-      .filter((item) => selected.has(item.id))
-      .map((item) => item.name),
-    [options, selected],
+    () => options.filter((item) => selected.has(item.id)).map((item) => item.name),
+    [options, selected]
   );
   const targetText = selectedNames.length > 0 ? selectedNames.join('、') : '请选择';
 
@@ -65,12 +53,7 @@ export default function SyncPersonalSettingsModal({
             <RefreshIcon width="20" height="20" />
             <span>同步个性化设置</span>
           </div>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            style={{ border: 'none', background: 'transparent' }}
-            title="关闭"
-          >
+          <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
           </button>
         </div>
@@ -80,13 +63,11 @@ export default function SyncPersonalSettingsModal({
         </p>
 
         <div
-          className="group-manage-list-container"
+          className="group-manage-list-container scrollbar-y-styled"
           style={{
             maxHeight: '46vh',
             overflowY: 'auto',
-            paddingRight: 4,
-            scrollbarWidth: 'thin',
-            scrollbarColor: 'var(--border) transparent',
+            paddingRight: '4px'
           }}
         >
           {options.length === 0 ? (
@@ -127,12 +108,7 @@ export default function SyncPersonalSettingsModal({
           >
             取消
           </button>
-          <button
-            className="button"
-            onClick={handleConfirm}
-            disabled={selected.size === 0}
-            style={{ flex: 1 }}
-          >
+          <button className="button" onClick={handleConfirm} disabled={selected.size === 0} style={{ flex: 1 }}>
             同步 ({selected.size})
           </button>
         </div>

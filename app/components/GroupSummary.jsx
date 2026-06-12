@@ -1,12 +1,14 @@
 'use client';
+import { isBoolean, isNumber, isObject } from 'lodash';
 
-import { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
-import {useIsMobile} from "@/app/hooks/useIsMobile";
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 import { PinIcon, PinOffIcon, EyeIcon, EyeOffIcon, SwitchIcon } from './Icons';
 import FitText from './FitText';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { formatMoney } from '@/lib/utils';
 
-/** 与 app/page.jsx、EmptyStateCard 中虚拟「汇总」Tab id 保持一致 */
-const SUMMARY_TAB_ID = '__portfolio_groups_summary__';
+import { SUMMARY_TAB_ID } from '@/app/constants';
 
 // 数字滚动组件（初始化时无动画，后续变更再动画）
 function CountUp({
@@ -18,7 +20,7 @@ function CountUp({
   style = {},
   maxFontSize,
   minFontSize,
-  as = 'span',
+  as = 'span'
 }) {
   const [displayValue, setDisplayValue] = useState(value);
   const previousValue = useRef(value);
@@ -68,18 +70,12 @@ function CountUp({
     };
   }, [value]);
 
-  const text = `${prefix}${Math.abs(displayValue).toLocaleString('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`;
-  const styleFontSize = typeof style.fontSize === 'number' ? style.fontSize : parseFloat(style.fontSize);
+  const text = `${prefix}${formatMoney(Math.abs(displayValue), decimals)}${suffix}`;
+  const styleFontSize = isNumber(style.fontSize) ? style.fontSize : parseFloat(style.fontSize);
   const resolvedMaxFontSize = maxFontSize ?? (Number.isFinite(styleFontSize) ? styleFontSize : undefined);
 
   return (
-    <FitText
-      as={as}
-      className={className}
-      style={style}
-      maxFontSize={resolvedMaxFontSize}
-      minFontSize={minFontSize}
-    >
+    <FitText as={as} className={className} style={style} maxFontSize={resolvedMaxFontSize} minFontSize={minFontSize}>
       {text}
     </FitText>
   );
@@ -99,19 +95,19 @@ export default function GroupSummary({
   onToggleSticky,
   masked,
   onToggleMasked,
-  marketIndexAccordionHeight,
-  navbarHeight,
+  shouldShowMarketIndex,
+  navbarHeight
 }) {
   const isMobile = useIsMobile();
   const [showPercent, setShowPercent] = useState(true);
   const [showTodayPercent, setShowTodayPercent] = useState(false);
   const [isMasked, setIsMasked] = useState(masked ?? false);
-  const rowRef = useRef(null);
-  const [assetSize, setAssetSize] = useState(26);
-  const [metricSize, setMetricSize] = useState(20);
+  const [isAssetMasked, setIsAssetMasked] = useState(false);
+  const assetSize = 26;
+  const metricSize = 20;
 
   useEffect(() => {
-    if (typeof masked === 'boolean') {
+    if (isBoolean(masked)) {
       setIsMasked(masked);
     }
   }, [masked]);
@@ -147,7 +143,7 @@ export default function GroupSummary({
         }
         if (profit.profitTotal !== null) {
           totalHoldingReturn += profit.profitTotal;
-          if (holding && typeof holding.cost === 'number' && typeof holding.share === 'number') {
+          if (holding && isNumber(holding.cost) && isNumber(holding.share)) {
             totalCost += holding.cost * holding.share;
           }
         }
@@ -167,12 +163,12 @@ export default function GroupSummary({
       hasHolding,
       returnRate,
       todayReturnRate,
-      hasAnyTodayData,
+      hasAnyTodayData
     };
   }, [funds, holdings, getProfit]);
 
   const summary =
-    summaryTotalsOverride != null && typeof summaryTotalsOverride === 'object'
+    summaryTotalsOverride != null && isObject(summaryTotalsOverride)
       ? {
           totalAsset: summaryTotalsOverride.totalAsset,
           totalProfitToday: summaryTotalsOverride.totalProfitToday,
@@ -180,38 +176,19 @@ export default function GroupSummary({
           hasHolding: summaryTotalsOverride.hasHolding,
           returnRate: summaryTotalsOverride.returnRate,
           todayReturnRate: summaryTotalsOverride.todayReturnRate,
-          hasAnyTodayData: summaryTotalsOverride.hasAnyTodayData,
+          hasAnyTodayData: summaryTotalsOverride.hasAnyTodayData
         }
       : derivedSummary;
 
-  useLayoutEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const height = el.clientHeight;
-    const tooTall = height > 80;
-    if (tooTall) {
-      setAssetSize((s) => Math.max(16, s - 1));
-      setMetricSize((s) => Math.max(12, s - 1));
-    }
-  }, [
-    summary.totalAsset,
-    summary.totalProfitToday,
-    summary.totalHoldingReturn,
-    summary.returnRate,
-    showPercent,
-    assetSize,
-    metricSize,
-  ]);
-
-  const style = useMemo(()=>{
+  const style = useMemo(() => {
     const style = {};
     if (isSticky) {
-      style.top = stickyTop + 14;
-    }else if(!marketIndexAccordionHeight) {
+      style.top = `calc(${stickyTop}px + var(--market-index-height, 0px) + 14px)`;
+    } else if (!shouldShowMarketIndex) {
       style.marginTop = navbarHeight;
     }
     return style;
-  },[isSticky, stickyTop, marketIndexAccordionHeight, navbarHeight])
+  }, [isSticky, stickyTop, shouldShowMarketIndex, navbarHeight]);
 
   if (!summary.hasHolding) return null;
 
@@ -219,17 +196,14 @@ export default function GroupSummary({
   const holdingReturnPrefix = summary.totalHoldingReturn > 0 ? '+' : summary.totalHoldingReturn < 0 ? '-' : '';
 
   return (
-    <div
-      className={isSticky ? 'group-summary-sticky' : ''}
-      style={style}
-    >
+    <div className={isSticky ? 'group-summary-sticky' : ''} style={style}>
       <div
         className="glass card group-summary-card"
         style={{
           marginBottom: 8,
           padding: '16px 20px',
           background: 'rgba(255, 255, 255, 0.03)',
-          position: 'relative',
+          position: 'relative'
         }}
       >
         <span
@@ -246,50 +220,44 @@ export default function GroupSummary({
             padding: 4,
             opacity: 0.6,
             zIndex: 10,
-            color: 'var(--muted)',
+            color: 'var(--muted)'
           }}
         >
-          {isSticky ? (
-            <PinIcon width="14" height="14" />
-          ) : (
-            <PinOffIcon width="14" height="14" />
-          )}
+          {isSticky ? <PinIcon width="14" height="14" /> : <PinOffIcon width="14" height="14" />}
         </span>
-        <div
-          ref={rowRef}
-          className="row"
-          style={{ alignItems: 'flex-end', justifyContent: 'space-between', minWidth: 0 }}
-        >
-          <div style={{flex: 4, minWidth: 0}}>
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}
-            >
+        <div className="row" style={{ alignItems: 'flex-end', justifyContent: 'space-between', minWidth: 0 }}>
+          <div style={{ flex: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
               <div className="muted" style={{ fontSize: '12px' }} key={portfolioTabId}>
                 {portfolioScopeLabel}
               </div>
-              <button
-                className="fav-button"
-                onClick={() => {
-                  if (onToggleMasked) {
-                    onToggleMasked();
-                  } else {
-                    setIsMasked((value) => !value);
-                  }
-                }}
-                aria-label={isMasked ? '显示资产' : '隐藏资产'}
-                style={{
-                  margin: 0,
-                  padding: 2,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                {isMasked ? (
-                  <EyeOffIcon width="16" height="16" />
-                ) : (
-                  <EyeIcon width="16" height="16" />
-                )}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="fav-button"
+                    onClick={() => {
+                      if (onToggleMasked) {
+                        onToggleMasked();
+                      } else {
+                        setIsMasked((value) => !value);
+                      }
+                    }}
+                    aria-label={isMasked ? '显示资产' : '隐藏资产'}
+                    style={{
+                      margin: 0,
+                      padding: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isMasked ? <EyeOffIcon width="16" height="16" /> : <EyeIcon width="16" height="16" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isMasked ? '点击显示所有持仓数据' : '点击隐藏所有持仓数据'}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div
               style={{
@@ -297,23 +265,27 @@ export default function GroupSummary({
                 fontWeight: 700,
                 fontFamily: 'var(--font-mono)',
                 minWidth: 0,
+                cursor: 'pointer',
+                overflow: 'hidden'
               }}
+              onClick={() => setIsAssetMasked((v) => !v)}
             >
-              {isMasked ? (
-                <span
-                  className="mask-text"
-                  style={{ fontSize: assetSize, position: 'relative', top: 4 }}
-                >
-                  ******
-                </span>
-              ) : (
-                <CountUp
-                  value={summary.totalAsset}
-                  maxFontSize={assetSize}
-                  minFontSize={16}
-                  as="div"
-                />
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div style={{ display: 'block', width: '100%' }}>
+                    {isMasked || isAssetMasked ? (
+                      <span className="mask-text" style={{ fontSize: assetSize, position: 'relative', top: 4 }}>
+                        ******
+                      </span>
+                    ) : (
+                      <CountUp value={summary.totalAsset} maxFontSize={assetSize} minFontSize={16} as="div" />
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isMasked || isAssetMasked ? '点击显示资产金额' : '点击隐藏资产金额'}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, flex: 5, minWidth: 0 }}>
@@ -326,11 +298,10 @@ export default function GroupSummary({
                   display: 'flex',
                   justifyContent: 'flex-end',
                   alignItems: 'center',
-                  gap: 2,
+                  gap: 2
                 }}
               >
-                当日收益{showTodayPercent ? '(%)' : ''}{' '}
-                <SwitchIcon style={{ opacity: 0.4 }} />
+                当日收益{showTodayPercent ? '(%)' : ''} <SwitchIcon style={{ opacity: 0.4 }} />
               </div>
               <div
                 className={
@@ -347,36 +318,50 @@ export default function GroupSummary({
                   fontWeight: 700,
                   fontFamily: 'var(--font-mono)',
                   cursor: summary.hasAnyTodayData ? 'pointer' : 'default',
+                  overflow: 'hidden'
                 }}
                 onClick={() => summary.hasAnyTodayData && setShowTodayPercent(!showTodayPercent)}
-                title="点击切换金额/百分比"
               >
-                {isMasked ? (
-                  <span className="mask-text" style={{ fontSize: metricSize }}>
-                    ******
-                  </span>
-                ) : summary.hasAnyTodayData ? (
-                  <>
-                    {showTodayPercent ? (
-                      <CountUp
-                        value={Math.abs(summary.todayReturnRate)}
-                        prefix={todayProfitPrefix}
-                        suffix="%"
-                        style={{ fontSize: metricSize }}
-                      />
-                    ) : (
-                      <CountUp
-                        value={Math.abs(summary.totalProfitToday)}
-                        prefix={todayProfitPrefix}
-                        maxFontSize={metricSize}
-                        minFontSize={12}
-                        as="div"
-                        style={{ textAlign: 'right' }}
-                      />
-                    )}
-                  </>
+                {summary.hasAnyTodayData ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div style={{ display: 'block', width: '100%' }}>
+                        {isMasked ? (
+                          <span className="mask-text" style={{ fontSize: metricSize }}>
+                            ******
+                          </span>
+                        ) : (
+                          <>
+                            {showTodayPercent ? (
+                              <CountUp
+                                value={Math.abs(summary.todayReturnRate)}
+                                prefix={todayProfitPrefix}
+                                suffix="%"
+                                maxFontSize={metricSize}
+                                minFontSize={12}
+                                as="div"
+                                style={{ textAlign: 'right' }}
+                              />
+                            ) : (
+                              <CountUp
+                                value={Math.abs(summary.totalProfitToday)}
+                                prefix={todayProfitPrefix}
+                                maxFontSize={metricSize}
+                                minFontSize={12}
+                                as="div"
+                                style={{ textAlign: 'right' }}
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>点击切换金额/百分比</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ) : (
-                  <span style={{ fontSize: metricSize }}>--</span>
+                  <span style={{ display: 'inline-block', fontSize: metricSize }}>--</span>
                 )}
               </div>
             </div>
@@ -389,53 +374,58 @@ export default function GroupSummary({
                   display: 'flex',
                   justifyContent: 'flex-end',
                   alignItems: 'center',
-                  gap: 2,
+                  gap: 2
                 }}
               >
-                持有收益{showPercent ? '(%)' : ''}{' '}
-                <SwitchIcon style={{ opacity: 0.4 }} />
+                持有收益{showPercent ? '(%)' : ''} <SwitchIcon style={{ opacity: 0.4 }} />
               </div>
               <div
-                className={
-                  summary.totalHoldingReturn > 0
-                    ? 'up'
-                    : summary.totalHoldingReturn < 0
-                      ? 'down'
-                      : ''
-                }
+                className={summary.totalHoldingReturn > 0 ? 'up' : summary.totalHoldingReturn < 0 ? 'down' : ''}
                 style={{
                   fontSize: '18px',
                   fontWeight: 700,
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
+                  overflow: 'hidden'
                 }}
                 onClick={() => setShowPercent(!showPercent)}
-                title="点击切换金额/百分比"
               >
-                {isMasked ? (
-                  <span className="mask-text" style={{ fontSize: metricSize }}>
-                    ******
-                  </span>
-                ) : (
-                  <>
-                    {showPercent ? (
-                      <CountUp
-                        value={Math.abs(summary.returnRate)}
-                        prefix={holdingReturnPrefix}
-                        suffix="%"
-                        style={{ fontSize: metricSize }}
-                      />
-                    ) : (
-                      <CountUp
-                        value={Math.abs(summary.totalHoldingReturn)}
-                        maxFontSize={metricSize}
-                        minFontSize={12}
-                        as="div"
-                        style={{ textAlign: 'right' }}
-                      />
-                    )}
-                  </>
-                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div style={{ display: 'block', width: '100%' }}>
+                      {isMasked ? (
+                        <span className="mask-text" style={{ fontSize: metricSize }}>
+                          ******
+                        </span>
+                      ) : (
+                        <>
+                          {showPercent ? (
+                            <CountUp
+                              value={Math.abs(summary.returnRate)}
+                              prefix={holdingReturnPrefix}
+                              suffix="%"
+                              maxFontSize={metricSize}
+                              minFontSize={12}
+                              as="div"
+                              style={{ textAlign: 'right' }}
+                            />
+                          ) : (
+                            <CountUp
+                              value={Math.abs(summary.totalHoldingReturn)}
+                              maxFontSize={metricSize}
+                              minFontSize={12}
+                              as="div"
+                              style={{ textAlign: 'right' }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>点击切换金额/百分比</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 'use client';
+import { isString } from 'lodash';
 
 import { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
@@ -6,6 +7,7 @@ import packageJson from '../../package.json';
 import { fetchLatestRelease } from '../api/fund';
 import { UpdateIcon } from './Icons';
 import UpdatePromptModal from './UpdatePromptModal';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function UpdateChecker({ onModalOpenChange }) {
   const [hasUpdate, setHasUpdate] = useState(false);
@@ -23,7 +25,7 @@ export default function UpdateChecker({ onModalOpenChange }) {
     const checkUpdate = async () => {
       try {
         const data = await fetchLatestRelease();
-        if (!data?.tagName) return;
+        if (!data || !data.tagName || !isString(data.tagName)) return;
         const remoteVersion = data.tagName.replace(/^v/, '');
         if (remoteVersion !== packageJson.version) {
           setHasUpdate(true);
@@ -43,14 +45,20 @@ export default function UpdateChecker({ onModalOpenChange }) {
   return (
     <>
       {hasUpdate && (
-        <div
-          className="badge"
-          title={`发现新版本 ${latestVersion}，点击前往下载`}
-          style={{ cursor: 'pointer', borderColor: 'var(--success)', color: 'var(--success)' }}
-          onClick={() => setUpdateModalOpen(true)}
-        >
-          <UpdateIcon width="14" height="14" />
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className="badge"
+              style={{ cursor: 'pointer', borderColor: 'var(--success)', color: 'var(--success)' }}
+              onClick={() => setUpdateModalOpen(true)}
+            >
+              <UpdateIcon width="14" height="14" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{`发现新版本 ${latestVersion}，点击前往下载`}</p>
+          </TooltipContent>
+        </Tooltip>
       )}
 
       <AnimatePresence>
@@ -66,4 +74,3 @@ export default function UpdateChecker({ onModalOpenChange }) {
     </>
   );
 }
-

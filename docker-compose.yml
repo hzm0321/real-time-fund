@@ -17,3 +17,4 @@ services:
 
     environment:
       NODE_ENV: production
+      NEXT_PUBLIC_IS_GITHUB_LOGIN: ${NEXT_PUBLIC_IS_GITHUB_LOGIN}

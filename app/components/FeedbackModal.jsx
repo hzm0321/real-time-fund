@@ -8,32 +8,32 @@ import { submitFeedback } from '../api/fund';
 export default function FeedbackModal({ onClose, user, onOpenWeChat }) {
   const [submitting, setSubmitting] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setError("");
+    setError('');
 
     const formData = new FormData(e.target);
-    const nickname = formData.get("nickname")?.trim();
+    const nickname = formData.get('nickname')?.trim();
     if (!nickname) {
-      formData.set("nickname", "匿名");
+      formData.set('nickname', '匿名');
     }
 
     // Web3Forms Access Key
-    formData.append("access_key", process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY || '');
-    formData.append("subject", "基估宝 - 用户反馈");
+    formData.append('access_key', process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY || '');
+    formData.append('subject', '基估宝 - 用户反馈');
 
     try {
       const data = await submitFeedback(formData);
       if (data.success) {
         setSucceeded(true);
       } else {
-        setError(data.message || "提交失败，请稍后再试");
+        setError(data.message || '提交失败，请稍后再试');
       }
     } catch (err) {
-      setError("网络错误，请检查您的连接");
+      setError('网络错误，请检查您的连接');
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +79,11 @@ export default function FeedbackModal({ onClose, user, onOpenWeChat }) {
         ) : (
           <form onSubmit={onSubmit} className="feedback-form">
             <div className="form-group" style={{ marginBottom: 16 }}>
-              <label htmlFor="nickname" className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+              <label
+                htmlFor="nickname"
+                className="muted"
+                style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}
+              >
                 您的昵称（可选）
               </label>
               <input
@@ -93,7 +97,11 @@ export default function FeedbackModal({ onClose, user, onOpenWeChat }) {
             </div>
             <input type="hidden" name="email" value={user?.email || ''} />
             <div className="form-group" style={{ marginBottom: 20 }}>
-              <label htmlFor="message" className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+              <label
+                htmlFor="message"
+                className="muted"
+                style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}
+              >
                 反馈内容
               </label>
               <textarea
@@ -133,7 +141,13 @@ export default function FeedbackModal({ onClose, user, onOpenWeChat }) {
                 或加入我们的
                 <a
                   className="link-button"
-                  style={{ color: 'var(--primary)', textDecoration: 'underline', padding: '0 4px', fontWeight: 600, cursor: 'pointer' }}
+                  style={{
+                    color: 'var(--primary)',
+                    textDecoration: 'underline',
+                    padding: '0 4px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
                   onClick={onOpenWeChat}
                 >
                   微信用户交流群

@@ -1,19 +1,10 @@
 'use client';
 
 import { CloseIcon } from './Icons';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-export default function PendingTradesModal({
-  open,
-  trades = [],
-  onClose,
-  onRevoke,
-}) {
+export default function PendingTradesModal({ open, trades = [], onClose, onRevoke }) {
   const handleOpenChange = (nextOpen) => {
     if (!nextOpen) {
       onClose?.();
@@ -36,16 +27,12 @@ export default function PendingTradesModal({
             <span style={{ fontSize: '20px' }}>📥</span>
             <span>待交易队列</span>
           </div>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            style={{ border: 'none', background: 'transparent' }}
-          >
+          <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
           </button>
         </div>
 
-        <div className="pending-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+        <div className="pending-list scrollbar-y-styled" style={{ maxHeight: '300px', overflowY: 'auto' }}>
           <div className="pending-list-items" style={{ paddingTop: 0 }}>
             {trades.map((trade, idx) => (
               <div key={trade.id || idx} className="trade-pending-item">
@@ -54,7 +41,7 @@ export default function PendingTradesModal({
                     style={{
                       fontWeight: 600,
                       fontSize: '14px',
-                      color: trade.type === 'buy' ? 'var(--danger)' : 'var(--success)',
+                      color: trade.type === 'buy' ? 'var(--danger)' : 'var(--success)'
                     }}
                   >
                     {trade.type === 'buy' ? '买入' : '卖出'}
@@ -91,4 +78,3 @@ export default function PendingTradesModal({
     </Dialog>
   );
 }
-

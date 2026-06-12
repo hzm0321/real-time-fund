@@ -8,14 +8,15 @@ import timezone from 'dayjs/plugin/timezone';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import zhifubaoImg from "../assets/zhifubao.jpg";
-import weixinImg from "../assets/weixin.jpg";
+import zhifubaoImg from '../assets/zhifubao.jpg';
+import weixinImg from '../assets/weixin.jpg';
 import { CalendarIcon, MinusIcon, PlusIcon, TrendUpIcon, TrendDownIcon } from './Icons';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
+import { DEFAULT_TZ } from '@/app/constants';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-
-const DEFAULT_TZ = 'Asia/Shanghai';
 const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -38,25 +39,32 @@ export function ConsecutiveTrendBadge({ trend }) {
   const Icon = isUp ? TrendUpIcon : TrendDownIcon;
 
   return (
-    <span
-      className="consecutive-trend-badge"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '1px',
-        color: color,
-        fontSize: '11px',
-        fontWeight: 'bold',
-        marginRight: '4px',
-        verticalAlign: 'middle',
-        position: 'relative',
-        bottom: '1px',
-      }}
-      title={`连续${trend.days}天${isUp ? '上涨' : '下跌'}`}
-    >
-      <Icon width="12" height="12" />
-      <span style={{ lineHeight: 1 }}>{trend.days}</span>
-    </span>
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <span
+          className="consecutive-trend-badge"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '1px',
+            color: color,
+            fontSize: '11px',
+            fontWeight: 'bold',
+            marginRight: '4px',
+            verticalAlign: 'middle',
+            position: 'relative',
+            bottom: '1px',
+            cursor: 'default'
+          }}
+        >
+          <Icon width="12" height="12" />
+          <span style={{ lineHeight: 1 }}>{trend.days}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        连续{trend.days}天{isUp ? '上涨' : '下跌'}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -66,18 +74,12 @@ export function DatePicker({ value, onChange, position = 'bottom', minDate }) {
   const selected = value ? toTz(value).toDate() : undefined;
   const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
 
-  const disabled = minDate
-    ? { before: toTz(minDate).startOf('day').toDate() }
-    : { after: today.toDate() };
+  const disabled = minDate ? { before: toTz(minDate).startOf('day').toDate() } : { after: today.toDate() };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className="input date-picker-trigger w-full justify-between font-normal"
-        >
+        <Button type="button" variant="ghost" className="input date-picker-trigger w-full justify-between font-normal">
           <span>{value || '选择日期'}</span>
           <CalendarIcon width="16" height="16" className="muted" />
         </Button>
@@ -93,13 +95,12 @@ export function DatePicker({ value, onChange, position = 'bottom', minDate }) {
           defaultMonth={selected}
           captionLayout="dropdown"
           formatters={{
-            formatWeekdayName: (date) => weekdayLabels[date.getDay()],
+            formatWeekdayName: (date) => weekdayLabels[date.getDay()]
           }}
           classNames={{
-            dropdown_root:
-              "relative rounded-md border-0 shadow-none has-focus:border-0 has-focus:ring-0",
+            dropdown_root: 'relative rounded-md border-0 shadow-none has-focus:border-0 has-focus:ring-0',
             today:
-              "rounded-md bg-primary/15 text-primary data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground",
+              'rounded-md bg-primary/15 text-primary data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground'
           }}
           disabled={disabled}
           onSelect={(d) => {
@@ -172,21 +173,9 @@ export function DonateTabs() {
       >
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
           {method === 'alipay' ? (
-            <Image
-              src={zhifubaoImg}
-              alt="支付宝收款码"
-              fill
-              sizes="184px"
-              style={{ objectFit: 'contain' }}
-            />
+            <Image src={zhifubaoImg} alt="支付宝收款码" fill sizes="184px" style={{ objectFit: 'contain' }} />
           ) : (
-            <Image
-              src={weixinImg}
-              alt="微信收款码"
-              fill
-              sizes="184px"
-              style={{ objectFit: 'contain' }}
-            />
+            <Image src={weixinImg} alt="微信收款码" fill sizes="184px" style={{ objectFit: 'contain' }} />
           )}
         </div>
       </div>
@@ -237,8 +226,15 @@ export function Stat({ label, value, delta }) {
   const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
   return (
     <div className="stat" style={{ flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <span className="label" style={{ fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-      <span className={`value ${dir}`} style={{ fontSize: '15px', lineHeight: 1.2, whiteSpace: 'nowrap' }}>{value}</span>
+      <span
+        className="label"
+        style={{ fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+      >
+        {label}
+      </span>
+      <span className={`value ${dir}`} style={{ fontSize: '15px', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+        {value}
+      </span>
     </div>
   );
 }

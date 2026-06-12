@@ -1,14 +1,16 @@
-"use client";
+'use client';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import ConfirmModal from './ConfirmModal';
 import { ResetIcon, SettingsIcon } from './Icons';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
-export default function SettingsModal({onClose,
+export default function SettingsModal({
+  onClose,
   tempSeconds,
   setTempSeconds,
   saveSettings,
@@ -22,7 +24,10 @@ export default function SettingsModal({onClose,
   showMarketIndexPc = true,
   showMarketIndexMobile = true,
   showGroupFundSearchPc = true,
-  showGroupFundSearchMobile = true}) {
+  showGroupFundSearchMobile = true,
+  dynamicStylePc = true,
+  dynamicStyleMobile = true
+}) {
   const isMobile = useIsMobile();
   const [sliderDragging, setSliderDragging] = useState(false);
   const [resetWidthConfirmOpen, setResetWidthConfirmOpen] = useState(false);
@@ -31,10 +36,12 @@ export default function SettingsModal({onClose,
   const [localShowMarketIndexMobile, setLocalShowMarketIndexMobile] = useState(showMarketIndexMobile);
   const [localShowGroupFundSearchPc, setLocalShowGroupFundSearchPc] = useState(showGroupFundSearchPc);
   const [localShowGroupFundSearchMobile, setLocalShowGroupFundSearchMobile] = useState(showGroupFundSearchMobile);
+  const [localDynamicStylePc, setLocalDynamicStylePc] = useState(dynamicStylePc);
+  const [localDynamicStyleMobile, setLocalDynamicStyleMobile] = useState(dynamicStyleMobile);
   const pageWidthTrackRef = useRef(null);
 
-  const clampedWidth = Math.min(2000, Math.max(600, Number(containerWidth) || 1200));
-  const pageWidthPercent = ((clampedWidth - 600) / (2000 - 600)) * 100;
+  const clampedWidth = Math.min(window.innerWidth, Math.max(600, Number(containerWidth) || 1200));
+  const pageWidthPercent = ((clampedWidth - 600) / (window.innerWidth - 600)) * 100;
 
   const updateWidthByClientX = (clientX) => {
     if (!pageWidthTrackRef.current || !setContainerWidth) return;
@@ -42,7 +49,7 @@ export default function SettingsModal({onClose,
     if (!rect.width) return;
     const ratio = (clientX - rect.left) / rect.width;
     const clampedRatio = Math.min(1, Math.max(0, ratio));
-    const rawWidth = 600 + clampedRatio * (2000 - 600);
+    const rawWidth = 600 + clampedRatio * (window.innerWidth - 600);
     const snapped = Math.round(rawWidth / 10) * 10;
     setContainerWidth(snapped);
   };
@@ -79,6 +86,14 @@ export default function SettingsModal({onClose,
     setLocalShowGroupFundSearchMobile(showGroupFundSearchMobile);
   }, [showGroupFundSearchMobile]);
 
+  useEffect(() => {
+    setLocalDynamicStylePc(dynamicStylePc);
+  }, [dynamicStylePc]);
+
+  useEffect(() => {
+    setLocalDynamicStyleMobile(dynamicStyleMobile);
+  }, [dynamicStyleMobile]);
+
   return (
     <Dialog
       open
@@ -100,15 +115,17 @@ export default function SettingsModal({onClose,
           </div>
 
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>刷新频率</div>
+            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>
+              刷新频率
+            </div>
             <div className="chips" style={{ marginBottom: 12 }}>
               {[30, 60, 120, 300].map((s) => (
                 <button
                   key={s}
                   type="button"
-                className={`chip ${localSeconds === s ? 'active' : ''}`}
-                onClick={() => setLocalSeconds(s)}
-                aria-pressed={localSeconds === s}
+                  className={`chip ${localSeconds === s ? 'active' : ''}`}
+                  onClick={() => setLocalSeconds(s)}
+                  aria-pressed={localSeconds === s}
                 >
                   {s} 秒
                 </button>
@@ -120,11 +137,11 @@ export default function SettingsModal({onClose,
               inputMode="numeric"
               min="30"
               step="5"
-            value={localSeconds}
-            onChange={(e) => setLocalSeconds(Number(e.target.value))}
+              value={localSeconds}
+              onChange={(e) => setLocalSeconds(Number(e.target.value))}
               placeholder="自定义秒数"
             />
-          {localSeconds < 30 && (
+            {localSeconds < 30 && (
               <div className="error-text" style={{ marginTop: 8 }}>
                 最小 30 秒
               </div>
@@ -134,24 +151,32 @@ export default function SettingsModal({onClose,
           {!isMobile && setContainerWidth && (
             <div className="form-group" style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <div className="muted" style={{ fontSize: '0.8rem' }}>页面宽度</div>
+                <div className="muted" style={{ fontSize: '0.8rem' }}>
+                  页面宽度
+                </div>
                 {onResetContainerWidth && (
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => setResetWidthConfirmOpen(true)}
-                    title="重置页面宽度"
-                    style={{
-                      border: 'none',
-                      width: '24px',
-                      height: '24px',
-                      padding: 0,
-                      backgroundColor: 'transparent',
-                      color: 'var(--muted)',
-                    }}
-                  >
-                    <ResetIcon width="14" height="14" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => setResetWidthConfirmOpen(true)}
+                        style={{
+                          border: 'none',
+                          width: '24px',
+                          height: '24px',
+                          padding: 0,
+                          backgroundColor: 'transparent',
+                          color: 'var(--muted)'
+                        }}
+                      >
+                        <ResetIcon width="14" height="14" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>重置页面宽度</p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -174,9 +199,7 @@ export default function SettingsModal({onClose,
                     className="pointer-events-none absolute top-1/2 -translate-y-1/2"
                     style={{ left: `${pageWidthPercent}%`, transform: 'translate(-50%, -50%)' }}
                   >
-                    <div
-                      className="h-3 w-3 rounded-full bg-primary shadow-md shadow-primary/40"
-                    />
+                    <div className="h-3 w-3 rounded-full bg-primary shadow-md shadow-primary/40" />
                   </div>
                 </div>
                 <span className="muted" style={{ fontSize: '0.8rem', minWidth: 48 }}>
@@ -187,7 +210,9 @@ export default function SettingsModal({onClose,
           )}
 
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>显示大盘指数</div>
+            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>
+              显示大盘指数
+            </div>
             <div className="row" style={{ justifyContent: 'flex-start', alignItems: 'center' }}>
               <Switch
                 checked={isMobile ? localShowMarketIndexMobile : localShowMarketIndexPc}
@@ -203,7 +228,9 @@ export default function SettingsModal({onClose,
           </div>
 
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>显示分组内基金搜索</div>
+            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>
+              显示分组内基金搜索
+            </div>
             <div className="row" style={{ justifyContent: 'flex-start', alignItems: 'center' }}>
               <Switch
                 checked={isMobile ? localShowGroupFundSearchMobile : localShowGroupFundSearchPc}
@@ -219,13 +246,38 @@ export default function SettingsModal({onClose,
           </div>
 
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>数据导出</div>
-            <div className="row" style={{ gap: 8 }}>
-              <button type="button" className="button" onClick={exportLocalData}>导出配置</button>
+            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>
+              减少动态样式效果
             </div>
-            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem', marginTop: 26 }}>数据导入</div>
+            <div className="row" style={{ justifyContent: 'flex-start', alignItems: 'center' }}>
+              <Switch
+                checked={isMobile ? !localDynamicStyleMobile : !localDynamicStylePc}
+                className="ml-2 scale-125"
+                onCheckedChange={(checked) => {
+                  const nextValue = !checked;
+                  if (isMobile) setLocalDynamicStyleMobile(nextValue);
+                  else setLocalDynamicStylePc(nextValue);
+                }}
+                aria-label="减少动态样式效果"
+              />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>
+              数据导出
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="button" onClick={exportLocalData}>
+                导出配置
+              </button>
+            </div>
+            <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem', marginTop: 26 }}>
+              数据导入
+            </div>
             <div className="row" style={{ gap: 8, marginTop: 8 }}>
-              <button type="button" className="button" onClick={() => importFileRef.current?.click?.()}>导入配置</button>
+              <button type="button" className="button" onClick={() => importFileRef.current?.click?.()}>
+                导入配置
+              </button>
             </div>
             <input
               ref={importFileRef}
@@ -244,13 +296,16 @@ export default function SettingsModal({onClose,
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 24 }}>
             <button
               className="button"
-              onClick={(e) => saveSettings(
-                e,
-                localSeconds,
-                isMobile ? localShowMarketIndexMobile : localShowMarketIndexPc,
-                isMobile ? localShowGroupFundSearchMobile : localShowGroupFundSearchPc,
-                isMobile
-              )}
+              onClick={(e) =>
+                saveSettings(
+                  e,
+                  localSeconds,
+                  isMobile ? localShowMarketIndexMobile : localShowMarketIndexPc,
+                  isMobile ? localShowGroupFundSearchMobile : localShowGroupFundSearchPc,
+                  isMobile,
+                  isMobile ? localDynamicStyleMobile : localDynamicStylePc
+                )
+              }
               disabled={localSeconds < 30}
             >
               保存并关闭

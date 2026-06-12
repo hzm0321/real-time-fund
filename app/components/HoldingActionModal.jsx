@@ -1,11 +1,8 @@
 'use client';
 
 import { CloseIcon, SettingsIcon } from './Icons';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function HoldingActionModal({ fund, onClose, onAction, hasHistory, pendingCount, groupName }) {
   const handleOpenChange = (open) => {
@@ -27,39 +24,45 @@ export default function HoldingActionModal({ fund, onClose, onAction, hasHistory
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <SettingsIcon width="20" height="20" />
             <span>持仓操作</span>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => onAction('history')}
-              style={{
-                marginLeft: 8,
-                padding: '4px 10px',
-                fontSize: '12px',
-                height: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                position: 'relative',
-              }}
-              title="查看交易记录"
-            >
-              <span>📜</span>
-              <span>交易记录</span>
-              {pendingCount > 0 && (
-                <span
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => onAction('history')}
                   style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    backgroundColor: '#ef4444',
-                    border: '2px solid var(--background)',
+                    marginLeft: 8,
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    position: 'relative'
                   }}
-                />
-              )}
-            </button>
+                >
+                  <span>📜</span>
+                  <span>交易记录</span>
+                  {pendingCount > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        backgroundColor: '#ef4444',
+                        border: '2px solid var(--background)'
+                      }}
+                    />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>查看交易记录</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
           <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
@@ -77,7 +80,7 @@ export default function HoldingActionModal({ fund, onClose, onAction, hasHistory
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              flexWrap: 'wrap',
+              flexWrap: 'wrap'
             }}
           >
             <span>{fund?.name}</span>
@@ -90,36 +93,44 @@ export default function HoldingActionModal({ fund, onClose, onAction, hasHistory
                   padding: '2px 8px',
                   borderRadius: 999,
                   background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid var(--border)',
+                  border: '1px solid var(--border)'
                 }}
               >
                 {groupName}
               </span>
             ) : null}
           </div>
-          <div className="muted" style={{ fontSize: '12px' }}>#{fund?.code}</div>
+          <div className="muted" style={{ fontSize: '12px' }}>
+            #{fund?.code}
+          </div>
         </div>
 
         <div className="grid" style={{ gap: 12 }}>
           <button
             className="button col-6"
             onClick={() => onAction('buy')}
-            style={{ background: 'rgba(34, 211, 238, 0.1)', border: '1px solid var(--primary)', color: 'var(--primary)', fontSize: 14 }}
+            style={{
+              background: 'rgba(34, 211, 238, 0.1)',
+              border: '1px solid var(--primary)',
+              color: 'var(--primary)',
+              fontSize: 14
+            }}
           >
             加仓
           </button>
           <button
             className="button col-6"
             onClick={() => onAction('sell')}
-            style={{ background: 'rgba(248, 113, 113, 0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: 14 }}
+            style={{
+              background: 'rgba(248, 113, 113, 0.1)',
+              border: '1px solid var(--danger)',
+              color: 'var(--danger)',
+              fontSize: 14
+            }}
           >
             减仓
           </button>
-          <button
-            className="button col-6 dca-btn"
-            onClick={() => onAction('dca')}
-            style={{ fontSize: 14 }}
-          >
+          <button className="button col-6 dca-btn" onClick={() => onAction('dca')} style={{ fontSize: 14 }}>
             定投
           </button>
           <button
@@ -129,12 +140,28 @@ export default function HoldingActionModal({ fund, onClose, onAction, hasHistory
               background: 'rgba(168, 85, 247, 0.12)',
               border: '1px solid rgba(168, 85, 247, 0.75)',
               color: 'rgba(168, 85, 247, 0.75)',
-              fontSize: 14,
+              fontSize: 14
             }}
           >
             转换
           </button>
-          <button className="button col-12" onClick={() => onAction('edit')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}>
+          <button
+            className="button col-12"
+            onClick={() => onAction('dividend')}
+            style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.75)',
+              color: 'rgba(245, 158, 11, 0.85)',
+              fontSize: 14
+            }}
+          >
+            分红方式
+          </button>
+          <button
+            className="button col-12"
+            onClick={() => onAction('edit')}
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}
+          >
             编辑持仓
           </button>
           <button
@@ -145,7 +172,7 @@ export default function HoldingActionModal({ fund, onClose, onAction, hasHistory
               background: 'linear-gradient(180deg, #ef4444, #f87171)',
               border: 'none',
               color: '#2b0b0b',
-              fontWeight: 600,
+              fontWeight: 600
             }}
           >
             清空持仓
