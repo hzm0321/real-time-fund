@@ -3,7 +3,7 @@
 import { useMemo, useEffect } from 'react';
 import { isArray, isNumber, isPlainObject } from 'lodash';
 import { useStorageStore } from '../stores';
-import { SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL } from '@/app/constants';
+import { SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL } from '../constants';
 import { aggregatePortfolioDailyEarnings, mergeAllScopedDailyEarnings } from '../lib/dailyEarnings';
 
 /**
@@ -105,36 +105,44 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
   // 4. 多分组汇总持仓合并与最优数据选择
   const { summaryMergedHoldings, summaryHoldingSourceGroupByCode } = useMemo(() => {
     const fundByCode = new Map((isArray(funds) ? funds : []).map((f) => [f.code, f]));
-    const merged = {};
-    const sourceByCode = {};
+    const merged = Object.create(null);
+    const sourceByCode = Object.create(null);
     const codes = new Set();
+    
     Object.entries(holdings || {}).forEach(([code, h]) => {
       const fund = fundByCode.get(code);
       if (!fund || !h) return;
       const p = getHoldingProfit(fund, h, null);
       if (p && Number.isFinite(p.amount) && p.amount > 0) codes.add(code);
     });
+
     for (const g of groupsWithHoldings) {
-      for (const c of g.codes || []) codes.add(c);
+      if (isArray(g.codes)) {
+        for (const c of g.codes) codes.add(c);
+      }
     }
+
     for (const code of codes) {
       const fund = fundByCode.get(code);
       if (!fund) continue;
+      
       let bestAmt = -Infinity;
       let bestH = null;
       let bestGid = null;
-      const globalH = holdings[code];
-      if (globalH) {
-        const p = getHoldingProfit(fund, globalH, null);
+      
+      if (holdings[code]) {
+        const p = getHoldingProfit(fund, holdings[code], null);
         const amt = p?.amount;
         if (Number.isFinite(amt) && amt > bestAmt) {
           bestAmt = amt;
-          bestH = globalH;
+          bestH = holdings[code];
           bestGid = SUMMARY_SOURCE_GLOBAL;
         }
       }
+
       for (const g of groupsWithHoldings) {
-        const h = groupHoldings[g.id]?.[code];
+        const groupBucket = isPlainObject(groupHoldings[g.id]) ? groupHoldings[g.id] : {};
+        const h = groupBucket[code];
         if (!h) continue;
         const p = getHoldingProfit(fund, h, g.id);
         const amt = p?.amount;
@@ -145,6 +153,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
           bestGid = g.id;
         }
       }
+      
       if (bestH != null && bestGid != null) {
         merged[code] = bestH;
         sourceByCode[code] = bestGid;
