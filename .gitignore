@@ -97,3 +97,6 @@ cli/
 /.mcp.json
 /.codex/
 /jgb-cli/
+
+# Sensitive or custom DB SQL schema
+doc/supabase.sql
