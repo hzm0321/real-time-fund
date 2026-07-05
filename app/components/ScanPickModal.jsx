@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchOcrDailyRemaining } from '../api/fund';
 import { ocrDailyRemaining } from '../lib/query-keys';
 import { useUserStore } from '../stores';
+import { useMembership } from '../hooks/useMembership';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -17,16 +18,18 @@ function getDroppedImageFiles(dataTransfer) {
 export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning }) {
   const [isDragging, setIsDragging] = useState(false);
   const user = useUserStore((s) => s.user);
+  const { isVip } = useMembership();
+  const maxLimit = isVip ? 20 : 5;
 
   const { data: ocrUsage } = useQuery({
-    queryKey: ocrDailyRemaining(user?.id),
-    queryFn: () => fetchOcrDailyRemaining(user?.id),
+    queryKey: [...ocrDailyRemaining(user?.id), maxLimit],
+    queryFn: () => fetchOcrDailyRemaining(user?.id, maxLimit),
     enabled: !!user?.id,
     staleTime: 30_000
   });
 
   const remaining = ocrUsage?.remaining ?? null;
-  const max = ocrUsage?.max ?? 10;
+  const max = ocrUsage?.max ?? maxLimit;
   const isExhausted = remaining !== null && remaining <= 0;
   const isWarning = remaining !== null && remaining > 0 && remaining <= 3;
 
@@ -86,7 +89,24 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
         style={{ width: 420, maxWidth: '90vw' }}
       >
         <div className="title" style={{ marginBottom: 12 }}>
-          <span>选择持仓截图</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>选择持仓截图</span>
+            {isVip && (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: '#f59e0b',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  fontWeight: 600
+                }}
+              >
+                PRO 专享 20次/天
+              </span>
+            )}
+          </div>
           {remaining !== null && (
             <span className={`ocr-quota-badge${isExhausted ? ' exhausted' : isWarning ? ' warning' : ''}`}>
               今日剩余识别次数 {remaining}/{max}

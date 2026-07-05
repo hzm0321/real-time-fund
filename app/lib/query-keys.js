@@ -48,3 +48,6 @@ export const fundBestSource = (fundCode) => ['fundBestSource', String(fundCode).
 
 /** @param {string} fundCode */
 export const isQdiiFund = (fundCode) => ['isQdiiFund', String(fundCode).trim()];
+
+/** @param {string} userId */
+export const membershipStatus = (userId) => ['membershipStatus', String(userId || '').trim()];

@@ -9,8 +9,9 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// 每日 OCR 识别上限
-const MAX_DAILY_OCR = 5;
+// 每日 OCR 识别上限（普通用户与 PRO 会员）
+const FREE_DAILY_OCR = 5;
+const PRO_DAILY_OCR = 20;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,24 +96,35 @@ Deno.serve(async (req: Request) => {
 
     console.info('当前用户:', user.id);
 
-    // ✅ 3.5 每日 OCR 用量限流检查（原子操作）
+    // ✅ 3.5 查询用户 PRO 会员状态，确定 OCR 限额
+    let maxDailyOcr = FREE_DAILY_OCR;
+    try {
+      const { data: memStatus } = await supabase.rpc('get_my_membership_status');
+      if (memStatus && memStatus.is_vip) {
+        maxDailyOcr = PRO_DAILY_OCR;
+      }
+    } catch (memErr) {
+      console.warn('查询会员状态失败，默认使用普通额度:', memErr);
+    }
+
+    // ✅ 3.6 每日 OCR 用量限流检查（原子操作）
     const { data: usageResult, error: usageError } = await supabase.rpc('check_and_increment_ocr_usage', {
-      p_max_limit: MAX_DAILY_OCR
+      p_max_limit: maxDailyOcr
     });
 
     if (usageError) {
       console.error('OCR 用量检查失败:', usageError);
       // 限流检查失败不阻断请求，记录日志后继续
     } else if (usageResult && !usageResult.allowed) {
-      const currentCount = usageResult.current_count || MAX_DAILY_OCR;
+      const currentCount = usageResult.current_count || maxDailyOcr;
       return new Response(
         JSON.stringify({
           success: false,
           error: 'DAILY_LIMIT_EXCEEDED',
-          message: `每日 OCR 识别次数已达上限（${MAX_DAILY_OCR} 次），请明天再试`,
+          message: `每日 OCR 识别次数已达上限（${maxDailyOcr} 次），请明天再试或升级 PRO 会员`,
           remaining: 0,
           current_count: currentCount,
-          max_limit: MAX_DAILY_OCR
+          max_limit: maxDailyOcr
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -261,7 +273,7 @@ Deno.serve(async (req: Request) => {
     }));
 
     // ✅ 6. 成功响应（附带剩余用量信息）
-    const remaining = usageResult ? Math.max(0, MAX_DAILY_OCR - (usageResult.current_count || 0)) : null;
+    const remaining = usageResult ? Math.max(0, maxDailyOcr - (usageResult.current_count || 0)) : null;
     return new Response(
       JSON.stringify({
         success: true,

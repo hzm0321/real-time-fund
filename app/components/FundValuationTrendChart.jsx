@@ -21,6 +21,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { useMembership } from '../hooks/useMembership';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -81,6 +82,7 @@ export default function FundValuationTrendChart({
   const [hiddenSources, setHiddenSources] = useState(() => new Set());
   const [activeIndex, setActiveIndex] = useState(null);
   const [tooltipInfo, setTooltipInfo] = useState(null);
+  const { isVip, loading: vipLoading } = useMembership();
 
   useEffect(() => {
     clearActiveIndexRef.current = () => {
@@ -504,6 +506,33 @@ export default function FundValuationTrendChart({
 
   if (!isSupabaseConfigured || !userId) {
     return null;
+  }
+
+  if (!isVip && !vipLoading) {
+    return (
+      <div
+        className="glass card"
+        style={{
+          padding: '28px 20px',
+          margin: '12px 0',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%)',
+          borderRadius: '16px'
+        }}
+      >
+        <div style={{ fontSize: '28px', lineHeight: 1 }}>👑</div>
+        <div style={{ fontWeight: 600, fontSize: '16PX', color: '#f59e0b' }}>PRO 会员专享功能</div>
+        <div className="muted" style={{ fontSize: '13px', lineHeight: 1.6, maxWidth: '300px' }}>
+          开通 PRO 会员即可解锁日内估值走势分时图，追踪主力估值变化轨迹与盘中异常波动。
+        </div>
+      </div>
+    );
   }
 
   const renderTrendTooltip = (className) =>

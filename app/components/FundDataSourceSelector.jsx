@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useStorageStore, useUserStore } from '@/app/stores';
+import { useMembership } from '@/app/hooks/useMembership';
 import DataSourceAccuracyBadge from './DataSourceAccuracyBadge';
 
 function formatGszzlEstimate(gszzl) {
@@ -22,6 +23,7 @@ function formatGszzlEstimate(gszzl) {
 export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   const isAdded = useStorageStore((s) => s.funds?.some((item) => item.code === fund?.code));
   const user = useUserStore((s) => s.user);
+  const { isVip } = useMembership();
   const [sourceId, setSourceId] = useState('1');
   const [loading, setLoading] = useState(true);
   const [estimates, setEstimates] = useState({
@@ -203,12 +205,16 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   // 自动开关切换处理
   const handleAutoToggle = useCallback(
     (checked) => {
+      if (checked && !isVip) {
+        sonnerToast.warning('自动智能切源为 PRO 会员专享功能，请开通会员后解锁');
+        return;
+      }
       setAutoSource(checked);
       if (checked && fund?.code) {
         fetchAndApplyBestSource(fund.code);
       }
     },
-    [fund?.code, fetchAndApplyBestSource]
+    [fund?.code, fetchAndApplyBestSource, isVip]
   );
 
   const handleConfirm = () => {
@@ -284,7 +290,13 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
             <RadioGroup
               value={sourceId}
               onValueChange={(v) => {
-                if (!isManualDisabled) setSourceId(v);
+                if (!isManualDisabled) {
+                  if (v === '4' && !isVip) {
+                    sonnerToast.warning('数据源 4 (新浪高级估算) 为 PRO 会员专享功能，请升级会员后解锁');
+                    return;
+                  }
+                  setSourceId(v);
+                }
               }}
               style={{
                 display: 'flex',
@@ -306,7 +318,13 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                   <div
                     key={item.id}
                     onClick={() => {
-                      if (!isManualDisabled) setSourceId(item.id);
+                      if (!isManualDisabled) {
+                        if (item.id === '4' && !isVip) {
+                          sonnerToast.warning('数据源 4 (新浪高级估算) 为 PRO 会员专享功能，请升级会员后解锁');
+                          return;
+                        }
+                        setSourceId(item.id);
+                      }
                     }}
                     style={{
                       display: 'flex',
@@ -354,12 +372,12 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                                 variant="outline"
                                 className="text-[10px] px-1.5 py-0 h-[18px] min-h-0 leading-none font-medium"
                                 style={{
-                                  borderColor: 'rgba(249, 115, 22, 0.5)',
-                                  color: '#f97316',
-                                  background: 'rgba(249, 115, 22, 0.1)'
+                                  borderColor: 'rgba(245, 158, 11, 0.5)',
+                                  color: '#f59e0b',
+                                  background: 'rgba(245, 158, 11, 0.12)'
                                 }}
                               >
-                                限免
+                                PRO 专享
                               </Badge>
                             )}
                           </div>
