@@ -12,7 +12,7 @@ export default function SelectHoldingGroupModal({ fund, groups = [], groupHoldin
       if (!g?.id) return false;
       const holding = groupHoldings?.[g.id]?.[code];
       const share = Number(holding?.share);
-      return Number.isFinite(share) && share > 0;
+      return Number.isFinite(share) && share >= 0;
     });
   }, [fund?.code, groups, groupHoldings]);
 

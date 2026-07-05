@@ -529,7 +529,7 @@ export default function FundValuationTrendChart({
         <div style={{ fontSize: '28px', lineHeight: 1 }}>👑</div>
         <div style={{ fontWeight: 600, fontSize: '16PX', color: '#f59e0b' }}>PRO 会员专享功能</div>
         <div className="muted" style={{ fontSize: '13px', lineHeight: 1.6, maxWidth: '300px' }}>
-          开通 PRO 会员即可解锁日内估值走势分时图，追踪主力估值变化轨迹与盘中异常波动。
+          开通 PRO 会员即可解锁基金历史估值走势图，追踪基金估值变化轨迹。
         </div>
       </div>
     );

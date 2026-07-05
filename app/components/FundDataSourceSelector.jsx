@@ -2,7 +2,7 @@
 import { isNumber } from 'lodash';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock, Crown } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
 import { fetchFundValuationBySource, fetchBestValuationSource, fetchFundBestSource, isQdiiFund } from '@/app/api/fund';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -206,7 +206,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   const handleAutoToggle = useCallback(
     (checked) => {
       if (checked && !isVip) {
-        sonnerToast.warning('自动智能切源为 PRO 会员专享功能，请开通会员后解锁');
+        sonnerToast.warning('自动智能切源为 PRO 会员专享功能，请开通会员后解锁', { id: 'pro-auto-source-toast' });
         return;
       }
       setAutoSource(checked);
@@ -218,7 +218,13 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   );
 
   const handleConfirm = () => {
-    onSelect(parseInt(sourceId, 10), autoSource);
+    if (!isManualDisabled) {
+      if (sourceId === '4' && !isVip) {
+        sonnerToast.warning('数据源 4 为 PRO 会员专享功能，请升级会员后解锁', { id: 'pro-source-4-toast' });
+        return;
+      }
+      onSelect?.(parseInt(sourceId, 10), autoSource);
+    }
     onClose();
   };
 
@@ -292,7 +298,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
               onValueChange={(v) => {
                 if (!isManualDisabled) {
                   if (v === '4' && !isVip) {
-                    sonnerToast.warning('数据源 4 (新浪高级估算) 为 PRO 会员专享功能，请升级会员后解锁');
+                    sonnerToast.warning('数据源 4 为 PRO 会员专享功能，请升级会员后解锁', { id: 'pro-source-4-toast' });
                     return;
                   }
                   setSourceId(v);
@@ -317,10 +323,14 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                 return (
                   <div
                     key={item.id}
-                    onClick={() => {
+                    onClick={(e) => {
                       if (!isManualDisabled) {
                         if (item.id === '4' && !isVip) {
-                          sonnerToast.warning('数据源 4 (新浪高级估算) 为 PRO 会员专享功能，请升级会员后解锁');
+                          e.preventDefault();
+                          e.stopPropagation();
+                          sonnerToast.warning('数据源 4 为 PRO 会员专享功能，请升级会员后解锁', {
+                            id: 'pro-source-4-toast'
+                          });
                           return;
                         }
                         setSourceId(item.id);
@@ -332,9 +342,15 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                       justifyContent: 'space-between',
                       padding: '16px',
                       borderRadius: '12px',
-                      border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      border: isSelected
+                        ? item.id === '4'
+                          ? '1px solid #f59e0b'
+                          : '1px solid var(--primary)'
+                        : '1px solid var(--border)',
                       background: isSelected
-                        ? 'color-mix(in srgb, var(--primary) 8%, var(--card))'
+                        ? item.id === '4'
+                          ? 'color-mix(in srgb, #f59e0b 8%, var(--card))'
+                          : 'color-mix(in srgb, var(--primary) 8%, var(--card))'
                         : 'var(--secondary)',
                       cursor: isManualDisabled ? 'not-allowed' : 'pointer',
                       width: '100%',
@@ -354,31 +370,44 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <Label
-                              htmlFor={`source-${item.id}`}
-                              style={{
-                                fontSize: '15px',
-                                cursor: isManualDisabled ? 'not-allowed' : 'pointer',
-                                fontWeight: 500
-                              }}
-                            >
-                              {item.name}
-                            </Label>
-                            {bestSource === Number(item.id) && (isYesterdayAccuracy || isTodayAccuracy) && (
-                              <DataSourceAccuracyBadge label={isTodayAccuracy ? '今日最准' : '昨日最准'} />
-                            )}
-                            {item.id === '4' && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0 h-[18px] min-h-0 leading-none font-medium"
+                            {item.id === '4' ? (
+                              <Label
+                                htmlFor={`source-${item.id}`}
                                 style={{
-                                  borderColor: 'rgba(245, 158, 11, 0.5)',
-                                  color: '#f59e0b',
-                                  background: 'rgba(245, 158, 11, 0.12)'
+                                  fontSize: '15px',
+                                  cursor: isManualDisabled ? 'not-allowed' : 'pointer',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
                                 }}
                               >
-                                PRO 专享
-                              </Badge>
+                                <Crown className="w-4 h-4 shrink-0" style={{ color: '#f59e0b', stroke: '#f59e0b' }} />
+                                <span
+                                  style={{
+                                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    fontSize: '15px'
+                                  }}
+                                >
+                                  {item.name}
+                                </span>
+                              </Label>
+                            ) : (
+                              <Label
+                                htmlFor={`source-${item.id}`}
+                                style={{
+                                  fontSize: '15px',
+                                  cursor: isManualDisabled ? 'not-allowed' : 'pointer',
+                                  fontWeight: 500
+                                }}
+                              >
+                                {item.name}
+                              </Label>
+                            )}
+                            {bestSource === Number(item.id) && (isYesterdayAccuracy || isTodayAccuracy) && (
+                              <DataSourceAccuracyBadge label={isTodayAccuracy ? '今日最准' : '昨日最准'} />
                             )}
                           </div>
                           {accuracyDiffs[item.id] != null && (
@@ -407,36 +436,64 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                             flexShrink: 0
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              color: 'var(--muted)',
-                              lineHeight: 1,
-                              background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
-                              padding: '2px 6px',
-                              borderRadius: '4px'
-                            }}
-                          >
-                            当前预测
-                          </span>
-                          <span
-                            className={
-                              item.est === '--'
-                                ? 'muted'
-                                : item.est.startsWith('+')
-                                  ? 'up'
-                                  : item.est.startsWith('-')
-                                    ? 'down'
-                                    : 'muted'
-                            }
-                            style={{
-                              fontSize: '15px',
-                              fontWeight: 600,
-                              lineHeight: 1
-                            }}
-                          >
-                            {item.est}
-                          </span>
+                          {!isVip && item.id === '4' ? (
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '5px 10px',
+                                borderRadius: '9999px',
+                                background: 'color-mix(in srgb, #f59e0b 14%, var(--card))',
+                                border: '1px solid rgba(245, 158, 11, 0.45)',
+                                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.12)',
+                                color: '#f59e0b',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                lineHeight: 1,
+                                backdropFilter: 'blur(8px)',
+                                WebkitBackdropFilter: 'blur(8px)',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Lock className="w-3.5 h-3.5" style={{ flexShrink: 0 }} />
+                              <span>专享实时估值</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  color: 'var(--muted)',
+                                  lineHeight: 1,
+                                  background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                当前预测
+                              </span>
+                              <span
+                                className={
+                                  item.est === '--'
+                                    ? 'muted'
+                                    : item.est.startsWith('+')
+                                      ? 'up'
+                                      : item.est.startsWith('-')
+                                        ? 'down'
+                                        : 'muted'
+                                }
+                                style={{
+                                  fontSize: '15px',
+                                  fontWeight: 600,
+                                  lineHeight: 1
+                                }}
+                              >
+                                {item.est}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

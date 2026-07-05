@@ -341,11 +341,11 @@ export default function Index({
   const hasHoldings =
     topHoldings.holdingsIsLastQuarter && isArray(topHoldings.holdings) && topHoldings.holdings.length > 0;
   // “我的收益”(每日收益)只依赖份额；成本价缺失也应可展示
-  const hasHoldingShare = holding && isNumber(holding.share) && holding.share > 0;
+  const hasHoldingShare = holding && isNumber(holding.share) && holding.share >= 0;
 
   // 兼容旧逻辑：部分 UI 仍需要“持仓金额/成本”完整信息
   const hasHoldingAmount =
-    !!profit && holding && isNumber(holding.share) && holding.share > 0 && isNumber(holding.cost) && holding.cost > 0;
+    !!profit && holding && isNumber(holding.share) && holding.share >= 0 && isNumber(holding.cost) && holding.cost >= 0;
 
   const dailyEarningsSeries = useMemo(() => {
     if (!hasHoldingShare) return [];

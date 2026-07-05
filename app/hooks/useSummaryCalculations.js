@@ -28,7 +28,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
         const h = bucket[code];
         if (!fund || !h) return false;
         const p = getHoldingProfit(fund, h, g.id);
-        return p && Number.isFinite(p.amount) && p.amount > 0;
+        return p && Number.isFinite(p.amount) && p.amount >= 0;
       });
     });
   }, [groups, groupHoldings, funds, getHoldingProfit]);
@@ -47,7 +47,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
     const accumulate = (fund, holding, scopeGid) => {
       if (!fund || !holding) return;
       const p = getHoldingProfit(fund, holding, scopeGid);
-      if (!p || !Number.isFinite(p.amount) || p.amount <= 0) return;
+      if (!p || !Number.isFinite(p.amount) || p.amount < 0) return;
       hasHolding = true;
       totalAsset += Math.round(p.amount * 100) / 100;
       if (p.profitToday != null) {
@@ -96,7 +96,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
       const fund = fundByCode.get(code);
       if (!fund || !h) return false;
       const p = getHoldingProfit(fund, h, null);
-      return p && Number.isFinite(p.amount) && p.amount > 0;
+      return p && Number.isFinite(p.amount) && p.amount >= 0;
     });
   }, [funds, holdings, getHoldingProfit]);
 
@@ -112,7 +112,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
       const fund = fundByCode.get(code);
       if (!fund || !h) return;
       const p = getHoldingProfit(fund, h, null);
-      if (p && Number.isFinite(p.amount) && p.amount > 0) codes.add(code);
+      if (p && Number.isFinite(p.amount) && p.amount >= 0) codes.add(code);
     });
     for (const g of groupsWithHoldings) {
       for (const c of g.codes || []) codes.add(c);

@@ -16,7 +16,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-import { isArray, isBoolean, isFunction, isNumber, isObject, isPlainObject, isString } from 'lodash';
+import { isArray, isBoolean, isFunction, isNil, isNumber, isObject, isPlainObject, isString } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import { toast as sonnerToast } from 'sonner';
 
@@ -459,7 +459,7 @@ export default function HomePage() {
     const linked = new Set();
     const groupIdsByCode = {};
 
-    const hasGlobalHolding = (h) => !!h && isNumber(h.share) && Number(h.share) > 0;
+    const hasGlobalHolding = (h) => !isNil(h) && isNumber(h.share) && Number(h.share) >= 0;
 
     for (const fund of funds || []) {
       const code = fund?.code;
@@ -477,7 +477,7 @@ export default function HomePage() {
         const h = groupHoldings?.[gid]?.[code];
         if (!h) continue;
         const s = Number(h.share);
-        if (!Number.isFinite(s) || s <= 0) continue;
+        if (!Number.isFinite(s) || s < 0) continue;
         sourceGroupIds.push(gid);
         totalShare += s;
 
@@ -488,10 +488,10 @@ export default function HomePage() {
         }
       }
 
-      if (totalShare > 0) {
+      if (sourceGroupIds.length > 0) {
         derived[code] = {
           share: totalShare,
-          cost: hasAnyCost ? totalCostShare / totalShare : null
+          cost: hasAnyCost && totalShare > 0 ? totalCostShare / totalShare : hasAnyCost ? 0 : null
         };
         linked.add(code);
         groupIdsByCode[code] = sourceGroupIds;
@@ -2956,7 +2956,7 @@ export default function HomePage() {
 
     if (gid) {
       const gh = groupHoldings[gid]?.[fund.code];
-      const hasGroupHolding = gh && isNumber(gh.share) && gh.share > 0;
+      const hasGroupHolding = !isNil(gh) && isNumber(gh.share) && gh.share >= 0;
       const hasGroupPending = pendingTrades.some((t) => t.fundCode === fund.code && t.groupId === gid);
       const scoped = migrateDcaPlansToScoped(dcaPlans);
       const hasGroupDca = !!scoped[gid]?.[fund.code];
@@ -2974,9 +2974,9 @@ export default function HomePage() {
     }
 
     const h = holdings[fund.code];
-    const hasGlobalHolding = h && isNumber(h.share) && h.share > 0;
+    const hasGlobalHolding = !isNil(h) && isNumber(h.share) && h.share >= 0;
     const hasGroupHolding = Object.values(groupHoldings || {}).some(
-      (b) => b && b[fund.code] && isNumber(b[fund.code].share) && b[fund.code].share > 0
+      (b) => !isNil(b) && !isNil(b[fund.code]) && isNumber(b[fund.code].share) && b[fund.code].share >= 0
     );
     const hasHolding = hasGlobalHolding || hasGroupHolding;
     const otherGroups = groups.filter((g) => g.codes.includes(fund.code)).map((g) => g.name);
@@ -3000,7 +3000,7 @@ export default function HomePage() {
       const scoped = migrateDcaPlansToScoped(dcaPlans);
       const needsConfirm = list.some((code) => {
         const gh = groupHoldings[gid]?.[code];
-        const hasGroupHolding = gh && isNumber(gh.share) && gh.share > 0;
+        const hasGroupHolding = !isNil(gh) && isNumber(gh.share) && gh.share >= 0;
         const hasGroupPending = pendingTrades.some((t) => t.fundCode === code && t.groupId === gid);
         const hasGroupDca = !!scoped[gid]?.[code];
         const txList = transactions[code] || [];
@@ -3035,9 +3035,9 @@ export default function HomePage() {
     }
     const needsGlobalConfirm = list.some((code) => {
       const h = holdings[code];
-      const hasGlobalHolding = h && isNumber(h.share) && h.share > 0;
+      const hasGlobalHolding = !isNil(h) && isNumber(h.share) && h.share >= 0;
       const hasGroupHolding = Object.values(groupHoldings || {}).some(
-        (b) => b && b[code] && isNumber(b[code].share) && b[code].share > 0
+        (b) => !isNil(b) && !isNil(b[code]) && isNumber(b[code].share) && b[code].share >= 0
       );
       return hasGlobalHolding || hasGroupHolding;
     });
@@ -4143,9 +4143,9 @@ export default function HomePage() {
       // 自定义分组：未设置持仓时，如果“全部”存在全局持仓，则提示迁移
       if (activeGroupId && meta?.hasHolding === false) {
         const gh = groupHoldings?.[activeGroupId]?.[row.code];
-        const hasGroupShare = gh && isNumber(gh.share) && gh.share > 0;
+        const hasGroupShare = !isNil(gh) && isNumber(gh.share) && gh.share >= 0;
         const global = holdings?.[row.code];
-        const hasGlobalShare = global && isNumber(global.share) && global.share > 0;
+        const hasGlobalShare = !isNil(global) && isNumber(global.share) && global.share >= 0;
         if (!hasGroupShare && hasGlobalShare) {
           const name = row.rawFund?.name ?? row.fundName ?? row.code;
           setHoldingMigrateDialog({
@@ -4185,9 +4185,9 @@ export default function HomePage() {
       // 自定义分组：卡片视图/抽屉中“未设置持仓”点击时也走同样迁移提示
       if (activeGroupId && code) {
         const gh = groupHoldings?.[activeGroupId]?.[code];
-        const hasGroupShare = gh && isNumber(gh.share) && gh.share > 0;
+        const hasGroupShare = !isNil(gh) && isNumber(gh.share) && gh.share >= 0;
         const global = holdings?.[code];
-        const hasGlobalShare = global && isNumber(global.share) && global.share > 0;
+        const hasGlobalShare = !isNil(global) && isNumber(global.share) && global.share >= 0;
         if (!hasGroupShare && hasGlobalShare) {
           const name = fund?.name ?? code;
           setHoldingMigrateDialog({

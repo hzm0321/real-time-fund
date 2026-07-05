@@ -1004,22 +1004,25 @@ function fetchSinaEstimateNetworthResponse(code) {
  */
 export const fetchQdiiValuationFromSupabase = async (code) => {
   if (!code || !isSupabaseConfigured) return null;
+  if (!supabase?.functions?.invoke) return null;
   const normalized = String(code).trim();
   if (!normalized) return null;
 
   try {
     const { data, error } = await withRetry(() =>
-      supabase.from('gs_qdii').select('gztime, gszzl, gzstatus').eq('fund_code', normalized).maybeSingle()
+      supabase.functions.invoke('get-qdii-valuation', {
+        body: { code: normalized }
+      })
     );
 
-    if (error || !data) return null;
+    if (error || !data || data.success !== true || !data.data) return null;
 
-    // gszzl 在表中是 real，通常为百分比数值（如 1.23 表示 1.23%）
+    const resData = data.data;
     return {
-      gztime: data.gztime != null ? String(data.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
-      gszzl: data.gszzl != null && Number.isFinite(Number(data.gszzl)) ? Number(data.gszzl) : null,
+      gztime: resData.gztime != null ? String(resData.gztime) : null,
+      gszzl: resData.gszzl != null && Number.isFinite(Number(resData.gszzl)) ? Number(resData.gszzl) : null,
       valuationSource: 'supabase_qdii',
-      gzstatus: data.gzstatus
+      gzstatus: resData.gzstatus
     };
   } catch (e) {
     return null;
