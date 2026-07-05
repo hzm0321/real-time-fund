@@ -114,7 +114,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
       }
 
       const bestSourcePromise =
-        actualZzl != null && fund.jzrq
+        isVip && actualZzl != null && fund.jzrq
           ? fetchBestValuationSource(fund.code, fund.jzrq, actualZzl).catch(() => null)
           : Promise.resolve(null);
 
@@ -206,7 +206,7 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   const handleAutoToggle = useCallback(
     (checked) => {
       if (checked && !isVip) {
-        sonnerToast.warning('自动智能切源为 PRO 会员专享功能，请开通会员后解锁', { id: 'pro-auto-source-toast' });
+        sonnerToast.warning('自动切源为 PRO 会员专享功能，请开通会员后解锁', { id: 'pro-auto-source-toast' });
         return;
       }
       setAutoSource(checked);
@@ -242,17 +242,38 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
         <div className="title" style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <span style={{ fontSize: '18px', fontWeight: 600, flexShrink: 0 }}>切换数据源</span>
-            {isAdded && user && (
+            {isAdded && (
               <div
+                onClick={(e) => {
+                  if (!isVip) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    sonnerToast.warning('自动切源为 PRO 会员专享功能，请开通会员后解锁', {
+                      id: 'pro-auto-source-toast'
+                    });
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  background: autoSource ? 'color-mix(in srgb, var(--primary) 10%, transparent)' : 'var(--secondary)',
-                  padding: '4px 8px 4px 12px',
-                  borderRadius: '99px',
-                  border: `1px solid ${autoSource ? 'color-mix(in srgb, var(--primary) 20%, transparent)' : 'var(--border)'}`,
-                  transition: 'all 0.2s ease'
+                  background: !isVip
+                    ? 'color-mix(in srgb, #f59e0b 14%, var(--card))'
+                    : autoSource
+                      ? 'color-mix(in srgb, #f59e0b 18%, var(--card))'
+                      : 'var(--secondary)',
+                  padding: '5px 10px 5px 12px',
+                  borderRadius: '9999px',
+                  border: !isVip
+                    ? '1px solid rgba(245, 158, 11, 0.45)'
+                    : autoSource
+                      ? '1px solid #f59e0b'
+                      : '1px solid var(--border)',
+                  boxShadow: !isVip || autoSource ? '0 2px 10px rgba(245, 158, 11, 0.12)' : 'none',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
                 }}
               >
                 <Label
@@ -260,18 +281,50 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '5px',
                     fontSize: '12px',
                     cursor: 'pointer',
-                    color: autoSource ? 'var(--primary)' : 'var(--muted)',
-                    fontWeight: 500,
+                    fontWeight: 600,
                     userSelect: 'none',
                     margin: 0
                   }}
                 >
-                  {autoLoading ? <Loader2 className="animate-spin" size={14} /> : <span>自动</span>}
+                  {autoLoading ? (
+                    <Loader2
+                      className="animate-spin"
+                      size={14}
+                      style={{ color: !isVip || autoSource ? '#f59e0b' : 'var(--muted-foreground)' }}
+                    />
+                  ) : (
+                    <>
+                      <Crown
+                        className="w-3.5 h-3.5 shrink-0"
+                        style={{ color: !isVip || autoSource ? '#f59e0b' : 'var(--muted-foreground)' }}
+                      />
+                      <span
+                        style={
+                          !isVip || autoSource
+                            ? {
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent'
+                              }
+                            : { color: 'var(--muted-foreground)' }
+                        }
+                      >
+                        自动
+                      </span>
+                    </>
+                  )}
                 </Label>
-                <Switch id="auto-source-switch" size="sm" checked={autoSource} onCheckedChange={handleAutoToggle} />
+                <Switch
+                  id="auto-source-switch"
+                  size="sm"
+                  checked={autoSource}
+                  onCheckedChange={handleAutoToggle}
+                  className={autoSource ? 'data-[state=checked]:!bg-[#f59e0b]' : ''}
+                  style={autoSource ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b' } : undefined}
+                />
               </div>
             )}
           </div>
@@ -406,11 +459,11 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                                 {item.name}
                               </Label>
                             )}
-                            {bestSource === Number(item.id) && (isYesterdayAccuracy || isTodayAccuracy) && (
+                            {isVip && bestSource === Number(item.id) && (isYesterdayAccuracy || isTodayAccuracy) && (
                               <DataSourceAccuracyBadge label={isTodayAccuracy ? '今日最准' : '昨日最准'} />
                             )}
                           </div>
-                          {accuracyDiffs[item.id] != null && (
+                          {isVip && accuracyDiffs[item.id] != null && (
                             <span
                               style={{
                                 fontSize: '10px',

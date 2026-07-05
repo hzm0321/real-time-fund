@@ -19,6 +19,8 @@ import {
 } from '../api/fund';
 import { TZ } from '../lib/fundHelpers';
 import { getQueryClient } from '../lib/get-query-client';
+import { membershipStatus } from '../lib/query-keys';
+import { fetchMembershipStatus } from './useMembership';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -219,12 +221,42 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           const currentFunds = useStorageStore.getState().funds || [];
           const user = useUserStore.getState().user;
 
-          if (!user) {
-            const hasAutoSource = currentFunds.some((f) => f.autoSource);
-            if (hasAutoSource) {
-              useStorageStore
-                .getState()
-                .setFunds((prev) => prev.map((f) => (f.autoSource ? { ...f, autoSource: false } : f)));
+          let isVip = false;
+          if (user?.id) {
+            try {
+              const qc = getQueryClient();
+              const memStatus = await qc.fetchQuery({
+                queryKey: membershipStatus(user.id),
+                queryFn: () => fetchMembershipStatus(user.id),
+                staleTime: 10 * 60 * 1000
+              });
+              isVip = Boolean(memStatus?.isVip);
+            } catch {
+              isVip = false;
+            }
+          }
+
+          if (!isVip) {
+            const hasRestricted = currentFunds.some((f) => f.autoSource || String(f.dataSource) === '4');
+            if (hasRestricted) {
+              useStorageStore.getState().setFunds((prev) =>
+                prev.map((f) => {
+                  const isDs4 = String(f.dataSource) === '4';
+                  if (f.autoSource || isDs4) {
+                    return {
+                      ...f,
+                      autoSource: false,
+                      dataSource: isDs4 ? (typeof f.dataSource === 'number' ? 1 : '1') : f.dataSource,
+                      gsz: isDs4 ? null : f.gsz,
+                      gszzl: isDs4 ? null : f.gszzl,
+                      gztime: isDs4 ? null : f.gztime,
+                      valuationSource: isDs4 ? null : f.valuationSource,
+                      noValuation: isDs4 ? false : f.noValuation
+                    };
+                  }
+                  return f;
+                })
+              );
             }
           } else {
             const autoSourceCodes = currentFunds

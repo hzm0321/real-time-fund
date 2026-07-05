@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { isArray, isNumber, isObject } from 'lodash';
 import { fetchBestValuationSource, fetchFundValuationBySource } from '@/app/api/fund';
 import { asyncPool } from '@/app/lib/asyncHelper';
+import { useMembership } from '@/app/hooks/useMembership';
 
 const TODAY_LABEL = '今日最准';
 const YESTERDAY_LABEL = '昨日最准';
@@ -63,6 +64,7 @@ async function resolveAccuracyLabel(row, todayStr) {
 }
 
 export function useDataSourceAccuracyLabels(rows, enabled) {
+  const { isVip } = useMembership();
   const [labelsByCode, setLabelsByCode] = useState({});
   const cacheRef = useRef(new Map());
   const todayStr = useMemo(() => getTodayStr(), []);
@@ -80,7 +82,7 @@ export function useDataSourceAccuracyLabels(rows, enabled) {
   }, [rows]);
 
   useEffect(() => {
-    if (!enabled || !isArray(rows) || rows.length === 0) {
+    if (!enabled || !isVip || !isArray(rows) || rows.length === 0) {
       setLabelsByCode({});
       return;
     }
@@ -137,7 +139,7 @@ export function useDataSourceAccuracyLabels(rows, enabled) {
     return () => {
       cancelled = true;
     };
-  }, [enabled, rows, rowsKey, todayStr]);
+  }, [enabled, isVip, rows, rowsKey, todayStr]);
 
   return labelsByCode;
 }
