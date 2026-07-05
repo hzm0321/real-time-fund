@@ -301,7 +301,9 @@ function ModalsLayerContent({ callbacksRef }) {
 
       {/* ===== Drawer: 使用教程 ===== */}
       <AnimatePresence>
-        {tutorialDrawerOpen && <TutorialDrawer open onOpenChange={setTutorialDrawerOpen} />}
+        {tutorialDrawerOpen && (
+          <TutorialDrawer open onOpenChange={setTutorialDrawerOpen} theme={cb.current?.theme || 'dark'} />
+        )}
       </AnimatePresence>
 
       {/* ===== Modal: 更新日志 ===== */}

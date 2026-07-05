@@ -4410,6 +4410,7 @@ export default function HomePage() {
     user,
     portfolioDailySeries,
     currentTab,
+    theme,
     // Settings
     tempSeconds,
     setTempSeconds,
@@ -4644,7 +4645,7 @@ export default function HomePage() {
                   if (isMobile) {
                     setTutorialDrawerOpen(true);
                   } else {
-                    window.open('https://www.yuque.com/u267605/ookgim/im06q8tembbld6im?singleDoc', '_blank');
+                    window.open(`https://fund.cc.cd/home/docs/intro?theme=${theme || 'dark'}`, '_blank');
                   }
                 }}
                 onUpdateLog={() => setUpdateLogOpen(true)}
@@ -5356,7 +5357,7 @@ export default function HomePage() {
             if (isMobile) {
               setTutorialDrawerOpen(true);
             } else {
-              window.open('https://www.yuque.com/u267605/ookgim/im06q8tembbld6im?singleDoc', '_blank');
+              window.open(`https://fund.cc.cd/home/docs/intro?theme=${theme || 'dark'}`, '_blank');
             }
           }}
           onUpdateLog={() => setUpdateLogOpen(true)}

@@ -2,7 +2,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@
 import { CloseIcon } from './Icons';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
-export default function TutorialDrawer({ open, onOpenChange }) {
+export default function TutorialDrawer({ open, onOpenChange, theme = 'dark' }) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="glass" style={{ height: '95vh' }}>
@@ -19,7 +19,7 @@ export default function TutorialDrawer({ open, onOpenChange }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <iframe
-                src="https://www.yuque.com/u267605/ookgim/im06q8tembbld6im?singleDoc"
+                src={`https://fund.cc.cd/home/docs/intro?theme=${theme || 'dark'}`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 frameBorder={0}
                 allowFullScreen
