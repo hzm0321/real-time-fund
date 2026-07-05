@@ -6,7 +6,8 @@ import dayjs from 'dayjs';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import ConfirmModal from './ConfirmModal';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Crown } from 'lucide-react';
+import { useMembership } from '@/app/hooks/useMembership';
 import { CalendarIcon, LoginIcon, LogoutIcon, SettingsIcon, UserIcon, ListIcon } from './Icons';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
@@ -29,6 +30,7 @@ export default function UserMenu({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const userMenuRef = useRef(null);
+  const { isVip, isPermanent, expireAt } = useMembership();
 
   useEffect(() => {
     onLogoutConfirmOpenChange?.(logoutConfirmOpen);
@@ -56,12 +58,12 @@ export default function UserMenu({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className={`icon-button user-menu-trigger ${user ? 'logged-in' : ''}`}
+              className={`icon-button user-menu-trigger ${user ? 'logged-in' : ''} ${isVip ? 'pro-vip' : ''}`}
               aria-label={user ? '用户菜单' : '登录'}
               onClick={() => setUserMenuOpen(!userMenuOpen)}
             >
               {user ? (
-                <div className="user-avatar-small">
+                <div className={`user-avatar-small ${isVip ? 'pro-vip' : ''}`}>
                   {userAvatar ? (
                     <Image
                       src={userAvatar}
@@ -97,24 +99,43 @@ export default function UserMenu({
             >
               {user ? (
                 <>
-                  <div className="user-menu-header">
-                    <div className="user-avatar-large">
-                      {userAvatar ? (
-                        <Image
-                          src={userAvatar}
-                          alt="用户头像"
-                          width={40}
-                          height={40}
-                          unoptimized
-                          style={{ borderRadius: '50%' }}
-                        />
-                      ) : (
-                        user.email?.charAt(0).toUpperCase() || 'U'
+                  <div className={`user-menu-header ${isVip ? 'pro-vip' : ''}`} style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0, paddingBottom: 5 }}>
+                      <div
+                        className={`user-avatar-large ${isVip ? 'pro-avatar-ring' : ''}`}
+                        style={{ position: 'relative' }}
+                      >
+                        {userAvatar ? (
+                          <Image
+                            src={userAvatar}
+                            alt="用户头像"
+                            width={40}
+                            height={40}
+                            unoptimized
+                            style={{ borderRadius: '50%' }}
+                          />
+                        ) : (
+                          user.email?.charAt(0).toUpperCase() || 'U'
+                        )}
+                      </div>
+                      {isVip && (
+                        <div className="pro-crown-badge" style={{ height: 16, padding: '0 6px', fontSize: 9, gap: 2 }}>
+                          <Crown size={9} fill="#451a03" color="#451a03" />
+                          <span>PRO</span>
+                        </div>
                       )}
                     </div>
                     <div className="user-info">
                       <span className="user-email">{user.email}</span>
-                      <span className="user-status">已登录</span>
+                      {isVip ? (
+                        <div className="pro-status-highlight" style={{ fontSize: 11, marginTop: 2 }}>
+                          <span>
+                            {isPermanent ? '终身有效' : `${expireAt ? dayjs(expireAt).format('YYYY-MM-DD') : ''}到期`}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="user-status">已登录</span>
+                      )}
                       {lastSyncTime && (
                         <span className="muted" style={{ fontSize: '10px', marginTop: 2 }}>
                           同步于 {dayjs(lastSyncTime).format('MM-DD HH:mm')}

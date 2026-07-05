@@ -710,13 +710,13 @@ body::before {
   left: 16px;
   right: 16px;
   z-index: 50;
-  padding: 12px 16px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   /* PC 端固定高度，避免聚焦搜索时展开动画导致导航栏高度跳动 */
-  min-height: 68px;
+  min-height: 60px;
   box-sizing: border-box;
 }
 
@@ -5294,4 +5294,128 @@ html::-webkit-scrollbar-thumb:active,
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2)) !important;
     backdrop-filter: blur(2px) !important;
   }
+}
+
+/* --- PRO 会员专享个人信息卡片与用户菜单高奢样式 (ui-ux-pro-max: Liquid Glass + Gold Accent) --- */
+.mine-profile-card.pro-vip {
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(0, 0, 0, 0) 65%) !important;
+  box-shadow: none !important;
+}
+
+.user-menu-header.pro-vip {
+  position: relative;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(0, 0, 0, 0) 65%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  margin-bottom: 4px;
+  padding: 12px;
+  box-shadow: none !important;
+}
+
+.pro-avatar-ring {
+  position: relative;
+  border: 2px solid transparent !important;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(135deg, #fffbeb 0%, #fde68a 25%, #f59e0b 50%, #d97706 75%, #92400e 100%) border-box !important;
+  box-shadow: none !important;
+}
+
+.pro-crown-badge {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #fffbeb 0%, #fde68a 30%, #f59e0b 70%, #d97706 100%);
+  color: #451a03;
+  border-radius: 9999px;
+  height: 18px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1.5px solid var(--card);
+  box-shadow: none !important;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.pro-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.28));
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pro-pill-badge:hover {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.35));
+  box-shadow: none !important;
+}
+
+.pro-status-highlight {
+  color: #f59e0b !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- PRO 会员导航菜单触发按钮高奢样式 (ui-ux-pro-max: Fintech Premium Gold VIP Trigger) --- */
+.user-menu-trigger.pro-vip {
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(15, 23, 42, 0.75) 100%) !important;
+  box-shadow: none !important;
+}
+
+.user-menu-trigger.pro-vip:hover {
+  border-color: rgba(245, 158, 11, 0.8) !important;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
+}
+
+[data-theme='light'] .user-menu-trigger.pro-vip {
+  border: 1px solid rgba(217, 119, 6, 0.45) !important;
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.85) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] .user-menu-trigger.pro-vip:hover {
+  border-color: rgba(217, 119, 6, 0.8) !important;
+  background: linear-gradient(135deg, rgba(253, 230, 138, 0.95) 0%, rgba(255, 255, 255, 1) 100%) !important;
+  transform: translateY(-1px) !important;
+}
+
+.user-avatar-small.pro-vip {
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #fffbeb 0%, #fde68a 25%, #f59e0b 50%, #d97706 75%, #92400e 100%) !important;
+  color: #451a03 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+[data-theme='light'] .user-avatar-small.pro-vip {
+  border: 1px solid rgba(146, 64, 14, 0.3) !important;
 }

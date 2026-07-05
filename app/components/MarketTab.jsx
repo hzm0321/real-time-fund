@@ -748,9 +748,9 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                               setTimeout(() => {
                                 const el = document.getElementById('market-ranking-section');
                                 if (el) {
-                                  // 动态获取固定导航栏的高度，如果找不到则降级使用默认值 68px
+                                  // 动态获取固定导航栏的高度，如果找不到则降级使用默认值 60px
                                   const navbar = document.querySelector('.navbar');
-                                  const navHeight = navbar ? navbar.getBoundingClientRect().height : 68;
+                                  const navHeight = navbar ? navbar.getBoundingClientRect().height : 60;
 
                                   // 动态获取大盘指数组件的高度
                                   const indexAccordion = document.querySelector('.market-index-accordion-root');

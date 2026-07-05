@@ -1,7 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { ChevronRight, QrCode } from 'lucide-react';
+import { ChevronRight, QrCode, Crown } from 'lucide-react';
+import dayjs from 'dayjs';
+import { useMembership } from '../hooks/useMembership';
 import { LoginIcon } from './Icons';
 
 export default function MineTab({
@@ -17,35 +19,61 @@ export default function MineTab({
   onSponsorSupport,
   onOpenWeChat
 }) {
+  const { isVip, isPermanent, expireAt } = useMembership();
+
   return (
     <div className="mine-tab" style={{ display: visible ? undefined : 'none' }} aria-hidden={!visible || undefined}>
-      <section className="mine-profile-card glass" aria-label="个人信息" style={{ position: 'relative' }}>
+      <section
+        className={`mine-profile-card glass ${user && isVip ? 'pro-vip' : ''}`}
+        aria-label="个人信息"
+        style={{ position: 'relative' }}
+      >
         <div className="mine-profile-row">
-          <div className="mine-profile-avatar">
-            {user ? (
-              userAvatar ? (
-                <Image
-                  src={userAvatar}
-                  alt="用户头像"
-                  width={56}
-                  height={56}
-                  unoptimized
-                  style={{ borderRadius: '50%', objectFit: 'cover' }}
-                />
+          <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0, paddingBottom: 6 }}>
+            <div
+              className={`mine-profile-avatar ${user && isVip ? 'pro-avatar-ring' : ''}`}
+              style={{ position: 'relative' }}
+            >
+              {user ? (
+                userAvatar ? (
+                  <Image
+                    src={userAvatar}
+                    alt="用户头像"
+                    width={56}
+                    height={56}
+                    unoptimized
+                    style={{ borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <span className="mine-profile-avatar-fallback">{user.email?.charAt(0).toUpperCase() || 'U'}</span>
+                )
               ) : (
-                <span className="mine-profile-avatar-fallback">{user.email?.charAt(0).toUpperCase() || 'U'}</span>
-              )
-            ) : (
-              <span className="mine-profile-avatar-fallback muted">?</span>
+                <span className="mine-profile-avatar-fallback muted">?</span>
+              )}
+            </div>
+            {user && isVip && (
+              <div className="pro-crown-badge">
+                <Crown size={11} fill="#451a03" color="#451a03" />
+                <span>PRO</span>
+              </div>
             )}
           </div>
           <div className="mine-profile-text">
             {user ? (
               <>
                 <div className="mine-profile-title">{user.email || '已登录用户'}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  已登录 · 可使用云端同步
-                </div>
+                {isVip ? (
+                  <div className="pro-status-highlight" style={{ fontSize: 12, marginTop: 4 }}>
+                    <span>
+                      👑 PRO 尊享会员 ·{' '}
+                      {isPermanent ? '终身有效' : `${expireAt ? dayjs(expireAt).format('YYYY-MM-DD') : ''}到期`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    已登录 · 可使用云端同步
+                  </div>
+                )}
                 {lastSyncDisplay && (
                   <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
                     同步于 {lastSyncDisplay}
