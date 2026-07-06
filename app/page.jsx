@@ -4645,7 +4645,7 @@ export default function HomePage() {
                   if (isMobile) {
                     setTutorialDrawerOpen(true);
                   } else {
-                    window.open(`https://fund.cc.cd/home/docs/intro?theme=${theme || 'dark'}`, '_blank');
+                    window.open(`https://fund.cc.cd/home/docs/help?theme=${theme || 'dark'}`, '_blank');
                   }
                 }}
                 onUpdateLog={() => setUpdateLogOpen(true)}
@@ -5357,7 +5357,7 @@ export default function HomePage() {
             if (isMobile) {
               setTutorialDrawerOpen(true);
             } else {
-              window.open(`https://fund.cc.cd/home/docs/intro?theme=${theme || 'dark'}`, '_blank');
+              window.open(`https://fund.cc.cd/home/docs/help?theme=${theme || 'dark'}`, '_blank');
             }
           }}
           onUpdateLog={() => setUpdateLogOpen(true)}

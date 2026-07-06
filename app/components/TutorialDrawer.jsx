@@ -19,7 +19,7 @@ export default function TutorialDrawer({ open, onOpenChange, theme = 'dark' }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <iframe
-                src={`https://fund.cc.cd/home/docs/intro?theme=${theme || 'dark'}`}
+                src={`https://fund.cc.cd/home/docs/help?theme=${theme || 'dark'}`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 frameBorder={0}
                 allowFullScreen
