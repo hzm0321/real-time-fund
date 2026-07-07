@@ -1,10 +1,24 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { isArray, isPlainObject } from 'lodash';
 import { CloseIcon } from './Icons';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { migrateDcaPlansToScoped } from '../lib/fundHelpers';
 
-export default function SelectHoldingGroupModal({ fund, groups = [], groupHoldings = {}, onClose, onNext }) {
+export default function SelectHoldingGroupModal({
+  fund,
+  groups = [],
+  groupHoldings = {},
+  dcaPlans,
+  pendingTrades,
+  onClose,
+  onNext
+}) {
+  const scopedDca = useMemo(() => {
+    return migrateDcaPlansToScoped(dcaPlans);
+  }, [dcaPlans]);
+
   const availableGroups = useMemo(() => {
     const code = fund?.code;
     if (!code) return [];
@@ -67,6 +81,12 @@ export default function SelectHoldingGroupModal({ fund, groups = [], groupHoldin
             <div className="group-manage-list">
               {availableGroups.map((group) => {
                 const active = selectedGroupId === group.id;
+                const code = fund?.code;
+                const hasDca = isPlainObject(scopedDca) && scopedDca[group.id]?.[code]?.enabled === true;
+                const hasPending =
+                  isArray(pendingTrades) &&
+                  pendingTrades.some((t) => t && t.fundCode === code && t.groupId === group.id);
+
                 return (
                   <div
                     key={group.id}
@@ -77,8 +97,24 @@ export default function SelectHoldingGroupModal({ fund, groups = [], groupHoldin
                     <div className="checkbox" style={{ marginRight: 12 }}>
                       {active && <div className="checked-mark" />}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600 }}>{group.name || '未命名分组'}</div>
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, lineHeight: 1 }}>{group.name || '未命名分组'}</span>
+                      {hasPending && (
+                        <span
+                          className="pending-indicator"
+                          style={{ margin: '0 0 0 6px', transform: 'none', flexShrink: 0 }}
+                        >
+                          待
+                        </span>
+                      )}
+                      {hasDca && (
+                        <span
+                          className="dca-indicator"
+                          style={{ margin: '0 0 0 6px', transform: 'none', flexShrink: 0 }}
+                        >
+                          定
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

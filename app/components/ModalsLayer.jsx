@@ -336,6 +336,8 @@ function ModalsLayerContent({ callbacksRef }) {
             fund={selectHoldingGroupModal.fund}
             groups={cb.current.groups}
             groupHoldings={cb.current.groupHoldings}
+            dcaPlans={cb.current.dcaPlans}
+            pendingTrades={cb.current.pendingTrades}
             onClose={() => setSelectHoldingGroupModal({ open: false, fund: null })}
             onNext={(groupId) => {
               const fund = selectHoldingGroupModal.fund;

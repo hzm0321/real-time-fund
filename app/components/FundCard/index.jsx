@@ -211,6 +211,7 @@ export default function Index({
   onDataSourceClick,
   groupTotalHoldingAmount = 0,
   fallbackFund,
+  hasDca = false,
   hasPending = false,
   onAddFund,
   userId
@@ -483,7 +484,7 @@ export default function Index({
             <span className="muted">
               #{f.code}
               {hasPending && <span className="pending-indicator">待</span>}
-              {dcaPlans?.[f.code]?.enabled === true && <span className="dca-indicator">定</span>}
+              {(hasDca || dcaPlans?.[f.code]?.enabled === true) && <span className="dca-indicator">定</span>}
               {isNavUpdated(f.jzrq, todayStr, f.confirmDays) && <span className="updated-indicator">✓</span>}
               {fundTags.length > 0 && (
                 <span

@@ -219,6 +219,7 @@ const FundListView = React.memo(function FundListView({
                     onFundTagsClick={openFundTagsEdit}
                     fundExtraData={fundExtraDataByCode[f.code]}
                     groupTotalHoldingAmount={groupTotalHoldingAmount}
+                    hasDca={f.hasDca}
                     hasPending={f.hasPending}
                     userId={userId}
                   />

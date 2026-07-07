@@ -678,6 +678,22 @@ export default function HomePage() {
     return isPlainObject(bucket) ? bucket : {};
   }, [dcaPlans, activeGroupId]);
 
+  // 全局及所有分组中存在开启定投计划的基金代码集合（用于关联持仓跨分组展示「定」标签）
+  const allEnabledDcaCodes = useMemo(() => {
+    const set = new Set();
+    const scoped = migrateDcaPlansToScoped(dcaPlans);
+    if (isPlainObject(scoped)) {
+      Object.values(scoped).forEach((bucket) => {
+        if (isPlainObject(bucket)) {
+          Object.entries(bucket).forEach(([code, plan]) => {
+            if (plan?.enabled === true) set.add(code);
+          });
+        }
+      });
+    }
+    return set;
+  }, [dcaPlans]);
+
   const transactionsForTab = useMemo(() => {
     if (!activeGroupId) return transactions;
     const out = {};
@@ -1369,7 +1385,7 @@ export default function HomePage() {
         fundTags,
         isHoldingLinked: !!isHoldingLinked,
         isUpdated: isNavUpdated(f.jzrq, todayStr, f.confirmDays),
-        hasDca: dcaPlansForTab[f.code]?.enabled === true,
+        hasDca: isHoldingLinked ? allEnabledDcaCodes.has(f.code) : dcaPlansForTab[f.code]?.enabled === true,
         hasPending: pendingCodesForTab.has(f.code),
         latestNav,
         latestNavDate: yesterdayDate,
@@ -1419,6 +1435,7 @@ export default function HomePage() {
     todayStr,
     getHoldingProfitForTab,
     dcaPlansForTab,
+    allEnabledDcaCodes,
     pendingCodesForTab,
     latestDailyByCode,
     currentTab,
@@ -4328,6 +4345,11 @@ export default function HomePage() {
         onFundTagsClick: openFundTagsEdit,
         fundExtraData: fundExtraDataByCode[fund.code] || fund.fundExtraData,
         groupTotalHoldingAmount,
+        hasDca: row
+          ? row.hasDca
+          : !!row?.isHoldingLinked
+            ? allEnabledDcaCodes.has(fund.code)
+            : dcaPlansForTab[fund.code]?.enabled === true,
         hasPending: pendingCodesForTab.has(fund.code),
         userId: user?.id
       };
@@ -4337,6 +4359,7 @@ export default function HomePage() {
       currentTab,
       favorites,
       dcaPlansForTab,
+      allEnabledDcaCodes,
       holdingsForTabWithLinked,
       percentModes,
       todayPercentModes,
