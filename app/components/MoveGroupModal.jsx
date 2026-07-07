@@ -11,8 +11,9 @@ import { AlertTriangleIcon } from './Icons';
  * 批量迁移分组弹框
  *
  * 规则：
- * - 当前为 全部/自选：只能迁移到其它自定义分组
- * - 当前为 自定义分组：可迁移到其它自定义分组或「全部」
+ * - 当前为 全部：只能迁移到自选或其它自定义分组
+ * - 当前为 自选：可迁移到「全部」或其它自定义分组
+ * - 当前为 自定义分组：可迁移到其它自定义分组、自选或「全部」
  * - 若目标分组已存在对应基金持仓数据，则二次确认（覆盖目标分组持仓数据）
  */
 export default function MoveGroupModal({
@@ -34,7 +35,7 @@ export default function MoveGroupModal({
 
   const allowedTargets = useMemo(() => {
     const list = (groups || []).filter((g) => g?.id && g.id !== fromTab);
-    if (isFromCustomGroup) {
+    if (isFromCustomGroup || fromTab === 'fav') {
       return [{ id: 'all', name: '全部' }, ...list];
     }
     return list;

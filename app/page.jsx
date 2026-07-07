@@ -3071,10 +3071,11 @@ export default function HomePage() {
 
     const isCustomTab = (tab) => tab && tab !== 'all' && tab !== 'fav' && groups.some((g) => g?.id === tab);
     const fromGid = isCustomTab(fromTab) ? fromTab : null;
-    const toGid = targetId && targetId !== 'all' ? targetId : null;
+    const toGid = targetId && targetId !== 'all' && targetId !== 'fav' ? targetId : null;
 
-    if (targetId === 'all') {
-      if (!fromGid) return { conflicts: [] };
+    if (targetId === 'all' || targetId === 'fav') {
+      if (targetId === 'all' && !fromGid && fromTab !== 'fav') return { conflicts: [] };
+      if (targetId === 'fav' && !fromGid && fromTab !== 'all') return { conflicts: [] };
     } else {
       if (!toGid || !groups.some((g) => g?.id === toGid)) return { conflicts: [] };
       if (toGid === fromGid) return { conflicts: [] };
@@ -3244,6 +3245,28 @@ export default function HomePage() {
       const next = { ...base, [fromKey]: fromBucket, [toKey]: toBucket };
       return next;
     });
+
+    // 7) favorites：维护自选星标状态
+    if (targetId === 'fav' || fromTab === 'fav' || toGid) {
+      setFavorites((prev) => {
+        const next = new Set(prev || []);
+        let changed = false;
+        for (const code of list) {
+          if (targetId === 'fav') {
+            if (!next.has(code)) {
+              next.add(code);
+              changed = true;
+            }
+          } else if (fromTab === 'fav' || toGid) {
+            if (next.has(code)) {
+              next.delete(code);
+              changed = true;
+            }
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
 
     // 迁移成功后切换到目标分组
     setCurrentTab(targetId === 'all' ? 'all' : targetId);
