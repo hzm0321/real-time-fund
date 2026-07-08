@@ -218,13 +218,11 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   );
 
   const handleConfirm = () => {
-    if (!isManualDisabled) {
-      if (sourceId === '4' && !isVip) {
-        sonnerToast.warning('数据源 4 为 PRO 会员专享功能，请升级会员后解锁', { id: 'pro-source-4-toast' });
-        return;
-      }
-      onSelect?.(parseInt(sourceId, 10), autoSource);
+    if (sourceId === '4' && !isVip) {
+      sonnerToast.warning('数据源 4 为 PRO 会员专享功能，请升级会员后解锁', { id: 'pro-source-4-toast' });
+      return;
     }
+    onSelect?.(parseInt(sourceId, 10), autoSource);
     onClose();
   };
 
