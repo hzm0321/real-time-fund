@@ -5,6 +5,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 console.info('server started');
 
 const AINX_API_KEY = Deno.env.get('AINX_API_KEY');
+const OCR_SPACE_API_KEY = 'K89995261788957';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -17,6 +18,48 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
+
+// ✅ 调用 ocr.space 进行云端识别
+async function recognizeImageWithOcrSpace(base64Image: string): Promise<string> {
+  const formData = new FormData();
+  formData.append('Base64Image', base64Image);
+  formData.append('language', 'chs');
+  formData.append('OCREngine', '2');
+  formData.append('scale', 'true');
+  formData.append('detectOrientation', 'true');
+  formData.append('isOverlayRequired', 'false');
+
+  const resp = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    headers: {
+      apikey: OCR_SPACE_API_KEY
+    },
+    body: formData
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`ocr.space 接口请求失败 (${resp.status}): ${errText}`);
+  }
+
+  const result = await resp.json();
+  if (result?.IsErroredOnProcessing || result?.OCRExitCode !== 1) {
+    const errDetails = result?.ErrorMessage?.[0] || result?.ErrorDetails || 'OCR 处理异常';
+    throw new Error(`OCR_SPACE_ERROR: ${errDetails}`);
+  }
+
+  const parsedResults = result?.ParsedResults;
+  if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+    throw new Error('OCR_SPACE_ERROR: 未提取到识别结果');
+  }
+
+  const extractedText = parsedResults
+    .map((r: any) => r?.ParsedText || '')
+    .join('\n')
+    .trim();
+
+  return extractedText;
+}
 
 // ✅ 清洗模型输出（增强版）
 function cleanModelOutput(text: string) {
@@ -207,46 +250,53 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 文本模式：清洗输入文本
+    // 文本模式与图片模式处理：统一转换为文本后调用大模型
     let text = '';
-    if (!isImageMode) {
+    if (isImageMode) {
+      try {
+        console.info('正在调用 ocr.space 进行云端识别...');
+        text = await recognizeImageWithOcrSpace(imageBase64);
+        console.info('ocr.space 识别完成，文字长度:', text.length);
+      } catch (ocrErr: any) {
+        console.error('OCR.space 识别错误:', ocrErr);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: '云端 OCR 识别未提取到有效文字，请更换清晰截图重试',
+            details: ocrErr.message
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else {
       text = rawText
         .replace(/\s+/g, ' ')
         .replace(/[^\S\r\n]+/g, ' ')
         .trim();
-
-      if (!text) {
-        return new Response(JSON.stringify({ success: false, error: '未提供有效文本' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
     }
 
-    // ✅ 4. 构建大模型请求消息
-    let userContent: any;
-    if (isImageMode) {
-      // 图片模式：使用 Vision API 格式
-      userContent = [
-        {
-          type: 'image_url',
-          image_url: { url: imageBase64 }
-        }
-      ];
-    } else {
-      // 文本模式：纯文本
-      userContent = text;
+    if (!text) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: isImageMode ? '云端 OCR 识别未提取到有效文字，请更换清晰截图重试' : '未提供有效文本'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // ✅ 5. 调用 AINX 大模型接口
-    const resp = await fetch('https://api.ainx.cc/v1/chat/completions', {
+    // ✅ 4. 构建大模型请求消息（无论是原始文本还是 OCR 解析结果，均作为纯文本传给大模型）
+    const userContent = text;
+
+    // ✅ 5. 调用 HAND 大模型接口
+    const resp = await fetch('https://handai-code.hand-china.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${AINX_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-5.5', // 指定模型
+        model: 'kimi-k2.6', // 指定模型
         temperature: 0, // 设置为 0 保证 JSON 输出更稳定
         stream: false,
         messages: [

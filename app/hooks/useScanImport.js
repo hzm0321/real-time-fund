@@ -288,26 +288,38 @@ export function useScanImport({
     setScanProgress({ stage: 'ocr', current: 0, total: files.length });
 
     try {
-      // PRO 用户：跳过客户端 OCR，直接压缩图片上传至大模型 Vision API
+      // PRO 用户：前端直接调云端 OCR (ocr.space) 提取文字，再提交大模型解析（彻底避免 150s 超时及传输大图）
       if (isVip) {
         const { compressImageToBase64 } = await import('../lib/imageCompress');
-        const compressedImages = [];
+        const { recognizeWithOcrSpace } = await import('../lib/ocrSpace');
+        const extractedTexts = [];
         for (let i = 0; i < files.length; i++) {
           if (abortScanRef.current) break;
           const f = files[i];
           setScanProgress((prev) => ({ ...prev, current: i + 1 }));
-          const base64 = await compressImageToBase64(f);
-          compressedImages.push(base64);
+          let text = '';
+          try {
+            const base64 = await compressImageToBase64(f);
+            text = await recognizeWithOcrSpace(base64);
+          } catch (e) {
+            // 如果只有一个文件，或是超时异常，直接向上抛出在前端展示具体错误信息
+            if (files.length === 1 || String(e?.message || '').includes('超时')) {
+              throw e;
+            }
+            console.error(`第 ${i + 1} 张图片云端 OCR 识别报错:`, e);
+            text = '';
+          }
+          if (text) extractedTexts.push(text);
         }
 
         if (abortScanRef.current) return;
 
-        setLastOcrTexts(compressedImages);
-        setLastIsImage(true);
+        setLastOcrTexts(extractedTexts);
+        setLastIsImage(false);
 
-        if (compressedImages.length > 0) {
-          setScanProgress({ stage: 'ocr', current: 0, total: compressedImages.length });
-          await processTextsInternal(compressedImages, true);
+        if (extractedTexts.length > 0) {
+          setScanProgress({ stage: 'ocr', current: 0, total: extractedTexts.length });
+          await processTextsInternal(extractedTexts, false);
         } else {
           setScannedFunds([]);
           setSelectedScannedCodes(new Set());
@@ -384,7 +396,7 @@ export function useScanImport({
           showToast(err.message || '今日 OCR 识别次数已达上限', 'error');
         } else {
           console.error('OCR Error:', err);
-          showToast('图片识别失败，请重试或更换更清晰的截图', 'error');
+          showToast(err.message || '图片识别失败，请重试或更换更清晰的截图', 'error');
         }
       }
     } finally {

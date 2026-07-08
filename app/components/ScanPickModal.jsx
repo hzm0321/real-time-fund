@@ -159,7 +159,7 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
               lineHeight: 1.5
             }}
           >
-            ✨ PRO 专享：图片将直接上传至 AI 识别，精度更高、速度更快
+            ✨ PRO 专享：采用云端高精度 OCR + AI 大模型智能提取，精度更高、速度更快
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

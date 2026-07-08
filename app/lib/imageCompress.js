@@ -1,7 +1,7 @@
 /**
  * 客户端图片压缩工具
  * PRO 用户上传基金截图时，自动压缩到指定大小以内
- * 优先输出 WebP 格式（体积更小），浏览器不支持时回退 JPEG
+ * 统一输出 JPEG 格式（兼容 ocr.space 云端识别接口）
  */
 
 const DEFAULT_MAX_SIZE = 1 * 1024 * 1024; // 1MB
@@ -31,30 +31,18 @@ function loadImageFromFile(file) {
 }
 
 /**
- * 将 canvas 导出为 Blob，优先 WebP，回退 JPEG
+ * 将 canvas 导出为 Blob，统一输出 JPEG 格式（兼容 ocr.space）
  * @param {HTMLCanvasElement} canvas
  * @param {number} quality 0~1
  * @returns {Promise<{blob: Blob, mimeType: string}>}
  */
 function canvasToBlob(canvas, quality) {
   return new Promise((resolve) => {
-    // 先尝试 WebP
     canvas.toBlob(
       (blob) => {
-        if (blob && blob.size > 0) {
-          resolve({ blob, mimeType: 'image/webp' });
-        } else {
-          // 浏览器不支持 WebP，回退 JPEG
-          canvas.toBlob(
-            (jpegBlob) => {
-              resolve({ blob: jpegBlob, mimeType: 'image/jpeg' });
-            },
-            'image/jpeg',
-            quality
-          );
-        }
+        resolve({ blob: blob || new Blob([], { type: 'image/jpeg' }), mimeType: 'image/jpeg' });
       },
-      'image/webp',
+      'image/jpeg',
       quality
     );
   });
@@ -98,8 +86,8 @@ function fileToDataURL(file) {
  * @returns {Promise<string>} data:image/xxx;base64,... 格式的 data URL
  */
 export async function compressImageToBase64(file, maxSizeBytes = DEFAULT_MAX_SIZE) {
-  // 如果文件本身 ≤ 限制，直接转 base64 返回
-  if (file.size <= maxSizeBytes) {
+  // 如果文件本身 ≤ 限制且不是 WebP 格式，直接转 base64 返回（兼容 ocr.space）
+  if (file.size <= maxSizeBytes && file.type !== 'image/webp') {
     return fileToDataURL(file);
   }
 
