@@ -2101,6 +2101,7 @@ export default function HomePage() {
     handleFilesUpload,
     handleFilesDrop,
     toggleScannedCode,
+    editScannedFundCode,
     confirmScanImport
   } = useScanImport({
     setCurrentTab,
@@ -4432,6 +4433,7 @@ export default function HomePage() {
     handleRetryOcr: () => handleRetryOcr?.(),
     handleFilesDrop: (e) => handleFilesDrop?.(e),
     toggleScannedCode: (code) => toggleScannedCode?.(code),
+    editScannedFundCode: (oldCode, newCode, newName) => editScannedFundCode?.(oldCode, newCode, newName),
     confirmScanImport: (...args) => confirmScanImport?.(...args),
     // 辅助函数
     getScopedHolding: (code, groupIdOverride) => getScopedHolding?.(code, groupIdOverride),

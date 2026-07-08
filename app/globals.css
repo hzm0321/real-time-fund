@@ -4071,6 +4071,42 @@ html::-webkit-scrollbar-thumb:active,
   color: #b4821e;
 }
 
+/* ===== 扫描导入编辑基金 ===== */
+.scan-edit-panel {
+  padding: 10px 12px;
+}
+
+.scan-edit-input {
+  border-radius: 10px;
+}
+
+.scan-edit-results {
+  border-radius: 8px;
+}
+
+.scan-edit-result-item {
+  border: 1px solid transparent;
+}
+
+.scan-edit-result-item:hover {
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* 亮色主题适配 */
+[data-theme='light'] .scan-edit-panel {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+[data-theme='light'] .scan-edit-input {
+  background: #fff;
+  border-color: var(--border);
+}
+
+[data-theme='light'] .scan-edit-result-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
 .no-results {
   padding: 20px;
   text-align: center;

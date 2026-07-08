@@ -423,6 +423,38 @@ export function useScanImport({
     });
   };
 
+  /**
+   * 替换某条扫描基金的正确代码与名称（保留持有金额/收益数据）
+   * 场景：OCR 识别的持有金额和收益正确，但基金代码识别错误时，
+   * 用户可通过编辑按钮搜索并选择正确的基金。
+   */
+  const editScannedFundCode = (oldCode, newCode, newName) => {
+    if (!oldCode || !newCode) return;
+
+    // 更新 scannedFunds：替换对应项的 code/name，重新评估状态
+    setScannedFunds((prev) =>
+      prev.map((f) => {
+        if (f.code !== oldCode) return f;
+        const alreadyAdded = funds.some((existing) => existing.code === newCode);
+        return {
+          ...f,
+          code: newCode,
+          name: newName || f.name,
+          status: alreadyAdded ? 'added' : 'ok'
+        };
+      })
+    );
+
+    // 更新 selectedScannedCodes：如果旧 code 被选中，则替换为新 code
+    setSelectedScannedCodes((prev) => {
+      if (!prev.has(oldCode)) return prev;
+      const next = new Set(prev);
+      next.delete(oldCode);
+      next.add(newCode);
+      return next;
+    });
+  };
+
   const confirmScanImport = async (
     targetGroupId = 'all',
     expandAfterAdd = true,
@@ -701,6 +733,7 @@ export function useScanImport({
     handleFilesUpload,
     handleFilesDrop,
     toggleScannedCode,
+    editScannedFundCode,
     confirmScanImport
   };
 }

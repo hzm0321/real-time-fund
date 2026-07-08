@@ -897,6 +897,7 @@ function ModalsLayerContent({ callbacksRef }) {
             selectedScannedCodes={selectedScannedCodes}
             onClose={() => setScanConfirmModalOpen(false)}
             onToggle={cb.current.toggleScannedCode}
+            onEditFund={cb.current.editScannedFundCode}
             onConfirm={cb.current.confirmScanImport}
             onRetryOcr={cb.current.handleRetryOcr}
             refreshing={cb.current.refreshing}
