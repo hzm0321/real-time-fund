@@ -12,7 +12,8 @@ const DEFAULT_FREE_STATUS = {
   isPermanent: false,
   daysRemaining: 0,
   expireAt: null,
-  loading: false
+  loading: false,
+  success: true
 };
 
 export async function fetchMembershipStatus(userId) {
@@ -22,7 +23,7 @@ export async function fetchMembershipStatus(userId) {
   try {
     const { data: res, error } = await supabase.rpc('get_my_membership_status');
     if (error || !isObject(res)) {
-      return DEFAULT_FREE_STATUS;
+      return { ...DEFAULT_FREE_STATUS, success: false };
     }
     return {
       isVip: isBoolean(res.is_vip) ? res.is_vip : Boolean(res.is_vip),
@@ -30,10 +31,11 @@ export async function fetchMembershipStatus(userId) {
       isPermanent: isBoolean(res.is_permanent) ? res.is_permanent : Boolean(res.is_permanent),
       daysRemaining: isNumber(res.days_remaining) ? res.days_remaining : Number(res.days_remaining || 0),
       expireAt: isString(res.expire_at) ? res.expire_at : null,
-      loading: false
+      loading: false,
+      success: true
     };
   } catch {
-    return DEFAULT_FREE_STATUS;
+    return { ...DEFAULT_FREE_STATUS, success: false };
   }
 }
 
