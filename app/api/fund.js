@@ -2354,15 +2354,15 @@ export const fetchFundValuationTrend = async (code, range = '3m') => {
   return isArray(data.data) ? data.data : [];
 };
 
-export const parseFundTextWithLLM = async (text) => {
-  if (!text) return null;
+export const parseFundTextWithLLM = async (text, imageBase64 = null) => {
+  if (!text && !imageBase64) return null;
   if (!isSupabaseConfigured) return null;
   if (!supabase?.functions?.invoke) return null;
 
   try {
     const { data, error } = await withRetry(() =>
       supabase.functions.invoke('analyze-fund', {
-        body: { text }
+        body: imageBase64 ? { image: imageBase64 } : { text }
       })
     );
 

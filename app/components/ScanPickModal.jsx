@@ -145,6 +145,23 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
             {isDragging ? '松开即可导入' : '拖拽图片到此处，或点击选择'}
           </div>
         </div>
+        {isVip && (
+          <div
+            className="muted"
+            style={{
+              fontSize: 12,
+              color: '#f59e0b',
+              marginBottom: 12,
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              lineHeight: 1.5
+            }}
+          >
+            ✨ PRO 专享：图片将直接上传至 AI 识别，精度更高、速度更快
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="button secondary" onClick={onClose}>
             取消

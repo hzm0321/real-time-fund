@@ -55,115 +55,11 @@ function extractJSON(text: string) {
   }
 }
 
-Deno.serve(async (req: Request) => {
-  // 处理跨域 OPTIONS 请求
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  try {
-    // ✅ 1. 获取 Authorization header
-    const authHeader = req.headers.get('Authorization');
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: 'Missing Authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // ✅ 2. 创建 Supabase client（带用户 JWT）
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      }
-    });
-
-    // ✅ 3. 校验用户登录状态
-    const {
-      data: { user },
-      error: authError
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.info('当前用户:', user.id);
-
-    // ✅ 3.5 查询用户 PRO 会员状态，确定 OCR 限额
-    let maxDailyOcr = FREE_DAILY_OCR;
-    try {
-      const { data: memStatus } = await supabase.rpc('get_my_membership_status');
-      if (memStatus && memStatus.is_vip) {
-        maxDailyOcr = PRO_DAILY_OCR;
-      }
-    } catch (memErr) {
-      console.warn('查询会员状态失败，默认使用普通额度:', memErr);
-    }
-
-    // ✅ 3.6 每日 OCR 用量限流检查（原子操作）
-    const { data: usageResult, error: usageError } = await supabase.rpc('check_and_increment_ocr_usage', {
-      p_max_limit: maxDailyOcr
-    });
-
-    if (usageError) {
-      console.error('OCR 用量检查失败:', usageError);
-      // 限流检查失败不阻断请求，记录日志后继续
-    } else if (usageResult && !usageResult.allowed) {
-      const currentCount = usageResult.current_count || maxDailyOcr;
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'DAILY_LIMIT_EXCEEDED',
-          message: `每日 OCR 识别次数已达上限（${maxDailyOcr} 次），请明天再试或升级 PRO 会员`,
-          remaining: 0,
-          current_count: currentCount,
-          max_limit: maxDailyOcr
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const body = await req.json().catch(() => ({}));
-    const rawText = body?.text || '';
-
-    // 清洗输入文本
-    const text = rawText
-      .replace(/\s+/g, ' ')
-      .replace(/[^\S\r\n]+/g, ' ')
-      .trim();
-
-    if (!text) {
-      return new Response(JSON.stringify({ success: false, error: '未提供有效文本' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // ✅ 4. 调用 AINX 大模型接口
-    const resp = await fetch('https://api.ainx.cc/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${AINX_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.5', // 指定模型
-        temperature: 0, // 设置为 0 保证 JSON 输出更稳定
-        stream: false,
-        messages: [
-          {
-            role: 'system',
-            content: `你是一个专业的基金持仓OCR解析助手。
+// ✅ System prompt（文本模式和图片模式共用）
+const SYSTEM_PROMPT = `你是一个专业的基金持仓OCR解析助手。
 
 任务目标：
-从提供的OCR识别文本中提取所有基金信息，并尽可能补全基金代码。
+从提供的OCR识别文本或基金持仓截图中提取所有基金信息，并尽可能补全基金代码。
 
 字段定义：
 
@@ -173,7 +69,7 @@ Deno.serve(async (req: Request) => {
    - 不允许截断或简写。
 
 2. fundCode（必填）
-   - 优先从OCR文本中提取6位基金代码。
+   - 优先从OCR文本或图片中提取6位基金代码。
    - 如果OCR文本中未出现基金代码，则根据fundName查询对应的基金代码并补全。
    - 若存在多个可能匹配结果，选择与基金名称最完全一致的基金。
    - 若仍无法确定，则返回空字符串 ""。
@@ -217,11 +113,150 @@ Deno.serve(async (req: Request) => {
     "holdAmounts": "",
     "holdGains": ""
   }
-]`
+]`;
+
+Deno.serve(async (req: Request) => {
+  // 处理跨域 OPTIONS 请求
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    // ✅ 1. 获取 Authorization header
+    const authHeader = req.headers.get('Authorization');
+
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing Authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // ✅ 2. 创建 Supabase client（带用户 JWT）
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
+
+    // ✅ 3. 校验用户登录状态
+    const {
+      data: { user },
+      error: authError
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.info('当前用户:', user.id);
+
+    // ✅ 3.5 查询用户 PRO 会员状态，确定 OCR 限额
+    let maxDailyOcr = FREE_DAILY_OCR;
+    let isVip = false;
+    try {
+      const { data: memStatus } = await supabase.rpc('get_my_membership_status');
+      if (memStatus && memStatus.is_vip) {
+        maxDailyOcr = PRO_DAILY_OCR;
+        isVip = true;
+      }
+    } catch (memErr) {
+      console.warn('查询会员状态失败，默认使用普通额度:', memErr);
+    }
+
+    // ✅ 3.6 每日 OCR 用量限流检查（原子操作）
+    const { data: usageResult, error: usageError } = await supabase.rpc('check_and_increment_ocr_usage', {
+      p_max_limit: maxDailyOcr
+    });
+
+    if (usageError) {
+      console.error('OCR 用量检查失败:', usageError);
+      // 限流检查失败不阻断请求，记录日志后继续
+    } else if (usageResult && !usageResult.allowed) {
+      const currentCount = usageResult.current_count || maxDailyOcr;
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'DAILY_LIMIT_EXCEEDED',
+          message: `每日 OCR 识别次数已达上限（${maxDailyOcr} 次），请明天再试或升级 PRO 会员`,
+          remaining: 0,
+          current_count: currentCount,
+          max_limit: maxDailyOcr
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const imageBase64 = body?.image || '';
+    const rawText = body?.text || '';
+
+    // ✅ 判断请求模式：图片模式 vs 文本模式
+    const isImageMode = !!imageBase64;
+
+    // 图片模式仅限 PRO 会员
+    if (isImageMode && !isVip) {
+      return new Response(JSON.stringify({ success: false, error: '图片直传功能仅限 PRO 会员使用' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // 文本模式：清洗输入文本
+    let text = '';
+    if (!isImageMode) {
+      text = rawText
+        .replace(/\s+/g, ' ')
+        .replace(/[^\S\r\n]+/g, ' ')
+        .trim();
+
+      if (!text) {
+        return new Response(JSON.stringify({ success: false, error: '未提供有效文本' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ✅ 4. 构建大模型请求消息
+    let userContent: any;
+    if (isImageMode) {
+      // 图片模式：使用 Vision API 格式
+      userContent = [
+        {
+          type: 'image_url',
+          image_url: { url: imageBase64 }
+        }
+      ];
+    } else {
+      // 文本模式：纯文本
+      userContent = text;
+    }
+
+    // ✅ 5. 调用 AINX 大模型接口
+    const resp = await fetch('https://api.ainx.cc/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${AINX_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-5.5', // 指定模型
+        temperature: 0, // 设置为 0 保证 JSON 输出更稳定
+        stream: false,
+        messages: [
+          {
+            role: 'system',
+            content: SYSTEM_PROMPT
           },
           {
             role: 'user',
-            content: text
+            content: userContent
           }
         ]
       })
@@ -238,7 +273,7 @@ Deno.serve(async (req: Request) => {
     // 提取模型返回的内容
     const rawContent = result?.choices?.[0]?.message?.content || '';
 
-    // ✅ 5. 解析并清洗 AI 返回的数据
+    // ✅ 6. 解析并清洗 AI 返回的数据
     const cleaned = cleanModelOutput(rawContent);
     const parsed = extractJSON(cleaned);
 
@@ -272,7 +307,7 @@ Deno.serve(async (req: Request) => {
       holdGains: String(item?.holdGains || '')
     }));
 
-    // ✅ 6. 成功响应（附带剩余用量信息）
+    // ✅ 7. 成功响应（附带剩余用量信息）
     const remaining = usageResult ? Math.max(0, maxDailyOcr - (usageResult.current_count || 0)) : null;
     return new Response(
       JSON.stringify({

@@ -4,6 +4,7 @@ import { toast as sonnerToast } from 'sonner';
 import { parseFundTextWithLLM, fetchFundData, searchFunds, fetchFundsBestSources } from '../api/fund';
 import { recordValuation } from '../lib/valuationTimeseries';
 import { useFundFuzzyMatcher } from './useFundFuzzyMatcher';
+import { useMembership } from './useMembership';
 import { useStorageStore, useUserStore, useModalStore } from '../stores';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -27,6 +28,7 @@ export function useScanImport({
 }) {
   const setSuccessModal = (state) => useModalStore.setState({ successModal: state });
   const user = useUserStore((s) => s.user);
+  const { isVip } = useMembership();
   const funds = useStorageStore((s) => s.funds);
   const favorites = useStorageStore((s) => s.favorites);
   const groups = useStorageStore((s) => s.groups);
@@ -76,6 +78,7 @@ export function useScanImport({
   const setIsOcrScan = (v) =>
     useModalStore.setState({ isOcrScan: isFunction(v) ? v(useModalStore.getState().isOcrScan) : v });
   const [lastOcrTexts, setLastOcrTexts] = useState([]);
+  const [lastIsImage, setLastIsImage] = useState(false);
 
   const abortScanRef = useRef(false);
   const fileInputRef = useRef(null);
@@ -97,7 +100,7 @@ export function useScanImport({
     }
   };
 
-  const processTextsInternal = async (texts) => {
+  const processTextsInternal = async (texts, isImage = false) => {
     const searchFundsWithTimeout = async (val, ms) => {
       let timer = null;
       const timeout = new Promise((resolve) => {
@@ -125,7 +128,7 @@ export function useScanImport({
 
       let fundsResString;
       try {
-        fundsResString = await parseFundTextWithLLM(text);
+        fundsResString = isImage ? await parseFundTextWithLLM(null, text) : await parseFundTextWithLLM(text);
       } catch (e) {
         // 限流错误直接向上传播，中止整个扫描流程
         if (e?.code === 'DAILY_LIMIT_EXCEEDED') throw e;
@@ -249,7 +252,7 @@ export function useScanImport({
     setScanProgress({ stage: 'ocr', current: 0, total: lastOcrTexts.length });
 
     try {
-      await processTextsInternal(lastOcrTexts);
+      await processTextsInternal(lastOcrTexts, lastIsImage);
     } catch (err) {
       if (!abortScanRef.current) {
         if (err?.code === 'DAILY_LIMIT_EXCEEDED') {
@@ -285,6 +288,36 @@ export function useScanImport({
     setScanProgress({ stage: 'ocr', current: 0, total: files.length });
 
     try {
+      // PRO 用户：跳过客户端 OCR，直接压缩图片上传至大模型 Vision API
+      if (isVip) {
+        const { compressImageToBase64 } = await import('../lib/imageCompress');
+        const compressedImages = [];
+        for (let i = 0; i < files.length; i++) {
+          if (abortScanRef.current) break;
+          const f = files[i];
+          setScanProgress((prev) => ({ ...prev, current: i + 1 }));
+          const base64 = await compressImageToBase64(f);
+          compressedImages.push(base64);
+        }
+
+        if (abortScanRef.current) return;
+
+        setLastOcrTexts(compressedImages);
+        setLastIsImage(true);
+
+        if (compressedImages.length > 0) {
+          setScanProgress({ stage: 'ocr', current: 0, total: compressedImages.length });
+          await processTextsInternal(compressedImages, true);
+        } else {
+          setScannedFunds([]);
+          setSelectedScannedCodes(new Set());
+          setIsOcrScan(true);
+          setScanConfirmModalOpen(true);
+        }
+        return;
+      }
+
+      // 普通用户：走原有 Tesseract OCR 流程
       let worker = ocrWorkerRef.current;
       if (!worker) {
         const { getOcrWorker } = await import('../lib/ocr');
@@ -334,6 +367,7 @@ export function useScanImport({
       if (abortScanRef.current) return;
 
       setLastOcrTexts(extractedTexts);
+      setLastIsImage(false);
 
       if (extractedTexts.length > 0) {
         setScanProgress({ stage: 'ocr', current: 0, total: extractedTexts.length });
