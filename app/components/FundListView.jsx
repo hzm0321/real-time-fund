@@ -2,14 +2,17 @@
 import { isArray } from 'lodash';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { AnimatePresence, motion } from 'framer-motion';
-import PcFundTable from './PcFundTable';
-import MobileFundTable from './MobileFundTable';
 import FundCard from './FundCard';
+import { useIsMobile } from '../hooks/useIsMobile';
+
+// 动态 import 实现代码分割：移动端不加载 PC 表格代码，反之亦然
+const PcFundTable = dynamic(() => import('./PcFundTable'), { ssr: false });
+const MobileFundTable = dynamic(() => import('./MobileFundTable'), { ssr: false });
 
 const FundListView = React.memo(function FundListView({
   viewMode,
-  isMobile,
   isGroupSummarySticky,
   navbarHeight,
   filterBarHeight,
@@ -72,10 +75,12 @@ const FundListView = React.memo(function FundListView({
   fundTagListsByCode,
   groupTotalHoldingAmount
 }) {
+  const isMobile = useIsMobile();
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={viewMode}
+        key={viewMode + (isMobile ? '-mobile' : '-pc')}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}

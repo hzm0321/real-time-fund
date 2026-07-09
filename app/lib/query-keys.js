@@ -43,6 +43,9 @@ export const bestValuationSource = (code, jzrq, actualZzl) => [
   actualZzl
 ];
 
+/** 批量最准数据源查询的 cache key（以排序后的 code:jzrq:actualZzl 拼接） */
+export const bestValuationSourceBatch = (itemsKey) => ['bestValuationSourceBatch', itemsKey];
+
 /** @param {string} fundCode */
 export const fundBestSource = (fundCode) => ['fundBestSource', String(fundCode).trim()];
 

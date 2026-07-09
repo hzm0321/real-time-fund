@@ -45,8 +45,6 @@ import {
   fetchFundPeriodReturns,
   searchFunds
 } from './api/fund';
-import PcFundTable from './components/PcFundTable';
-import MobileFundTable from './components/MobileFundTable';
 import MobileBottomNav from './components/MobileBottomNav';
 import MineTab from './components/MineTab';
 import MarketTab from './components/MarketTab';
@@ -5171,7 +5169,6 @@ export default function HomePage() {
                         ) : (
                           <FundListView
                             viewMode={viewMode}
-                            isMobile={isMobile}
                             isGroupSummarySticky={isGroupSummarySticky}
                             navbarHeight={navbarHeight}
                             filterBarHeight={filterBarHeight}

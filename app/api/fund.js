@@ -1094,6 +1094,129 @@ export async function fetchBestValuationSource(code, jzrq, actualZzl) {
   }
 }
 
+let activeBatchPromise = null;
+let activeBatchSignature = null;
+
+/**
+ * 批量调用 Edge Function 检测基金最准数据源。
+ *
+ * 带有请求去重机制（Deduplication）：如果在相同参数的请求尚未返回时又发起了相同的请求，
+ * 将直接复用正在进行中的 Promise，避免 PC 和移动端表格同时渲染时发出重复网络请求。
+ *
+ * 同时会将每个基金的独立结果写入 TanStack Query 缓存（key = qk.bestValuationSource），
+ * 使得后续单次 fetchBestValuationSource 调用可直接命中缓存。
+ *
+ * @param {Array<{ code: string, jzrq: string, actualZzl: number }>} items - 基金查询列表
+ * @returns {Promise<Record<string, { bestSource: number|null, isYesterdayAccuracy: boolean, isTodayAccuracy: boolean, diffs: Object<string,number>, diff?: number }|null>>}
+ *   以基金代码为 key 的结果 map，无数据的基金值为 null
+ */
+export async function fetchBestValuationSourceBatch(items) {
+  if (!isSupabaseConfigured || !supabase?.functions?.invoke) return {};
+  if (!isArray(items) || items.length === 0) return {};
+
+  const qc = getQueryClient();
+
+  // 1. 规范化 + 去重 + 过滤缓存命中
+  const normalized = [];
+  const cachedResults = {};
+  const seenCodes = new Set();
+
+  for (const item of items) {
+    const code = item?.code != null ? String(item.code).trim() : '';
+    const jzrq = isString(item?.jzrq) ? item.jzrq.trim() : '';
+    const actualZzl = isNumber(item?.actualZzl) && Number.isFinite(item.actualZzl) ? item.actualZzl : null;
+
+    if (!code || !jzrq || actualZzl == null) continue;
+    if (seenCodes.has(code)) continue;
+    seenCodes.add(code);
+
+    // 优先从单条缓存中读取
+    const cacheKey = qk.bestValuationSource(code, jzrq, actualZzl);
+    const cached = qc.getQueryData(cacheKey);
+    if (cached !== undefined) {
+      cachedResults[code] = cached;
+    } else {
+      normalized.push({ code, jzrq, actualZzl });
+    }
+  }
+
+  if (normalized.length === 0) return cachedResults;
+
+  // 生成当前这批请求的唯一签名
+  const signature = normalized
+    .map((item) => `${item.code}_${item.jzrq}_${item.actualZzl}`)
+    .sort()
+    .join('|');
+
+  // 并发请求去重：如果已有完全相同的请求在进行中，则复用其 Promise
+  if (activeBatchPromise && activeBatchSignature === signature) {
+    try {
+      const batchResults = await activeBatchPromise;
+      const allResults = { ...cachedResults };
+      for (const batch of batchResults) {
+        Object.assign(allResults, batch);
+      }
+      return allResults;
+    } catch (e) {
+      // 若复用失败，则忽略并继续发起新请求
+    }
+  }
+
+  // 2. 调用批量 Edge Function（每批最多 100 条）
+  const BATCH_SIZE = 100;
+  const batches = [];
+  for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
+    batches.push(normalized.slice(i, i + BATCH_SIZE));
+  }
+
+  const promise = Promise.all(
+    batches.map(async (batch) => {
+      try {
+        const { data, error } = await withRetry(() =>
+          supabase.functions.invoke('best-valuation-source-batch', {
+            body: { items: batch }
+          })
+        );
+
+        if (error || !data?.success) return {};
+
+        const res = data.data || {};
+        // 3. 将每个基金的结果写入单条缓存，供后续单次调用复用
+        for (const item of batch) {
+          const singleResult = res[item.code] ?? null;
+          qc.setQueryData(qk.bestValuationSource(item.code, item.jzrq, item.actualZzl), singleResult, {
+            staleTime: 60 * 60 * 1000
+          });
+        }
+        return res;
+      } catch {
+        return {};
+      }
+    })
+  );
+
+  activeBatchSignature = signature;
+  activeBatchPromise = promise;
+
+  let batchResults;
+  try {
+    batchResults = await promise;
+  } finally {
+    if (activeBatchSignature === signature) {
+      activeBatchPromise = null;
+      activeBatchSignature = null;
+    }
+  }
+
+  // 4. 合并所有结果
+  const allResults = { ...cachedResults };
+  for (const batch of batchResults) {
+    Object.assign(allResults, batch);
+  }
+
+  return allResults;
+}
+
 /**
  * 调用 Supabase RPC 获取基金最佳数据源（从 fund_pingzhongdata 表中预计算的 source 字段）
  * @param {string} fundCode - 基金编码
