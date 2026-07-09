@@ -109,7 +109,7 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
     queryFn: async () => {
       try {
         if (!supabase) return [];
-        const { data, error } = await supabase.from('fund_topic').select('*');
+        const { data, error } = await supabase.rpc('get_hot_sectors');
         if (error) throw error;
         return data || [];
       } catch (e) {
