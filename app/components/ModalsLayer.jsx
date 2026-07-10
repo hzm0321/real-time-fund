@@ -41,6 +41,7 @@ import SortSettingModal from './SortSettingModal';
 import AddFundToGroupModal from './AddFundToGroupModal';
 import FundDataSourceSelector from './FundDataSourceSelector';
 import FundTagsEditDialog from './FundTagsEditDialog';
+import SectorSelectModal from './SectorSelectModal';
 import MyEarningsCalendarPage from './MyEarningsCalendarPage';
 import { DEFAULT_FUND_TAG_THEME, DCA_SCOPE_GLOBAL } from '@/app/constants';
 import { migrateDcaPlansToScoped } from '../lib/fundHelpers';
@@ -111,6 +112,7 @@ function ModalsLayerContent({ callbacksRef }) {
   const dcaModal = useModalStore((s) => s.dcaModal);
   const clearConfirm = useModalStore((s) => s.clearConfirm);
   const holdingMigrateDialog = useModalStore((s) => s.holdingMigrateDialog);
+  const sectorSelectDialog = useModalStore((s) => s.sectorSelectDialog);
 
   // 确认弹框
   const fundDeleteConfirm = useModalStore((s) => s.fundDeleteConfirm);
@@ -180,6 +182,7 @@ function ModalsLayerContent({ callbacksRef }) {
   const setScanModalOpen = (v) => _ms({ scanModalOpen: isFunction(v) ? v(_gs().scanModalOpen) : v });
   const setScanConfirmModalOpen = (v) =>
     _ms({ scanConfirmModalOpen: isFunction(v) ? v(_gs().scanConfirmModalOpen) : v });
+  const setSectorSelectDialog = (v) => _ms({ sectorSelectDialog: isFunction(v) ? v(_gs().sectorSelectDialog) : v });
 
   return (
     <>
@@ -966,6 +969,19 @@ function ModalsLayerContent({ callbacksRef }) {
       <AnimatePresence>
         {sortSettingOpen && <SortSettingModal open={sortSettingOpen} onClose={() => setSortSettingOpen(false)} />}
       </AnimatePresence>
+
+      {/* ===== Modal: 多主题关联板块切换 ===== */}
+      {sectorSelectDialog?.open && (
+        <SectorSelectModal
+          open={sectorSelectDialog?.open}
+          fundCode={sectorSelectDialog?.fundCode}
+          fundName={sectorSelectDialog?.fundName}
+          currentSector={sectorSelectDialog?.currentSector}
+          onClose={() => setSectorSelectDialog({ open: false, fundCode: null, fundName: '', currentSector: null })}
+          onSelect={cb.current.handleSelectFundSector}
+          showToast={cb.current.showToast}
+        />
+      )}
     </>
   );
 }

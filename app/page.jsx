@@ -1380,6 +1380,8 @@ export default function HomePage() {
         rawFund: f,
         code: f.code,
         fundName: f.name,
+        relatedSector: f.relatedSector,
+        relatedSectorQuote: f.relatedSectorQuote || null,
         fundTags,
         isHoldingLinked: !!isHoldingLinked,
         isUpdated: isNavUpdated(f.jzrq, todayStr, f.confirmDays),
@@ -4392,10 +4394,22 @@ export default function HomePage() {
     ]
   );
 
+  const handleSelectFundSector = useCallback(
+    (fundCode, sectorCode, sectorQuote) => {
+      setFunds((prev) =>
+        prev.map((f) =>
+          f.code === fundCode ? { ...f, relatedSector: sectorCode, relatedSectorQuote: sectorQuote || null } : f
+        )
+      );
+    },
+    [setFunds]
+  );
+
   // ModalsLayer 回调 ref：页面级回调与数据通过 ref 注入，不触发重渲染
   const modalCbRef = useRef({});
   modalCbRef.current = {
     // 业务回调
+    handleSelectFundSector,
     handleClearConfirm,
     handleDeleteTransaction,
     handleAddHistory,

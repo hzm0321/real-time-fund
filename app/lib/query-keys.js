@@ -13,6 +13,12 @@ export const fundSecid = (relatedSector) => ['fundSecid', String(relatedSector).
 /** @param {string} secid */
 export const eastSectorQuote = (secid) => ['eastSectorQuote', String(secid).trim()];
 
+/** @param {string} tp */
+export const bkDetailQuote = (tp) => ['bkDetailQuote', String(tp).trim()];
+
+/** @param {string} fundCode */
+export const fundSectorOptions = (fundCode) => ['fundSectorOptions', String(fundCode).trim()];
+
 /** @param {string} fundCode */
 export const pingzhongdata = (fundCode) => ['pingzhongdata', String(fundCode).trim()];
 

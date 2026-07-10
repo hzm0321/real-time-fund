@@ -95,6 +95,27 @@ const processRelatedSectorsQueue = async () => {
       }
 
       const qc = getQueryClient();
+      if (missingCodes.length > 0 && isSupabaseConfigured) {
+        try {
+          const { data: batchData } = await supabase.rpc('get_fund_sector_ids_batch', {
+            p_fund_codes: missingCodes
+          });
+          if (isArray(batchData)) {
+            for (const row of batchData) {
+              const code = String(row?.fund_code ?? '').trim();
+              const ids = isArray(row?.sector_ids)
+                ? row.sector_ids.map((x) => String(x || '').trim()).filter(Boolean)
+                : [];
+              if (!code) continue;
+              qc.setQueryData(qk.fundSectorOptions(code), ids, { staleTime: ONE_DAY_MS });
+              if (!foundMap.get(code) && ids.length > 0) {
+                foundMap.set(code, ids[0]);
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
       for (const code of missingCodes) {
         const value = foundMap.get(code) || '';
         qc.setQueryData(qk.relatedSectors(code, seg), value, { staleTime: ONE_DAY_MS });
@@ -372,6 +393,179 @@ export const fetchEastmoneySectorQuotesBatch = async (secids, { cacheTime = SECT
   }
 
   return results;
+};
+
+const BK_DETAIL_CACHE_MS = 60 * 1000;
+
+function runBKDetailInfoJsonp(tp, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const code = String(tp || '').trim();
+    if (!code) {
+      resolve(null);
+      return;
+    }
+    const cbName = `jsonp_bk_${code}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const url = `https://api.fund.eastmoney.com/ZTJJ/GetBKDetailInfoNew?tp=${encodeURIComponent(code)}&callback=${cbName}&_=${Date.now()}`;
+
+    let done = false;
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+
+    const cleanup = () => {
+      done = true;
+      if (timer) clearTimeout(timer);
+      try {
+        delete window[cbName];
+      } catch (e) {
+        window[cbName] = undefined;
+      }
+      try {
+        if (document.body && document.body.contains(script)) {
+          document.body.removeChild(script);
+        }
+      } catch (e) {}
+    };
+
+    const timer = setTimeout(() => {
+      if (done) return;
+      cleanup();
+      resolve(null);
+    }, timeoutMs);
+
+    window[cbName] = (res) => {
+      if (done) return;
+      cleanup();
+      try {
+        const data = res?.Data;
+        if (!data || !data.SEC_NAME) {
+          resolve(null);
+          return;
+        }
+        const pctVal = data.D;
+        const pct = pctVal != null && Number.isFinite(Number(pctVal)) ? Number(pctVal) : null;
+        resolve({
+          name: String(data.SEC_NAME).trim(),
+          code,
+          pct
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    };
+
+    script.onerror = () => {
+      if (done) return;
+      cleanup();
+      resolve(null);
+    };
+
+    document.body.appendChild(script);
+  });
+}
+
+/**
+ * 批量调用 GetBKDetailInfoNew 接口获取板块名称与行情（通过 JSONP 解决 CORS 限制）
+ * @param {string[]} tps 板块编码数组
+ */
+export const fetchBKDetailInfoNewBatch = async (tps, { cacheTime = BK_DETAIL_CACHE_MS } = {}) => {
+  if (!isArray(tps) || tps.length === 0) return {};
+  const qc = getQueryClient();
+  const results = {};
+  const missingTps = [];
+
+  for (const tp of tps) {
+    const s = tp != null ? String(tp).trim() : '';
+    if (!s) continue;
+    const cached = qc.getQueryData(qk.bkDetailQuote(s));
+    if (cached !== undefined) {
+      results[s] = cached;
+    } else {
+      missingTps.push(s);
+    }
+  }
+
+  if (missingTps.length === 0) return results;
+
+  await Promise.all(
+    missingTps.map(async (tp) => {
+      try {
+        const quote = await runBKDetailInfoJsonp(tp);
+        results[tp] = quote || null;
+        qc.setQueryData(qk.bkDetailQuote(tp), quote || null, { staleTime: cacheTime });
+      } catch (e) {
+        results[tp] = null;
+      }
+    })
+  );
+
+  return results;
+};
+
+/**
+ * 统一获取关联板块行情：兼容常规行业名称查询与以 BK 编码直调 GetBKDetailInfoNew
+ * @param {string[]} labels
+ */
+export const fetchSectorQuotesForLabelsBatch = async (labels, { cacheTime = SECTOR_QUOTE_CACHE_MS } = {}) => {
+  if (!isArray(labels) || labels.length === 0) return {};
+
+  const bkLabels = labels.filter((l) => /^BK\d+/i.test(String(l || '').trim()));
+  const normalLabels = labels.filter((l) => !/^BK\d+/i.test(String(l || '').trim()));
+
+  const [normalQuotes, bkQuotes] = await Promise.all([
+    (async () => {
+      if (normalLabels.length === 0) return {};
+      const secidResults = await fetchFundSecidsBatch(normalLabels, { cacheTime });
+      const secids = normalLabels.map((l) => secidResults[l]).filter(Boolean);
+      const quotes = await fetchEastmoneySectorQuotesBatch(secids, { cacheTime });
+      const map = {};
+      for (const l of normalLabels) {
+        const secid = secidResults[l];
+        if (secid && quotes[secid]) {
+          map[l] = quotes[secid];
+        }
+      }
+      return map;
+    })(),
+    (async () => {
+      if (bkLabels.length === 0) return {};
+      return await fetchBKDetailInfoNewBatch(bkLabels, { cacheTime });
+    })()
+  ]);
+
+  return { ...normalQuotes, ...bkQuotes };
+};
+
+/**
+ * 获取或查询单支基金对应的全部关联板块候选主题编码数组
+ * @param {string} fundCode
+ * @returns {Promise<string[]>}
+ */
+export const fetchFundSectorOptions = async (fundCode) => {
+  const code = String(fundCode || '').trim();
+  if (!code || !isSupabaseConfigured) return [];
+  const qc = getQueryClient();
+  const cached = qc.getQueryData(qk.fundSectorOptions(code));
+  if (cached !== undefined && isArray(cached)) return cached;
+  try {
+    const { data: batchData } = await supabase.rpc('get_fund_sector_ids_batch', {
+      p_fund_codes: [code]
+    });
+    let validOptions = [];
+    if (isArray(batchData)) {
+      const row = batchData.find((r) => String(r?.fund_code ?? '').trim() === code);
+      const ids = row && isArray(row.sector_ids) ? row.sector_ids : [];
+      validOptions = ids.map((x) => String(x || '').trim()).filter(Boolean);
+    }
+    qc.setQueryData(qk.fundSectorOptions(code), validOptions, { staleTime: ONE_DAY_MS });
+    return validOptions;
+  } catch (e) {
+    return [];
+  }
 };
 
 function normalizeEastmoneyScriptUrl(url) {

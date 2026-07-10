@@ -555,6 +555,8 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
               if (f.autoSource != null) merged.autoSource = f.autoSource;
               if (f.showImageChart !== undefined) merged.showImageChart = f.showImageChart;
               if (f.confirmDays != null) merged.confirmDays = f.confirmDays;
+              if (f.relatedSector != null) merged.relatedSector = f.relatedSector;
+              if (f.relatedSectorQuote != null) merged.relatedSectorQuote = f.relatedSectorQuote;
               if (merged.addedAt == null || merged.addBaseNav == null || merged.addBaseDate == null) {
                 const snap = getAddBaseSnapshotFromFund(merged);
                 if (merged.addedAt == null) merged.addedAt = Date.now();

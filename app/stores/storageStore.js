@@ -11,7 +11,14 @@ export const getFundCodesSignature = (value, extraFields = []) => {
     const list = isArray(value) ? value : JSON.parse(value || '[]');
     if (!isArray(list)) return '';
     const fields = Array.from(
-      new Set(['jzrq', 'dwjz', 'dataSource', 'showImageChart', ...(isArray(extraFields) ? extraFields : [])])
+      new Set([
+        'jzrq',
+        'dwjz',
+        'dataSource',
+        'showImageChart',
+        'relatedSector',
+        ...(isArray(extraFields) ? extraFields : [])
+      ])
     );
     const items = list
       .map((item) => {

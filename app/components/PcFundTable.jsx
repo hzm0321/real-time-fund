@@ -53,9 +53,12 @@ import {
   fetchFundPeriodReturns,
   fetchRelatedSectorsBatch,
   fetchFundSecidsBatch,
-  fetchEastmoneySectorQuotesBatch
+  fetchEastmoneySectorQuotesBatch,
+  fetchSectorQuotesForLabelsBatch
 } from '@/app/api/fund';
 import { storageStore } from '../stores';
+import { getQueryClient } from '@/app/lib/get-query-client';
+import * as qk from '@/app/lib/query-keys';
 import { asyncPool } from '@/app/lib/asyncHelper';
 import MoveGroupModal from './MoveGroupModal';
 import { Badge } from '@/components/ui/badge';
@@ -1205,6 +1208,11 @@ const PcFundTable = memo(function PcFundTable({
   const sectorAuthSegment = relatedSectorSessionKey || 'anon';
   const dataCodes = useMemo(() => Array.from(new Set((data || []).map((d) => d?.code).filter(Boolean))), [data]);
   const dataCodesKey = useMemo(() => dataCodes.join('|'), [dataCodes]);
+  // 仅在 code→relatedSector 映射变化时才变更，避免基金净值等无关字段更新触发行情 effect 重跑
+  const relatedSectorKey = useMemo(
+    () => (data || []).map((d) => `${d?.code ?? ''}:${d?.relatedSector ?? ''}`).join('|'),
+    [data]
+  );
 
   useEffect(() => {
     relatedSectorCacheRef.current.clear();
@@ -1251,11 +1259,15 @@ const PcFundTable = memo(function PcFundTable({
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;
-    if (dataCodes.length === 0) return;
+    if (!isArray(data) || data.length === 0) return;
 
     const labels = new Set();
-    for (const code of dataCodes) {
-      const lbl = relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code);
+    for (const row of data) {
+      const code = row?.code;
+      if (!code) continue;
+      // 优先使用用户选择的板块（来自 data 行的 relatedSector），再用接口默认值
+      const userSector = row?.relatedSector;
+      const lbl = userSector || (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code));
       const t = lbl != null ? String(lbl).trim() : '';
       if (t) labels.add(t);
     }
@@ -1265,21 +1277,7 @@ const PcFundTable = memo(function PcFundTable({
     let cancelled = false;
     (async () => {
       try {
-        // 1. 批量获取 secid
-        const secidResults = await fetchFundSecidsBatch(labelList);
-        if (cancelled) return;
-
-        // 2. 批量获取行情
-        const secids = labelList.map((label) => secidResults[label]).filter(Boolean);
-        const quotes = await fetchEastmoneySectorQuotesBatch(secids);
-        const batch = {};
-        for (const label of labelList) {
-          const secid = secidResults[label];
-          if (!secid) continue;
-          const quote = quotes[secid];
-          if (quote) batch[label] = quote;
-        }
-
+        const batch = await fetchSectorQuotesForLabelsBatch(labelList);
         if (cancelled) return;
         setSectorQuoteByLabel((prev) => {
           let changed = false;
@@ -1303,12 +1301,14 @@ const PcFundTable = memo(function PcFundTable({
     return () => {
       cancelled = true;
     };
-  }, [relatedSectorEnabled, dataCodesKey, relatedSectorByCode, dataCodes]);
+  }, [relatedSectorEnabled, dataCodesKey, relatedSectorByCode, relatedSectorKey]);
 
   const withRelatedSectorFund = useCallback(
     (row) => {
       if (!row || !row.code) return row;
-      const rawValue = relatedSectorByCode?.[row.code] ?? relatedSectorCacheRef.current.get(row.code) ?? '';
+      const userSector = row.relatedSector;
+      const rawValue =
+        userSector || (relatedSectorByCode?.[row.code] ?? relatedSectorCacheRef.current.get(row.code) ?? '');
       const relatedSector = rawValue != null ? String(rawValue).trim() : '';
       const quote = relatedSector ? sectorQuoteByLabel?.[relatedSector] : null;
       const quoteName = quote?.name != null ? String(quote.name).trim() : '';
@@ -1633,17 +1633,38 @@ const PcFundTable = memo(function PcFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
-          const value = (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
+          const userSector = original.relatedSector;
+          const value =
+            userSector || (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
           const display = value || '—';
           const labelKey = value ? String(value).trim() : '';
-          const quote = labelKey ? sectorQuoteByLabel?.[labelKey] : null;
+          const quote =
+            (labelKey ? sectorQuoteByLabel?.[labelKey] : null) || (userSector ? original.relatedSectorQuote : null);
           const nameFromQuote = quote?.name != null ? String(quote.name).trim() : '';
           const firstLine = nameFromQuote || display;
           const pct = quote?.pct;
           const pctText = pct != null ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : null;
           const pctCls = pct != null ? (pct > 0 ? 'up' : pct < 0 ? 'down' : '') : '';
+          const options = (code && getQueryClient().getQueryData(qk.fundSectorOptions(code))) || [];
+          const hasMultiTopics =
+            Boolean(value) &&
+            isArray(options) &&
+            options.length > 1 &&
+            options.some((opt) => String(opt).trim() === String(value).trim());
+
           return (
             <div
+              onClick={() => {
+                if (hasMultiTopics) {
+                  useModalStore.getState().setSectorSelectDialog({
+                    open: true,
+                    fundCode: code,
+                    fundName: original.name || original.fundName || '',
+                    currentSector: value
+                  });
+                }
+              }}
+              className={cn(hasMultiTopics && 'cursor-pointer group hover:opacity-80 transition-opacity')}
               style={{
                 width: '100%',
                 minWidth: 0,
@@ -1669,20 +1690,32 @@ const PcFundTable = memo(function PcFundTable({
                   {pctText}
                 </span>
               ) : null}
-              <span
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'right',
-                  fontSize: pctText != null ? '11px' : '14px'
-                }}
-              >
-                {firstLine}
-              </span>
+              <div className="flex items-center justify-end gap-1 min-w-0">
+                <span
+                  style={{
+                    display: 'block',
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    textAlign: 'right',
+                    fontSize: pctText != null ? '11px' : '14px'
+                  }}
+                  title={firstLine}
+                >
+                  {firstLine}
+                </span>
+                {hasMultiTopics && (
+                  <Tooltip delayDuration={150}>
+                    <TooltipTrigger asChild>
+                      <span className="shrink-0 inline-flex items-center px-1 py-0.2 rounded text-[10px] bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                        ▾ {options.length}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{options.length}种可切换板块主题</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
           );
         },

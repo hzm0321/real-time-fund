@@ -21,7 +21,8 @@ const DEFAULTS = {
   holdingMigrateDialog: { open: false, code: null, name: '', targetGroupId: null },
   cloudConfigModal: { open: false, userId: null, type: null, cloudData: null },
   deviceConflictModal: { open: false, message: '', userId: null, payload: null, isPartial: false },
-  successModal: { open: false, message: '' }
+  successModal: { open: false, message: '' },
+  sectorSelectDialog: { open: false, fundCode: null, fundName: '', currentSector: null }
 };
 
 const getClosedModalState = () => ({
@@ -62,6 +63,7 @@ const getClosedModalState = () => ({
   cloudConfigModal: { ...DEFAULTS.cloudConfigModal },
   deviceConflictModal: { ...DEFAULTS.deviceConflictModal },
   successModal: { ...DEFAULTS.successModal },
+  sectorSelectDialog: { ...DEFAULTS.sectorSelectDialog },
   scanModalOpen: false,
   scanConfirmModalOpen: false,
   isScanning: false,
@@ -124,6 +126,7 @@ export const useModalStore = create((set, get) => ({
   cloudConfigModal: { ...DEFAULTS.cloudConfigModal },
   deviceConflictModal: { ...DEFAULTS.deviceConflictModal },
   successModal: { ...DEFAULTS.successModal },
+  sectorSelectDialog: { ...DEFAULTS.sectorSelectDialog },
 
   // ---- Scan modals (migrated from useScanImport) ----
   scanModalOpen: false,
@@ -138,6 +141,10 @@ export const useModalStore = create((set, get) => ({
   modalErrorResetKey: 0,
 
   // ---- Actions ----
+  setSectorSelectDialog: (val) =>
+    set((s) => ({
+      sectorSelectDialog: typeof val === 'function' ? val(s.sectorSelectDialog) : val
+    })),
 
   /** Generic close: resets a named modal to its default value */
   closeModal: (name) => {
