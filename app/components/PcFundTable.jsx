@@ -1214,6 +1214,17 @@ const PcFundTable = memo(function PcFundTable({
     [data]
   );
 
+  const [visibilityTick, setVisibilityTick] = useState(0);
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        setVisibilityTick((t) => t + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
   useEffect(() => {
     relatedSectorCacheRef.current.clear();
     setRelatedSectorByCode({});
@@ -1224,7 +1235,12 @@ const PcFundTable = memo(function PcFundTable({
     if (!relatedSectorEnabled) return;
     if (dataCodes.length === 0) return;
 
-    const missing = dataCodes.filter((code) => !relatedSectorCacheRef.current.has(code));
+    const qc = getQueryClient();
+    const missing = dataCodes.filter((code) => {
+      const hasRelated = qc.getQueryData(qk.relatedSectors(code, sectorAuthSegment)) !== undefined;
+      const hasOptions = qc.getQueryData(qk.fundSectorOptions(code)) !== undefined;
+      return !hasRelated || !hasOptions;
+    });
     if (missing.length === 0) return;
 
     let cancelled = false;
@@ -1255,7 +1271,7 @@ const PcFundTable = memo(function PcFundTable({
     return () => {
       cancelled = true;
     };
-  }, [relatedSectorEnabled, dataCodesKey, sectorAuthSegment, dataCodes]);
+  }, [relatedSectorEnabled, dataCodesKey, sectorAuthSegment, dataCodes, visibilityTick]);
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;

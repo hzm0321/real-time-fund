@@ -1147,6 +1147,17 @@ const MobileFundTable = memo(function MobileFundTable({
 
   const sectorAuthSegment = relatedSectorSessionKey || 'anon';
 
+  const [visibilityTick, setVisibilityTick] = useState(0);
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        setVisibilityTick((t) => t + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
   useEffect(() => {
     relatedSectorCacheRef.current.clear();
     setRelatedSectorByCode({});
@@ -1157,8 +1168,13 @@ const MobileFundTable = memo(function MobileFundTable({
     if (!relatedSectorEnabled) return;
     if (!isArray(data) || data.length === 0) return;
 
+    const qc = getQueryClient();
     const codes = Array.from(new Set(data.map((d) => d?.code).filter(Boolean)));
-    const missing = codes.filter((code) => !relatedSectorCacheRef.current.has(code));
+    const missing = codes.filter((code) => {
+      const hasRelated = qc.getQueryData(qk.relatedSectors(code, sectorAuthSegment)) !== undefined;
+      const hasOptions = qc.getQueryData(qk.fundSectorOptions(code)) !== undefined;
+      return !hasRelated || !hasOptions;
+    });
     if (missing.length === 0) return;
 
     let cancelled = false;
@@ -1189,7 +1205,7 @@ const MobileFundTable = memo(function MobileFundTable({
     return () => {
       cancelled = true;
     };
-  }, [relatedSectorEnabled, data, sectorAuthSegment]);
+  }, [relatedSectorEnabled, data, sectorAuthSegment, visibilityTick]);
 
   useEffect(() => {
     if (!relatedSectorEnabled) return;
