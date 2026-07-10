@@ -468,8 +468,63 @@ function runBKDetailInfoJsonp(tp, timeoutMs = 8000) {
   });
 }
 
+let bkDataLoaderTimeout = null;
+let pendingBkRequests = new Map();
+
+const dispatchBkDataLoader = async () => {
+  const currentRequests = pendingBkRequests;
+  pendingBkRequests = new Map();
+  bkDataLoaderTimeout = null;
+
+  const codes = Array.from(currentRequests.keys());
+  if (codes.length === 0) return;
+
+  try {
+    if (!isSupabaseConfigured || !supabase?.functions?.invoke) {
+      throw new Error('Supabase not configured, fallback to JSONP');
+    }
+
+    const { data, error } = await supabase.functions.invoke('eastmoney-batch', {
+      body: { codes }
+    });
+
+    if (error) throw error;
+
+    for (const code of codes) {
+      const resolvers = currentRequests.get(code) || [];
+      const result = data?.[code] || null;
+      resolvers.forEach((resolve) => resolve(result));
+    }
+  } catch (e) {
+    // Fallback to JSONP if edge function fails or Supabase is not configured
+    for (const code of codes) {
+      const resolvers = currentRequests.get(code) || [];
+      runBKDetailInfoJsonp(code)
+        .then((result) => {
+          resolvers.forEach((resolve) => resolve(result));
+        })
+        .catch(() => {
+          resolvers.forEach((resolve) => resolve(null));
+        });
+    }
+  }
+};
+
+const fetchBKDetailInfoSingle = (tp) => {
+  return new Promise((resolve) => {
+    if (!pendingBkRequests.has(tp)) {
+      pendingBkRequests.set(tp, []);
+    }
+    pendingBkRequests.get(tp).push(resolve);
+
+    if (!bkDataLoaderTimeout) {
+      bkDataLoaderTimeout = setTimeout(dispatchBkDataLoader, 50);
+    }
+  });
+};
+
 /**
- * 批量调用 GetBKDetailInfoNew 接口获取板块名称与行情（通过 JSONP 解决 CORS 限制）
+ * 批量调用 GetBKDetailInfoNew 接口获取板块名称与行情（优先通过 Supabase Edge Function 解决 CORS 限制并批处理，失败回退 JSONP）
  * @param {string[]} tps 板块编码数组
  */
 export const fetchBKDetailInfoNewBatch = async (tps, { cacheTime = BK_DETAIL_CACHE_MS } = {}) => {
@@ -494,7 +549,7 @@ export const fetchBKDetailInfoNewBatch = async (tps, { cacheTime = BK_DETAIL_CAC
   await Promise.all(
     missingTps.map(async (tp) => {
       try {
-        const quote = await runBKDetailInfoJsonp(tp);
+        const quote = await fetchBKDetailInfoSingle(tp);
         results[tp] = quote || null;
         qc.setQueryData(qk.bkDetailQuote(tp), quote || null, { staleTime: cacheTime });
       } catch (e) {

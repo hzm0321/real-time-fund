@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { isArray } from 'lodash';
-import { Check, Layers } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { fetchFundSectorOptions, fetchSectorQuotesForLabelsBatch } from '@/app/api/fund';
 
 export default function SectorSelectModal({ open, fundCode, fundName, currentSector, onClose, onSelect, showToast }) {
@@ -61,7 +61,10 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose?.()}>
-      <DialogContent className="max-w-md p-6 mobile-dialog-glass border border-border shadow-2xl rounded-2xl bg-card text-card-foreground max-h-[88vh] flex flex-col">
+      <DialogContent
+        className="glass card modal flex flex-col"
+        style={{ maxWidth: '400px', zIndex: 999, width: '90vw', padding: '24px', maxHeight: '88vh' }}
+      >
         <style>{`
           .sector-select-scroll::-webkit-scrollbar {
             width: 6px;
@@ -79,9 +82,6 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
         `}</style>
         <DialogHeader className="space-y-1.5 text-left shrink-0">
           <div className="flex items-center gap-2 text-primary">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15">
-              <Layers className="h-4 w-4 text-primary" />
-            </div>
             <DialogTitle className="text-lg font-semibold tracking-tight text-foreground">关联板块主题切换</DialogTitle>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -93,71 +93,116 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
           className="my-3 max-h-[320px] md:max-h-[380px] overflow-y-auto space-y-2.5 pr-1.5 scrollbar-y-styled sector-select-scroll"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {loading && options.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-2">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span>正在加载可切换的板块主题...</span>
+          {loading ? (
+            <div className="space-y-2.5">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={`skeleton-${i}`}
+                  className="flex items-center justify-between p-3.5 rounded-xl border border-border/40 bg-card animate-pulse"
+                >
+                  <div className="flex flex-col gap-2 min-w-0 pr-3">
+                    <div className="h-4 w-28 bg-muted/80 rounded"></div>
+                    <div className="h-3 w-16 bg-muted/50 rounded"></div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="h-6 w-14 bg-muted/60 rounded-full"></div>
+                    <div className="h-6 w-6 rounded-full border border-border/60 bg-muted/30"></div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : options.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">暂无备选多主题板块数据</div>
           ) : (
-            options.map((tp, idx) => {
-              const quote = quotes[tp];
-              const name = quote?.name || tp;
-              const pct = quote?.pct;
-              const isSelected = selectedSector ? selectedSector === tp : idx === 0;
+            <RadioGroup
+              value={selectedSector}
+              onValueChange={setSelectedSector}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}
+            >
+              {options.map((tp, idx) => {
+                const quote = quotes[tp];
+                const name = quote?.name || tp;
+                const pct = quote?.pct;
+                const isSelected = selectedSector ? selectedSector === tp : idx === 0;
 
-              const pctText =
-                pct != null && Number.isFinite(Number(pct)) ? `${pct > 0 ? '+' : ''}${Number(pct).toFixed(2)}%` : '—';
-              const isUp = pct > 0;
-              const isDown = pct < 0;
+                const pctText =
+                  pct != null && Number.isFinite(Number(pct)) ? `${pct > 0 ? '+' : ''}${Number(pct).toFixed(2)}%` : '—';
+                const isUp = pct > 0;
+                const isDown = pct < 0;
 
-              return (
-                <div
-                  key={tp}
-                  onClick={() => setSelectedSector(tp)}
-                  className={cn(
-                    'group relative flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-pointer select-none',
-                    isSelected
-                      ? 'border-primary bg-primary/10 dark:bg-primary/20 shadow-sm text-foreground'
-                      : 'border-border/60 bg-card hover:border-primary/60 hover:bg-primary/5 dark:hover:bg-primary/15 text-foreground'
-                  )}
-                >
-                  <div className="flex flex-col gap-1 min-w-0 pr-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-foreground truncate">{name}</span>
+                return (
+                  <div
+                    key={tp}
+                    onClick={() => setSelectedSector(tp)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: isSelected
+                        ? 'color-mix(in srgb, var(--primary) 8%, var(--card))'
+                        : 'var(--secondary)',
+                      cursor: 'pointer',
+                      width: '100%',
+                      transition: 'all 0.2s ease',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', minWidth: 0 }}>
+                      <RadioGroupItem value={tp} id={`sector-${tp}`} style={{ flexShrink: 0, marginTop: '2px' }} />
+
+                      <div
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                          <span
+                            style={{
+                              fontSize: '15px',
+                              fontWeight: 600,
+                              color: 'var(--foreground)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}
+                          >
+                            {name}
+                          </span>
+                          <span style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--muted-foreground)' }}>
+                            {tp}
+                          </span>
+                        </div>
+
+                        <span
+                          className={cn(
+                            'text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0',
+                            isUp
+                              ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+                              : isDown
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : 'bg-secondary text-muted-foreground border-transparent'
+                          )}
+                        >
+                          {pctText}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-mono text-xs text-muted-foreground tracking-wider">{tp}</span>
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={cn(
-                        'text-xs font-semibold px-2.5 py-1 rounded-full border',
-                        isUp
-                          ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-                          : isDown
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                            : 'bg-secondary text-muted-foreground border-transparent'
-                      )}
-                    >
-                      {pctText}
-                    </span>
-
-                    <div
-                      className={cn(
-                        'flex h-6 w-6 items-center justify-center rounded-full transition-all duration-200',
-                        isSelected
-                          ? 'bg-primary text-primary-foreground shadow-sm scale-105'
-                          : 'border border-border/80 text-transparent group-hover:border-primary group-hover:text-primary/40 group-hover:scale-105'
-                      )}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </RadioGroup>
           )}
         </div>
 
