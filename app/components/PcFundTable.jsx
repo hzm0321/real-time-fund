@@ -1598,7 +1598,7 @@ const PcFundTable = memo(function PcFundTable({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
-                alignItems: 'center',
+                alignItems: 'flex-end',
                 gap: '4px'
               }}
             >
@@ -1622,7 +1622,7 @@ const PcFundTable = memo(function PcFundTable({
           );
         },
         meta: {
-          align: 'center'
+          align: 'right'
         }
       },
       {
