@@ -626,6 +626,9 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           const qc = getQueryClient();
           qc.refetchQueries({ queryKey: ['hotSectors'], type: 'active', stale: true });
           qc.refetchQueries({ queryKey: ['valuationRanking'], type: 'active', stale: true });
+          // 清除关联板块行情缓存，使表格组件在下一次 effect 执行时拉取最新涨跌幅
+          qc.removeQueries({ queryKey: ['eastSectorQuote'] });
+          qc.removeQueries({ queryKey: ['bkDetailQuote'] });
         } catch (e) {
           console.warn('刷新行情数据出错', e);
         }

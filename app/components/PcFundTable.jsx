@@ -1208,11 +1208,6 @@ const PcFundTable = memo(function PcFundTable({
   const sectorAuthSegment = relatedSectorSessionKey || 'anon';
   const dataCodes = useMemo(() => Array.from(new Set((data || []).map((d) => d?.code).filter(Boolean))), [data]);
   const dataCodesKey = useMemo(() => dataCodes.join('|'), [dataCodes]);
-  // 仅在 code→relatedSector 映射变化时才变更，避免基金净值等无关字段更新触发行情 effect 重跑
-  const relatedSectorKey = useMemo(
-    () => (data || []).map((d) => `${d?.code ?? ''}:${d?.relatedSector ?? ''}`).join('|'),
-    [data]
-  );
 
   const [visibilityTick, setVisibilityTick] = useState(0);
   useEffect(() => {
@@ -1317,7 +1312,7 @@ const PcFundTable = memo(function PcFundTable({
     return () => {
       cancelled = true;
     };
-  }, [relatedSectorEnabled, dataCodesKey, relatedSectorByCode, relatedSectorKey]);
+  }, [relatedSectorEnabled, data, relatedSectorByCode]);
 
   const withRelatedSectorFund = useCallback(
     (row) => {
