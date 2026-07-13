@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.4.1';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.4.2';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -109,18 +109,10 @@ export default function Announcement() {
                 paddingRight: '4px'
               }}
             >
-              <p>v2.4.1 Pro 版本更新内容：</p>
-              <p>
-                1. 发布全新项目介绍官网地址：
-                <a href="https://fund.cc.cd/home" target="_blank">
-                  https://fund.cc.cd/home
-                </a>
-                。
-              </p>
-              <p>2. 发布 @jigubao/cli 工具。</p>
-              <p>3. 关联持仓展示定和待标签。</p>
-              <p>4. 修复关联持仓金额为 0 不识别问题。</p>
-              <p>5. 修复其余分组往自选分组迁移数据丢失问题。</p>
+              <p>v2.4.2 Pro 版本更新内容：</p>
+              <p>1.关联板块部分基金支持切换板块主题。</p>
+              <p>2.OCR 识别的基金结果支持二次修改。</p>
+              <p>3.优化PC端数据源列右对齐。</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button
