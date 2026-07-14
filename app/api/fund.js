@@ -395,7 +395,7 @@ export const fetchEastmoneySectorQuotesBatch = async (secids, { cacheTime = SECT
   return results;
 };
 
-const BK_DETAIL_CACHE_MS = 60 * 1000;
+const BK_DETAIL_CACHE_MS = 5 * 60 * 1000;
 
 function runBKDetailInfoJsonp(tp, timeoutMs = 8000) {
   return new Promise((resolve) => {
