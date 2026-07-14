@@ -15,7 +15,8 @@ import {
   fetchNetValueRangeFromTrend,
   fetchFundDividends,
   fetchFundConfirmDays,
-  fetchFundsBestSources
+  fetchFundsBestSources,
+  prefetchQdiiValuations
 } from '../api/fund';
 import { TZ } from '../lib/fundHelpers';
 import { getQueryClient } from '../lib/get-query-client';
@@ -294,6 +295,23 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           }
         } catch (e) {
           console.error('批量获取自动数据源失败', e);
+        }
+
+        // 预取所有 QDII（数据源 4）基金估值，单次 PostgREST 批量查询替代 N 次 Edge Function 调用
+        try {
+          const currentFundsForQdii = useStorageStore.getState().funds || [];
+          const qdiiCodes = currentFundsForQdii
+            .filter((f) => {
+              const ds = bestSourcesMap[f.code] ?? f.dataSource ?? 1;
+              return String(ds) === '4';
+            })
+            .map((f) => f.code)
+            .filter(Boolean);
+          if (qdiiCodes.length > 0) {
+            await prefetchQdiiValuations(qdiiCodes);
+          }
+        } catch (e) {
+          console.warn('批量预取 QDII 估值失败', e);
         }
 
         await asyncPool(3, uniqueCodes, async (c) => {
@@ -624,11 +642,11 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
 
         try {
           const qc = getQueryClient();
-          qc.refetchQueries({ queryKey: ['hotSectors'], type: 'active', stale: true });
-          qc.refetchQueries({ queryKey: ['valuationRanking'], type: 'active', stale: true });
-          // 清除关联板块行情缓存，使表格组件在下一次 effect 执行时拉取最新涨跌幅
-          qc.removeQueries({ queryKey: ['eastSectorQuote'] });
-          qc.removeQueries({ queryKey: ['bkDetailQuote'] });
+          // 仅标记为 stale，由组件按需 refetch，避免强制清缓存导致下一轮渲染集中爆发 Edge Function 调用
+          qc.invalidateQueries({ queryKey: ['hotSectors'], refetchType: 'none' });
+          qc.invalidateQueries({ queryKey: ['valuationRanking'], refetchType: 'none' });
+          qc.invalidateQueries({ queryKey: ['eastSectorQuote'], refetchType: 'none' });
+          qc.invalidateQueries({ queryKey: ['bkDetailQuote'], refetchType: 'none' });
         } catch (e) {
           console.warn('刷新行情数据出错', e);
         }

@@ -3,7 +3,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { isArray, isNumber, isObject, isString } from 'lodash';
 import { storageStore } from '../stores';
-import { withRetry } from '../lib/asyncHelper';
+import { withRetry, withRetrySmart } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
 import * as qk from '../lib/query-keys';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -1248,35 +1248,127 @@ function fetchSinaEstimateNetworthResponse(code) {
  * @property {string} valuationSource - 如 fundgz、sina_ds2、sina_ds3
  */
 
+/** QDII 估值缓存时长：交易时段 2 分钟，非交易时段 10 分钟 */
+const getQdiiStaleTime = () => {
+  const now = nowInTz();
+  const tradingDay = isTradingDay(now);
+  const hour = now.hour();
+  const minute = now.minute();
+  const timeNum = hour * 100 + minute;
+  const isTradingTime = tradingDay && ((timeNum >= 925 && timeNum <= 1135) || (timeNum >= 1255 && timeNum <= 1505));
+  return isTradingTime ? 2 * 60 * 1000 : 10 * 60 * 1000;
+};
+
 /**
- * 从 Supabase gs_qdii 表获取 QDII 基金的估值数据（数据源 4）
+ * 从 Supabase gs_qdii 表获取 QDII 基金的估值数据（数据源 4）。
+ *
+ * 优化：直接使用 PostgREST 查询 gs_qdii 表（RLS 已启用），替代原先的 Edge Function 调用，
+ * 并通过 TanStack Query 缓存避免同一刷新周期内重复请求。
+ *
+ * @param {string} code - 基金编码
+ * @returns {Promise<{ gztime: string|null, gszzl: number|null, valuationSource: string, gzstatus: string|null }|null>}
  */
 export const fetchQdiiValuationFromSupabase = async (code) => {
   if (!code || !isSupabaseConfigured) return null;
-  if (!supabase?.functions?.invoke) return null;
   const normalized = String(code).trim();
   if (!normalized) return null;
 
+  const qc = getQueryClient();
   try {
-    const { data, error } = await withRetry(() =>
-      supabase.functions.invoke('get-qdii-valuation', {
-        body: { code: normalized }
-      })
-    );
+    return await qc.fetchQuery({
+      queryKey: qk.qdiiValuation(normalized),
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('gs_qdii')
+          .select('gztime, gszzl, gzstatus')
+          .eq('fund_code', normalized)
+          .maybeSingle();
 
-    if (error || !data || data.success !== true || !data.data) return null;
+        if (error || !data) return null;
 
-    const resData = data.data;
-    return {
-      gztime: resData.gztime != null ? String(resData.gztime) : null,
-      gszzl: resData.gszzl != null && Number.isFinite(Number(resData.gszzl)) ? Number(resData.gszzl) : null,
-      valuationSource: 'supabase_qdii',
-      gzstatus: resData.gzstatus
-    };
-  } catch (e) {
+        const gztime = data.gztime != null ? String(data.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null;
+        return {
+          gztime,
+          gszzl: data.gszzl != null && Number.isFinite(Number(data.gszzl)) ? Number(data.gszzl) : null,
+          valuationSource: 'supabase_qdii',
+          gzstatus: data.gzstatus
+        };
+      },
+      staleTime: getQdiiStaleTime()
+    });
+  } catch {
     return null;
   }
 };
+
+/**
+ * 批量预取多个 QDII 基金的估值数据并写入 TanStack Query 缓存。
+ *
+ * 使用单次 PostgREST IN 查询替代原先 N 次 Edge Function 调用，
+ * 后续 fetchQdiiValuationFromSupabase 单基金调用将直接命中缓存。
+ *
+ * @param {string[]} codes - 基金编码数组
+ * @returns {Promise<Record<string, { gztime: string|null, gszzl: number|null, valuationSource: string, gzstatus: string|null }|null>>}
+ */
+export async function prefetchQdiiValuations(codes) {
+  if (!isSupabaseConfigured || !isArray(codes) || codes.length === 0) return {};
+
+  const qc = getQueryClient();
+  const staleTime = getQdiiStaleTime();
+  const results = {};
+  const missing = [];
+
+  for (const c of codes) {
+    const code = c != null ? String(c).trim() : '';
+    if (!code) continue;
+    const cached = qc.getQueryData(qk.qdiiValuation(code));
+    if (cached !== undefined) {
+      if (cached) results[code] = cached;
+    } else {
+      missing.push(code);
+    }
+  }
+
+  if (missing.length === 0) return results;
+
+  try {
+    const { data, error } = await supabase
+      .from('gs_qdii')
+      .select('fund_code, gztime, gszzl, gzstatus')
+      .in('fund_code', missing);
+
+    if (error) return results;
+
+    const foundMap = new Map();
+    if (isArray(data)) {
+      for (const row of data) {
+        const code = String(row.fund_code || '').trim();
+        if (!code) continue;
+        const gztime = row.gztime != null ? String(row.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null;
+        const valuation = {
+          gztime,
+          gszzl: row.gszzl != null && Number.isFinite(Number(row.gszzl)) ? Number(row.gszzl) : null,
+          valuationSource: 'supabase_qdii',
+          gzstatus: row.gzstatus
+        };
+        foundMap.set(code, valuation);
+      }
+    }
+
+    for (const code of missing) {
+      const valuation = foundMap.get(code) || null;
+      qc.setQueryData(qk.qdiiValuation(code), valuation, { staleTime });
+      if (valuation) results[code] = valuation;
+    }
+  } catch (e) {
+    // 查询失败时缓存 null 避免后续重复请求
+    for (const code of missing) {
+      qc.setQueryData(qk.qdiiValuation(code), null, { staleTime });
+    }
+  }
+
+  return results;
+}
 
 /**
  * 检查指定基金编码是否存在于 Supabase gs_qdii 表中
@@ -1316,7 +1408,7 @@ export const isQdiiFund = async (code) => {
  * @returns {Promise<{ bestSource: number|null, isYesterdayAccuracy: boolean, isTodayAccuracy: boolean, diffs: Object<string,number>, diff?: number }|null>}
  */
 export async function fetchBestValuationSource(code, jzrq, actualZzl) {
-  if (!isSupabaseConfigured || !supabase?.functions?.invoke) return null;
+  if (!isSupabaseConfigured) return null;
   const c = code != null ? String(code).trim() : '';
   if (!c || !jzrq || !isNumber(actualZzl) || !Number.isFinite(actualZzl)) return null;
 
@@ -1328,14 +1420,13 @@ export async function fetchBestValuationSource(code, jzrq, actualZzl) {
   }
 
   try {
-    const { data, error } = await withRetry(() =>
-      supabase.functions.invoke('best-valuation-source', {
-        body: { code: c, jzrq, actualZzl }
-      })
-    );
+    // 使用 RPC 替代 Edge Function，减少配额消耗
+    const { data, error } = await supabase.rpc('get_best_valuation_source_batch', {
+      p_items: [{ code: c, jzrq, actualZzl }]
+    });
 
     if (error || !data?.success) return null;
-    const res = data.data || null;
+    const res = data.data?.[c] ?? null;
     qc.setQueryData(cacheKey, res, { staleTime: 60 * 60 * 1000 });
     return res;
   } catch (e) {
@@ -1360,7 +1451,7 @@ let activeBatchSignature = null;
  *   以基金代码为 key 的结果 map，无数据的基金值为 null
  */
 export async function fetchBestValuationSourceBatch(items) {
-  if (!isSupabaseConfigured || !supabase?.functions?.invoke) return {};
+  if (!isSupabaseConfigured) return {};
   if (!isArray(items) || items.length === 0) return {};
 
   const qc = getQueryClient();
@@ -1411,7 +1502,7 @@ export async function fetchBestValuationSourceBatch(items) {
     }
   }
 
-  // 2. 调用批量 Edge Function（每批最多 100 条）
+  // 2. 调用批量 RPC（每批最多 100 条），替代 Edge Function 以减少配额消耗
   const BATCH_SIZE = 100;
   const batches = [];
   for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
@@ -1421,11 +1512,9 @@ export async function fetchBestValuationSourceBatch(items) {
   const promise = Promise.all(
     batches.map(async (batch) => {
       try {
-        const { data, error } = await withRetry(() =>
-          supabase.functions.invoke('best-valuation-source-batch', {
-            body: { items: batch }
-          })
-        );
+        const { data, error } = await supabase.rpc('get_best_valuation_source_batch', {
+          p_items: batch
+        });
 
         if (error || !data?.success) return {};
 
@@ -2716,7 +2805,7 @@ export const fetchFundValuationTrend = async (code, range = '3m') => {
   if (!isSupabaseConfigured) return [];
   if (!supabase?.functions?.invoke) return [];
 
-  const { data, error } = await withRetry(() =>
+  const { data, error } = await withRetrySmart(() =>
     supabase.functions.invoke('get-fund-valuation-trend', {
       body: { fund_code: code, range }
     })
@@ -2732,7 +2821,7 @@ export const parseFundTextWithLLM = async (text, imageBase64 = null) => {
   if (!supabase?.functions?.invoke) return null;
 
   try {
-    const { data, error } = await withRetry(() =>
+    const { data, error } = await withRetrySmart(() =>
       supabase.functions.invoke('analyze-fund', {
         body: imageBase64 ? { image: imageBase64 } : { text }
       })
@@ -2771,7 +2860,7 @@ export const fetchFundValuationRanking = async (sort = 3, order = 'desc', page =
   if (!isSupabaseConfigured) return null;
   if (!supabase?.functions?.invoke) return null;
 
-  const { data, error } = await withRetry(() =>
+  const { data, error } = await withRetrySmart(() =>
     supabase.functions.invoke('fund-valuation-ranking', {
       body: { sort, order, page, pageSize }
     })

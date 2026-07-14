@@ -118,7 +118,7 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
       }
     },
     enabled: !!isActive,
-    staleTime: 120000
+    staleTime: 5 * 60 * 1000
   });
 
   const filteredAndSortedSectors = useMemo(() => {
@@ -160,7 +160,7 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
       return res?.Data?.list || [];
     },
     enabled: !!isActive,
-    staleTime: 120000
+    staleTime: 5 * 60 * 1000
   });
 
   const formatPercent = (val) => {
