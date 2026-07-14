@@ -5337,8 +5337,8 @@ html::-webkit-scrollbar-thumb:active,
   }
 
   [data-theme='light'] .trend-tooltip-desktop {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2)) !important;
-    backdrop-filter: blur(2px) !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.4)) !important;
+    backdrop-filter: blur(4px) !important;
   }
 }
 

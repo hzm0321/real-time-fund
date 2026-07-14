@@ -1,4 +1,4 @@
-import { isFunction, isNumber, isObject } from 'lodash';
+import { isArray, isFunction, isNumber, isObject } from 'lodash';
 
 const DEFAULT_GAP = 12;
 const DEFAULT_PADDING = 6;
@@ -193,7 +193,8 @@ export function getChartTooltipPosition({
   gap = DEFAULT_GAP,
   padding = DEFAULT_PADDING,
   anchorAvoidRadius = DEFAULT_ANCHOR_AVOID_RADIUS,
-  avoidRects = []
+  avoidRects = [],
+  additionalAvoidPoints = []
 }) {
   const safeChartArea = normalizeRect(chartArea);
   const chartBounds = normalizeRect({
@@ -229,6 +230,22 @@ export function getChartTooltipPosition({
     : DEFAULT_ANCHOR_AVOID_RADIUS;
   const anchorAvoidRect = makePointAvoidRect(anchorX, anchorY, safeAnchorAvoidRadius);
   const obstacles = avoidRects.map(normalizeRect).filter(Boolean);
+
+  // Build combined list of all avoid points (anchor + additional from multi-dataset charts)
+  const validAdditionalPoints = (isArray(additionalAvoidPoints) ? additionalAvoidPoints : [])
+    .filter((p) => isFiniteNumber(p?.x) && isFiniteNumber(p?.y))
+    .map((p) => ({
+      x: p.x,
+      y: p.y,
+      radius: isFiniteNumber(p.radius) ? Math.max(0, p.radius) : safeAnchorAvoidRadius
+    }));
+
+  const allAvoidPoints = [{ x: anchorX, y: anchorY, radius: safeAnchorAvoidRadius }, ...validAdditionalPoints];
+  const allPointAvoidRects = allAvoidPoints.map((p) => makePointAvoidRect(p.x, p.y, p.radius));
+
+  // Vertical extent of all avoid points — used to generate "clear all" candidates
+  const pointMinY = allAvoidPoints.length > 0 ? Math.min(...allAvoidPoints.map((p) => p.y)) : anchorY;
+  const pointMaxY = allAvoidPoints.length > 0 ? Math.max(...allAvoidPoints.map((p) => p.y)) : anchorY;
 
   const rawCandidates = [
     {
@@ -278,6 +295,45 @@ export function getChartTooltipPosition({
       left: anchorX + gap,
       top: anchorY + gap,
       priority: 7
+    },
+    // ── Candidates that clear ALL points vertically ──
+    // Place tooltip above the highest point or below the lowest point
+    {
+      placement: 'top',
+      left: anchorX - tooltipWidth / 2,
+      top: pointMinY - tooltipHeight - gap,
+      priority: 8
+    },
+    {
+      placement: 'bottom',
+      left: anchorX - tooltipWidth / 2,
+      top: pointMaxY + gap,
+      priority: 9
+    },
+    // Left/right aligned to chart-area top & bottom (more vertical options)
+    {
+      placement: 'right',
+      left: anchorX + gap,
+      top: minTop,
+      priority: 10
+    },
+    {
+      placement: 'right',
+      left: anchorX + gap,
+      top: maxTop,
+      priority: 11
+    },
+    {
+      placement: 'left',
+      left: anchorX - tooltipWidth - gap,
+      top: minTop,
+      priority: 12
+    },
+    {
+      placement: 'left',
+      left: anchorX - tooltipWidth - gap,
+      top: maxTop,
+      priority: 13
     }
   ];
 
@@ -297,8 +353,13 @@ export function getChartTooltipPosition({
     const left = clamp(pushed.left, minLeft, maxLeft);
     const top = clamp(pushed.top, minTop, maxTop);
     const rect = makeRect(left, top, tooltipWidth, tooltipHeight);
-    const anchorArea = intersectionArea(rect, anchorAvoidRect);
-    const coversAnchorPoint = rectContainsPoint(rect, anchorX, anchorY);
+
+    // Check coverage of ALL avoid points (not just the anchor)
+    const coversAnyPoint = allAvoidPoints.some((p) => rectContainsPoint(rect, p.x, p.y));
+    const totalPointAvoidArea = allPointAvoidRects.reduce(
+      (sum, avoidRect) => sum + intersectionArea(rect, avoidRect),
+      0
+    );
     const obstacleArea = obstacles.reduce((sum, obstacle) => sum + intersectionArea(rect, obstacle), 0);
     const safeOverflowArea = overflowArea(rect, safeBounds);
     const chartOverflowArea = overflowArea(rect, chartBounds);
@@ -310,11 +371,11 @@ export function getChartTooltipPosition({
       left,
       top,
       rect,
-      anchorArea,
-      coversAnchorPoint,
+      coversAnyPoint,
+      totalPointAvoidArea,
       score:
-        (coversAnchorPoint ? 1000000000 : 0) +
-        anchorArea * 1000000 +
+        (coversAnyPoint ? 1000000000 : 0) +
+        totalPointAvoidArea * 1000000 +
         obstacleArea * 10000 +
         safeOverflowArea * 1000 +
         chartOverflowArea * 100000 +
@@ -324,9 +385,9 @@ export function getChartTooltipPosition({
   });
 
   const nonBlockingCandidates = candidates.filter(
-    (candidate) => !candidate.coversAnchorPoint && candidate.anchorArea === 0
+    (candidate) => !candidate.coversAnyPoint && candidate.totalPointAvoidArea === 0
   );
-  const pointClearCandidates = candidates.filter((candidate) => !candidate.coversAnchorPoint);
+  const pointClearCandidates = candidates.filter((candidate) => !candidate.coversAnyPoint);
   const candidatePool = nonBlockingCandidates.length
     ? nonBlockingCandidates
     : pointClearCandidates.length

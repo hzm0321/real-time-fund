@@ -647,6 +647,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           qc.invalidateQueries({ queryKey: ['valuationRanking'], refetchType: 'none' });
           qc.invalidateQueries({ queryKey: ['eastSectorQuote'], refetchType: 'none' });
           qc.invalidateQueries({ queryKey: ['bkDetailQuote'], refetchType: 'none' });
+          qc.invalidateQueries({ queryKey: ['fundTopicTimeseries'], refetchType: 'none' });
         } catch (e) {
           console.warn('刷新行情数据出错', e);
         }

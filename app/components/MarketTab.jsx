@@ -2,19 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Star,
-  Filter,
-  ChevronDown,
-  ChevronRight,
-  LogIn,
-  Lock,
-  TrendingUp,
-  BarChart3,
-  Activity,
-  CheckCircle,
-  PlusCircle
-} from 'lucide-react';
+import { ChevronRight, LogIn, Lock, TrendingUp, BarChart3, Activity, CheckCircle, PlusCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table';
 import { fetchFundValuationRanking, fetchFundPeriodReturns } from '../api/fund';
@@ -22,16 +10,15 @@ import { cn } from '@/lib/utils';
 import { useStorageStore, useUserStore, useModalStore } from '../stores';
 import { supabase } from '../lib/supabase';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Empty, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import MobileFundCardDrawer from './MobileFundCardDrawer';
 import FundCard from './FundCard';
-import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink } from '@/components/ui/pagination';
+import RealtimeSectorFlowChart from './RealtimeSectorFlowChart';
 
 function FundDetailDialog({ cardDialogRow, getFundCardProps, setCardDialogRow }) {
   const isAnySubModalOpen = useModalStore(
@@ -500,6 +487,12 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
               </motion.div>
             </div>
           )}
+
+          {/* 当日实时板块资金流向追踪组件 */}
+          <RealtimeSectorFlowChart
+            sectorFilter={sectorFilter === 'concept' ? 'concept' : 'industry'}
+            sectorSort={sectorSort || 'change_pct'}
+          />
 
           {/* 榜单栏 */}
           <div className="market-ranking-section glass" id="market-ranking-section">
