@@ -2,7 +2,7 @@
 import { isNumber } from 'lodash';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Lock, Crown } from 'lucide-react';
+import { Loader2, Lock, Crown, HelpCircle } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
 import { fetchFundValuationBySource, fetchBestValuationSource, fetchFundBestSource, isQdiiFund } from '@/app/api/fund';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useStorageStore, useUserStore } from '@/app/stores';
 import { useMembership } from '@/app/hooks/useMembership';
 import DataSourceAccuracyBadge from './DataSourceAccuracyBadge';
@@ -241,88 +242,117 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <span style={{ fontSize: '18px', fontWeight: 600, flexShrink: 0 }}>切换数据源</span>
             {isAdded && (
-              <div
-                onClick={(e) => {
-                  if (!isVip) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    sonnerToast.warning('自动切源为 PRO 会员专享功能，请开通会员后解锁', {
-                      id: 'pro-auto-source-toast'
-                    });
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: !isVip
-                    ? 'color-mix(in srgb, #f59e0b 14%, var(--card))'
-                    : autoSource
-                      ? 'color-mix(in srgb, #f59e0b 18%, var(--card))'
-                      : 'var(--secondary)',
-                  padding: '5px 10px 5px 12px',
-                  borderRadius: '9999px',
-                  border: !isVip
-                    ? '1px solid rgba(245, 158, 11, 0.45)'
-                    : autoSource
-                      ? '1px solid #f59e0b'
-                      : '1px solid var(--border)',
-                  boxShadow: !isVip || autoSource ? '0 2px 10px rgba(245, 158, 11, 0.12)' : 'none',
-                  backdropFilter: 'blur(8px)',
-                  WebkitBackdropFilter: 'blur(8px)',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer'
-                }}
-              >
-                <Label
-                  htmlFor="auto-source-switch"
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  onClick={(e) => {
+                    if (!isVip) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      sonnerToast.warning('自动切源为 PRO 会员专享功能，请开通会员后解锁', {
+                        id: 'pro-auto-source-toast'
+                      });
+                    }
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    userSelect: 'none',
-                    margin: 0
+                    gap: '8px',
+                    background: !isVip
+                      ? 'color-mix(in srgb, #f59e0b 14%, var(--card))'
+                      : autoSource
+                        ? 'color-mix(in srgb, #f59e0b 18%, var(--card))'
+                        : 'var(--secondary)',
+                    padding: '5px 10px 5px 12px',
+                    borderRadius: '9999px',
+                    border: !isVip
+                      ? '1px solid rgba(245, 158, 11, 0.45)'
+                      : autoSource
+                        ? '1px solid #f59e0b'
+                        : '1px solid var(--border)',
+                    boxShadow: !isVip || autoSource ? '0 2px 10px rgba(245, 158, 11, 0.12)' : 'none',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
                   }}
                 >
-                  {autoLoading ? (
-                    <Loader2
-                      className="animate-spin"
-                      size={14}
-                      style={{ color: !isVip || autoSource ? '#f59e0b' : 'var(--muted-foreground)' }}
-                    />
-                  ) : (
-                    <>
-                      <Crown
-                        className="w-3.5 h-3.5 shrink-0"
+                  <Label
+                    htmlFor="auto-source-switch"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      userSelect: 'none',
+                      margin: 0
+                    }}
+                  >
+                    {autoLoading ? (
+                      <Loader2
+                        className="animate-spin"
+                        size={14}
                         style={{ color: !isVip || autoSource ? '#f59e0b' : 'var(--muted-foreground)' }}
                       />
-                      <span
-                        style={
-                          !isVip || autoSource
-                            ? {
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent'
-                              }
-                            : { color: 'var(--muted-foreground)' }
-                        }
-                      >
-                        自动
-                      </span>
-                    </>
-                  )}
-                </Label>
-                <Switch
-                  id="auto-source-switch"
-                  size="sm"
-                  checked={autoSource}
-                  onCheckedChange={handleAutoToggle}
-                  className={autoSource ? 'data-[state=checked]:!bg-[#f59e0b]' : ''}
-                  style={autoSource ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b' } : undefined}
-                />
+                    ) : (
+                      <>
+                        <Crown
+                          className="w-3.5 h-3.5 shrink-0"
+                          style={{ color: !isVip || autoSource ? '#f59e0b' : 'var(--muted-foreground)' }}
+                        />
+                        <span
+                          style={
+                            !isVip || autoSource
+                              ? {
+                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                  WebkitBackgroundClip: 'text',
+                                  WebkitTextFillColor: 'transparent'
+                                }
+                              : { color: 'var(--muted-foreground)' }
+                          }
+                        >
+                          自动
+                        </span>
+                      </>
+                    )}
+                  </Label>
+                  <Switch
+                    id="auto-source-switch"
+                    size="sm"
+                    checked={autoSource}
+                    onCheckedChange={handleAutoToggle}
+                    className={autoSource ? 'data-[state=checked]:!bg-[#f59e0b]' : ''}
+                    style={autoSource ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b' } : undefined}
+                  />
+                </div>
+                <Tooltip delayDuration={150}>
+                  <TooltipTrigger asChild>
+                    <div
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        cursor: 'help'
+                      }}
+                    >
+                      <HelpCircle
+                        size={16}
+                        className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    className="max-w-[240px] sm:max-w-none text-balance leading-relaxed"
+                    style={{ zIndex: 10000 }}
+                  >
+                    自动数据源基于历史估值走势与业绩走势线段拟合程度来选择最优数据源。
+                  </TooltipContent>
+                </Tooltip>
               </div>
             )}
           </div>
