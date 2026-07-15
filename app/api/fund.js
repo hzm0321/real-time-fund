@@ -700,22 +700,17 @@ export const loadScript = (url, options = {}) => {
 
 export const fetchFundNetValue = async (code, date) => {
   if (typeof window === 'undefined') return null;
-  const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${code}&page=1&per=1&sdate=${date}&edate=${date}`;
+  // F10DataApi.aspx 已失效，改用 pingzhongdata 查找指定日期净值
   try {
-    const apidata = await loadScript(url, { staleTime: getNetValueStaleTime() });
-    if (apidata && apidata.content) {
-      const content = apidata.content;
-      if (content.includes('暂无数据')) return null;
-      const rows = content.split('<tr>');
-      for (const row of rows) {
-        if (row.includes(`<td>${date}</td>`)) {
-          const cells = row.match(/<td[^>]*>(.*?)<\/td>/g);
-          if (cells && cells.length >= 2) {
-            const valStr = cells[1].replace(/<[^>]+>/g, '');
-            const val = parseFloat(valStr);
-            return isNaN(val) ? null : val;
-          }
-        }
+    const pz = await fetchFundPingzhongdata(String(code).trim(), { cacheTime: getNetValueStaleTime() });
+    const trend = pz?.Data_netWorthTrend;
+    if (!isArray(trend) || trend.length === 0) return null;
+    for (const d of trend) {
+      if (!d || !isNumber(d.x)) continue;
+      const pointDate = dayjs(d.x).tz(TZ).format('YYYY-MM-DD');
+      if (pointDate === date) {
+        const nav = Number(d.y);
+        return Number.isFinite(nav) ? nav : null;
       }
     }
     return null;
@@ -839,27 +834,55 @@ export const fetchFundNetValueRange = async (code, sdate, edate) => {
   }
   if (sdate > edate) return [];
 
+  // F10DataApi.aspx 已失效，改用 pingzhongdata 作为数据源
   const c = String(code).trim();
-  const merged = new Map();
-  let pageNum = 1;
-  const per = 500;
-  while (true) {
-    const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${c}&page=${pageNum}&per=${per}&sdate=${sdate}&edate=${edate}`;
-    try {
-      const apidata = await loadScript(url);
-      const content = apidata?.content || '';
-      const batch = parseNetValuesFromLsjzContent(content);
-      if (!batch.length) break;
-      for (const row of batch) {
-        merged.set(row.date, row);
-      }
-      if (batch.length < per) break;
-      pageNum += 1;
-    } catch {
-      break;
+  try {
+    const pz = await fetchFundPingzhongdata(c);
+    const trend = pz?.Data_netWorthTrend;
+    if (!isArray(trend) || trend.length === 0) return [];
+
+    const valid = trend
+      .filter((d) => isObject(d) && isNumber(d.x) && Number.isFinite(Number(d.y)))
+      .sort((a, b) => a.x - b.x);
+
+    const byDate = new Map();
+    const pointByDate = new Map();
+    for (const d of valid) {
+      const date = dayjs(d.x).tz(TZ).format('YYYY-MM-DD');
+      const nav = Number(d.y);
+      if (!Number.isFinite(nav) || nav <= 0) continue;
+      byDate.set(date, nav);
+      pointByDate.set(date, d);
     }
+
+    const allDates = Array.from(byDate.keys()).sort();
+    const results = [];
+    for (let i = 0; i < allDates.length; i++) {
+      const date = allDates[i];
+      if (date < sdate || date > edate) continue;
+      const nav = byDate.get(date);
+      const point = pointByDate.get(date);
+      let growth = null;
+      if (!isNil(point?.equityReturn) && Number.isFinite(Number(point.equityReturn))) {
+        growth = Number(point.equityReturn);
+      } else if (i > 0) {
+        const prevNav = byDate.get(allDates[i - 1]);
+        if (Number.isFinite(prevNav) && prevNav > 0) {
+          growth = ((nav - prevNav) / prevNav) * 100;
+        }
+      }
+      let dividend = null;
+      const unitMoney = String(point?.unitMoney || '').trim();
+      const divMatch = unitMoney.match(/派现金(\d+(?:\.\d+)?)/);
+      if (divMatch) {
+        dividend = parseFloat(divMatch[1]);
+      }
+      results.push({ date, nav, growth, dividend });
+    }
+    return results;
+  } catch {
+    return [];
   }
-  return Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
 };
 
 /**
@@ -911,15 +934,19 @@ export const fetchNetValueRangeFromTrend = async (code, sdate, edate, options = 
     if (!isArray(trend) || trend.length === 0) return [];
 
     // 过滤出有效数据点并按时间升序排列
-    const valid = trend.filter((d) => d && isNumber(d.x) && Number.isFinite(Number(d.y))).sort((a, b) => a.x - b.x);
+    const valid = trend
+      .filter((d) => isObject(d) && isNumber(d.x) && Number.isFinite(Number(d.y)))
+      .sort((a, b) => a.x - b.x);
 
-    // 按日期去重（同一天可能有多个数据点，取最后一条）并转换格式
+    // 按日期去重（同一天可能有多个数据点，取最后一条）并保存数据点用于获取涨跌幅
     const byDate = new Map();
+    const pointByDate = new Map();
     for (const d of valid) {
       const date = dayjs(d.x).tz(TZ).format('YYYY-MM-DD');
       const nav = Number(d.y);
       if (!Number.isFinite(nav) || nav <= 0) continue;
       byDate.set(date, nav); // 同日覆盖取最后一条
+      pointByDate.set(date, d);
     }
 
     // 提取范围内数据并计算 growth（日涨跌幅）
@@ -929,9 +956,11 @@ export const fetchNetValueRangeFromTrend = async (code, sdate, edate, options = 
       const date = allDates[i];
       if (date < sdate || date > edate) continue;
       const nav = byDate.get(date);
+      const point = pointByDate.get(date);
       let growth = null;
-      // 寻找前一个交易日净值用于计算涨跌幅
-      if (i > 0) {
+      if (!isNil(point?.equityReturn) && Number.isFinite(Number(point.equityReturn))) {
+        growth = Number(point.equityReturn);
+      } else if (i > 0) {
         const prevNav = byDate.get(allDates[i - 1]);
         if (Number.isFinite(prevNav) && prevNav > 0) {
           growth = ((nav - prevNav) / prevNav) * 100;
@@ -1002,7 +1031,7 @@ export const fetchNavMetricsFromTrendFallback = async (code) => {
 };
 
 const extractHoldingsReportDate = (html) => {
-  if (!html) return null;
+  if (!html || !isString(html)) return null;
 
   // 优先匹配带有“报告期 / 截止日期”等关键字附近的日期
   const m1 = html.match(/(报告期|截止日期)[^0-9]{0,20}(\d{4}-\d{2}-\d{2})/);
@@ -1063,16 +1092,7 @@ export const fetchFundDataFallback = async (c) => {
     try {
       // 尝试并行获取 F10 数据和通过搜索接口获取基金名称
       const f10Promise = (async () => {
-        const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${c}&page=1&per=3&sdate=&edate=`;
-        const apidata = await loadScript(url);
-        const content = apidata?.content || '';
-        const navList = parseNetValuesFromLsjzContent(content);
-        const latest = navList.length > 0 ? navList[navList.length - 1] : null;
-        if (!isNil(latest) && !isNil(latest.growth) && Number.isFinite(Number(latest.growth))) {
-          const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
-          const yM = computeYesterdayNavMetricsFromList(navList);
-          return { latest, previousNav, yM };
-        }
+        // F10DataApi.aspx 已失效，直接使用 pingzhongdata 获取净值指标
         const trendFallback = await fetchNavMetricsFromTrendFallback(c);
         if (!isNil(trendFallback)) {
           return {
@@ -1088,9 +1108,7 @@ export const fetchFundDataFallback = async (c) => {
             }
           };
         }
-        const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
-        const yM = computeYesterdayNavMetricsFromList(navList);
-        return { latest, previousNav, yM };
+        return { latest: null, previousNav: null, yM: { yesterdayZzl: null, yesterdayNavDelta: null } };
       })();
 
       const namePromise = (async () => {
@@ -1920,54 +1938,8 @@ export const fetchFundData = async (c, overrideDataSource) => {
   }
 
   // 1. 发起并发的历史净值和重仓请求
-  const lsjzPromise = new Promise((resolveT) => {
-    const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${code}&page=1&per=3&sdate=&edate=`;
-    loadScript(url, { staleTime: getNetValueStaleTime() })
-      .then(async (apidata) => {
-        const content = apidata?.content || '';
-        const navList = parseNetValuesFromLsjzContent(content);
-        if (navList.length > 0) {
-          const latest = navList[navList.length - 1];
-          if (!isNil(latest.growth) && Number.isFinite(Number(latest.growth))) {
-            const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
-            const yM = computeYesterdayNavMetricsFromList(navList);
-            resolveT({
-              dwjz: String(latest.nav),
-              zzl: Number(latest.growth),
-              jzrq: latest.date,
-              lastNav: previousNav ? String(previousNav.nav) : null,
-              yesterdayZzl: yM.yesterdayZzl,
-              yesterdayNavDelta: yM.yesterdayNavDelta
-            });
-            return;
-          }
-        }
-        const trendFallback = await fetchNavMetricsFromTrendFallback(code);
-        if (!isNil(trendFallback)) {
-          resolveT(trendFallback);
-          return;
-        }
-        if (navList.length > 0) {
-          const latest = navList[navList.length - 1];
-          const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
-          const yM = computeYesterdayNavMetricsFromList(navList);
-          resolveT({
-            dwjz: String(latest.nav),
-            zzl: Number.isFinite(latest.growth) ? latest.growth : null,
-            jzrq: latest.date,
-            lastNav: previousNav ? String(previousNav.nav) : null,
-            yesterdayZzl: yM.yesterdayZzl,
-            yesterdayNavDelta: yM.yesterdayNavDelta
-          });
-        } else {
-          resolveT(null);
-        }
-      })
-      .catch(async () => {
-        const trendFallback = await fetchNavMetricsFromTrendFallback(code);
-        resolveT(trendFallback);
-      });
-  });
+  // F10DataApi.aspx 已失效，直接使用 pingzhongdata 获取历史净值指标
+  const lsjzPromise = fetchNavMetricsFromTrendFallback(code);
 
   // 2. 发起估值请求
   const gzPromise = fetchFundValuationBySource(code, dataSource);
@@ -2046,21 +2018,25 @@ export const fetchFundHoldings = async (code) => {
   if (!code) return { holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false };
   return new Promise((resolveH) => {
     fundDebugLog('fetchFundHoldings start', { code });
-    const holdingsUrl = `https://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=${code}&topline=10&year=&month=&_=${Date.now()}`;
+    // FundArchivesDatas.aspx 已失效，改用移动端 API FundMNInverstPosition
+    const holdingsUrl = `https://fundmobapi.eastmoney.com/FundMNewApi/FundMNInverstPosition?FCODE=${code}&deviceid=Wap&plat=WAP&product=EFund&version=2.0.0`;
     getQueryClient()
       .fetchQuery({
         queryKey: qk.fundHoldingsArchives(code),
         queryFn: async () => {
-          const r = await runEastmoneyF10ScriptForApidata(holdingsUrl);
-          if (!r?.ok) throw new Error(r?.error || '数据加载失败');
-          return r.apidata;
+          const resp = await fetch(holdingsUrl);
+          if (!resp.ok) throw new Error('数据加载失败');
+          const json = await resp.json();
+          if (!json || !json.Success) throw new Error(json?.ErrMsg || '数据加载失败');
+          return json;
         },
         staleTime: 60 * 60 * 1000
       })
-      .then(async (apidata) => {
+      .then(async (json) => {
         let holdings = [];
-        const html = apidata?.content || '';
-        const holdingsReportDate = extractHoldingsReportDate(html);
+        const holdingsReportDate = extractHoldingsReportDate(
+          isString(json?.Expansion) ? json.Expansion : String(json?.Expansion || '')
+        );
         const holdingsIsLastQuarter = isLastQuarterReport(holdingsReportDate);
 
         // 如果不是上一季度末的披露数据，则不展示重仓（并避免继续解析/请求行情）
@@ -2069,53 +2045,13 @@ export const fetchFundHoldings = async (code) => {
           return;
         }
 
-        const headerRow = (html.match(/<thead[\s\S]*?<tr[\s\S]*?<\/tr>[\s\S]*?<\/thead>/i) || [])[0] || '';
-        const headerCells = (headerRow.match(/<th[\s\S]*?>([\s\S]*?)<\/th>/gi) || []).map((th) =>
-          th.replace(/<[^>]*>/g, '').trim()
-        );
-        let idxCode = -1,
-          idxName = -1,
-          idxWeight = -1;
-        headerCells.forEach((h, i) => {
-          const t = h.replace(/\s+/g, '');
-          if (idxCode < 0 && (t.includes('股票代码') || t.includes('证券代码'))) idxCode = i;
-          if (idxName < 0 && (t.includes('股票名称') || t.includes('证券名称'))) idxName = i;
-          if (idxWeight < 0 && (t.includes('占净值比例') || t.includes('占比'))) idxWeight = i;
-        });
-        const rows = html.match(/<tbody[\s\S]*?<\/tbody>/i) || [];
-        const dataRows = rows.length
-          ? rows[0].match(/<tr[\s\S]*?<\/tr>/gi) || []
-          : html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-        for (const r of dataRows) {
-          const tds = (r.match(/<td[\s\S]*?>([\s\S]*?)<\/td>/gi) || []).map((td) => td.replace(/<[^>]*>/g, '').trim());
-          if (!tds.length) continue;
-          let hc = '';
-          let hn = '';
-          let hw = '';
-          if (idxCode >= 0 && tds[idxCode]) {
-            const raw = String(tds[idxCode] || '').trim();
-            const mA = raw.match(/(\d{6})/);
-            const mHK = raw.match(/(\d{5})/);
-            // 海外股票常见为英文代码（如 AAPL / usAAPL / TSLA.US / 0700.HK）
-            const mAlpha = raw.match(/\b([A-Za-z]{1,10})\b/);
-            hc = mA ? mA[1] : mHK ? mHK[1] : mAlpha ? mAlpha[1].toUpperCase() : raw;
-          } else {
-            const codeIdx = tds.findIndex((txt) => /^\d{6}$/.test(txt));
-            if (codeIdx >= 0) hc = tds[codeIdx];
-          }
-          if (idxName >= 0 && tds[idxName]) {
-            hn = tds[idxName];
-          } else if (hc) {
-            const i = tds.findIndex((txt) => txt && txt !== hc && !/%$/.test(txt));
-            hn = i >= 0 ? tds[i] : '';
-          }
-          if (idxWeight >= 0 && tds[idxWeight]) {
-            const wm = tds[idxWeight].match(/([\d.]+)\s*%/);
-            hw = wm ? `${wm[1]}%` : tds[idxWeight];
-          } else {
-            const wIdx = tds.findIndex((txt) => /\d+(?:\.\d+)?\s*%/.test(txt));
-            hw = wIdx >= 0 ? tds[wIdx].match(/([\d.]+)\s*%/)?.[1] + '%' : '';
-          }
+        // 从移动端 API 响应中解析重仓股
+        const fundStocks = isArray(json?.Datas?.fundStocks) ? json.Datas.fundStocks : [];
+        for (const s of fundStocks) {
+          if (!isObject(s)) continue;
+          const hc = String(s.GPDM || '').trim();
+          const hn = String(s.GPJC || '').trim();
+          const hw = s.JZBL ? `${s.JZBL}%` : '';
           if (hc || hn || hw) {
             holdings.push({ code: hc, name: hn, weight: hw, change: null });
           }
