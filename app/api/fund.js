@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isArray, isNumber, isObject, isString } from 'lodash';
+import { isArray, isNil, isNumber, isObject, isString } from 'lodash';
 import { storageStore } from '../stores';
 import { withRetry, withRetrySmart } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
@@ -946,6 +946,61 @@ export const fetchNetValueRangeFromTrend = async (code, sdate, edate, options = 
   }
 };
 
+/**
+ * 从业绩趋势接口（pingzhongdata.Data_netWorthTrend）中提取最新有效的净值与涨跌幅信息，
+ * 用于 F10 历史净值接口（lsjz）无法返回最新涨跌幅时的兜底。
+ * @param {string} code 基金代码
+ * @returns {Promise<{ dwjz: string, zzl: number, jzrq: string, lastNav: string|null, yesterdayZzl: number|null, yesterdayNavDelta: number|null }|null>}
+ */
+export const fetchNavMetricsFromTrendFallback = async (code) => {
+  if (typeof window === 'undefined') return null;
+  if (!isString(code) || !String(code).trim()) return null;
+
+  try {
+    const pz = await fetchFundPingzhongdata(String(code).trim(), { cacheTime: 60 * 60 * 1000 });
+    const trend = pz?.Data_netWorthTrend;
+    if (!isArray(trend) || trend.length === 0) return null;
+
+    const valid = trend
+      .filter(
+        (d) =>
+          isObject(d) &&
+          isNumber(d.x) &&
+          Number.isFinite(Number(d.y)) &&
+          !isNil(d.equityReturn) &&
+          Number.isFinite(Number(d.equityReturn))
+      )
+      .sort((a, b) => a.x - b.x);
+
+    if (valid.length === 0) return null;
+
+    const latest = valid[valid.length - 1];
+    const prev = valid.length > 1 ? valid[valid.length - 2] : null;
+
+    const dwjz = String(latest.y);
+    const zzl = Number(latest.equityReturn);
+    const jzrq = dayjs(latest.x).tz(TZ).format('YYYY-MM-DD');
+    const lastNav = !isNil(prev) ? String(prev.y) : null;
+    const yesterdayZzl =
+      !isNil(prev) && !isNil(prev.equityReturn) && Number.isFinite(Number(prev.equityReturn))
+        ? Number(prev.equityReturn)
+        : null;
+    const yesterdayNavDelta =
+      !isNil(prev) && Number.isFinite(Number(prev.y)) ? Number(latest.y) - Number(prev.y) : null;
+
+    return {
+      dwjz,
+      zzl,
+      jzrq,
+      lastNav,
+      yesterdayZzl,
+      yesterdayNavDelta
+    };
+  } catch {
+    return null;
+  }
+};
+
 const extractHoldingsReportDate = (html) => {
   if (!html) return null;
 
@@ -1013,6 +1068,26 @@ export const fetchFundDataFallback = async (c) => {
         const content = apidata?.content || '';
         const navList = parseNetValuesFromLsjzContent(content);
         const latest = navList.length > 0 ? navList[navList.length - 1] : null;
+        if (!isNil(latest) && !isNil(latest.growth) && Number.isFinite(Number(latest.growth))) {
+          const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
+          const yM = computeYesterdayNavMetricsFromList(navList);
+          return { latest, previousNav, yM };
+        }
+        const trendFallback = await fetchNavMetricsFromTrendFallback(c);
+        if (!isNil(trendFallback)) {
+          return {
+            latest: {
+              date: trendFallback.jzrq,
+              nav: trendFallback.dwjz,
+              growth: trendFallback.zzl
+            },
+            previousNav: !isNil(trendFallback.lastNav) ? { nav: trendFallback.lastNav } : null,
+            yM: {
+              yesterdayZzl: trendFallback.yesterdayZzl,
+              yesterdayNavDelta: trendFallback.yesterdayNavDelta
+            }
+          };
+        }
         const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
         const yM = computeYesterdayNavMetricsFromList(navList);
         return { latest, previousNav, yM };
@@ -1848,9 +1923,30 @@ export const fetchFundData = async (c, overrideDataSource) => {
   const lsjzPromise = new Promise((resolveT) => {
     const url = `https://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code=${code}&page=1&per=3&sdate=&edate=`;
     loadScript(url, { staleTime: getNetValueStaleTime() })
-      .then((apidata) => {
+      .then(async (apidata) => {
         const content = apidata?.content || '';
         const navList = parseNetValuesFromLsjzContent(content);
+        if (navList.length > 0) {
+          const latest = navList[navList.length - 1];
+          if (!isNil(latest.growth) && Number.isFinite(Number(latest.growth))) {
+            const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
+            const yM = computeYesterdayNavMetricsFromList(navList);
+            resolveT({
+              dwjz: String(latest.nav),
+              zzl: Number(latest.growth),
+              jzrq: latest.date,
+              lastNav: previousNav ? String(previousNav.nav) : null,
+              yesterdayZzl: yM.yesterdayZzl,
+              yesterdayNavDelta: yM.yesterdayNavDelta
+            });
+            return;
+          }
+        }
+        const trendFallback = await fetchNavMetricsFromTrendFallback(code);
+        if (!isNil(trendFallback)) {
+          resolveT(trendFallback);
+          return;
+        }
         if (navList.length > 0) {
           const latest = navList[navList.length - 1];
           const previousNav = navList.length > 1 ? navList[navList.length - 2] : null;
@@ -1867,7 +1963,10 @@ export const fetchFundData = async (c, overrideDataSource) => {
           resolveT(null);
         }
       })
-      .catch(() => resolveT(null));
+      .catch(async () => {
+        const trendFallback = await fetchNavMetricsFromTrendFallback(code);
+        resolveT(trendFallback);
+      });
   });
 
   // 2. 发起估值请求
@@ -1901,6 +2000,11 @@ export const fetchFundData = async (c, overrideDataSource) => {
         baseData.jzrq = tData.jzrq;
         baseData.zzl = tData.zzl;
         baseData.lastNav = tData.lastNav;
+      } else if (isNil(baseData.zzl) && !isNil(tData.zzl)) {
+        baseData.zzl = tData.zzl;
+        if (!baseData.dwjz) baseData.dwjz = tData.dwjz;
+        if (!baseData.jzrq) baseData.jzrq = tData.jzrq;
+        if (!baseData.lastNav) baseData.lastNav = tData.lastNav;
       }
       if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayZzl')) {
         baseData.yesterdayZzl = tData.yesterdayZzl;
