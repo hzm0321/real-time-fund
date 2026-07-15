@@ -25,6 +25,7 @@ import { useMembership } from '../hooks/useMembership';
 import { getChartTooltipPosition } from '../lib/chartTooltipPosition';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -868,30 +869,25 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
 
           {/* 切换控制条：左侧分时走势/排名对比，右侧展示日期 */}
           <div className="flex items-center justify-between">
-            <div className="inline-flex items-center p-0.5 rounded-lg bg-foreground/5 border border-border/40">
-              <button
-                onClick={() => setChartMode('line')}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
-                  chartMode === 'line'
-                    ? 'bg-background text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
+            <ToggleGroup
+              type="single"
+              value={chartMode}
+              onValueChange={(v) => v && setChartMode(v)}
+              className="bg-black/5 dark:bg-white/10 p-0.5 rounded-md border border-black/5 dark:border-white/5 gap-0 shadow-inner"
+            >
+              <ToggleGroupItem
+                value="line"
+                className="h-6 px-2 text-[10px] flex items-center gap-1 rounded-sm border-0 bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm transition-all cursor-pointer"
               >
-                <Activity className="size-3.5" /> 分时折线
-              </button>
-              <button
-                onClick={() => setChartMode('bar')}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
-                  chartMode === 'bar'
-                    ? 'bg-background text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
+                <Activity className="size-3" /> 分时折线
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="bar"
+                className="h-6 px-2 text-[10px] flex items-center gap-1 rounded-sm border-0 bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm transition-all cursor-pointer"
               >
-                <BarChart3 className="size-3.5" /> 排名对比
-              </button>
-            </div>
+                <BarChart3 className="size-3" /> 排名对比
+              </ToggleGroupItem>
+            </ToggleGroup>
             <span className="text-xs font-mono font-medium text-muted-foreground">{displayDateStr}</span>
           </div>
 

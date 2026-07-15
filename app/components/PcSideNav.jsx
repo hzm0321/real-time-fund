@@ -32,7 +32,7 @@ export default function PcSideNav({ value, onChange }) {
     >
       <nav className="pc-side-nav" role="navigation" aria-label="侧边导航">
         <div className="pc-side-nav-handle">
-          <ChevronRight size={16} strokeWidth={2.5} color="var(--muted)" />
+          <ChevronRight size={16} strokeWidth={2.5} />
         </div>
         <div className="pc-side-nav-content">
           <LayoutGroup id="pc-side-nav-group">
