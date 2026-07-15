@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isArray, isNumber, isPlainObject, isString } from 'lodash';
+import { isArray, isNil, isNumber, isPlainObject, isString } from 'lodash';
 
 import { useStorageStore, storageStore, useUserStore } from '../stores';
 import { recordValuation, setValuationSeries as persistValuationSeries } from '../lib/valuationTimeseries';
@@ -52,6 +52,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
   const refreshCycleStartRef = useRef(Date.now());
   const refreshingRef = useRef(false);
   const refreshCodesRef = useRef([]);
+  const priorityRetryQueueRef = useRef(new Set());
 
   const scheduleDcaTradesRef = useRef(scheduleDcaTrades);
   const processPendingQueueRef = useRef(processPendingQueue);
@@ -86,7 +87,10 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
       refreshingRef.current = true;
       setRefreshing(true);
 
-      const uniqueCodes = Array.from(new Set(codes));
+      const allUniqueCodes = Array.from(new Set(codes));
+      const priorityCodes = allUniqueCodes.filter((c) => priorityRetryQueueRef.current.has(c));
+      const normalCodes = allUniqueCodes.filter((c) => !priorityRetryQueueRef.current.has(c));
+      const uniqueCodes = [...priorityCodes, ...normalCodes];
 
       const fundCodeStillInStorage = (code) => {
         if (!code) return false;
@@ -315,11 +319,16 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
         }
 
         await asyncPool(3, uniqueCodes, async (c) => {
-          if (!fundCodeStillInStorage(c)) return;
+          if (!fundCodeStillInStorage(c)) {
+            priorityRetryQueueRef.current.delete(c);
+            return;
+          }
           let data = null;
+          let fetchSuccess = true;
           try {
             data = await fetchFundData(c, bestSourcesMap[c]);
           } catch (e) {
+            fetchSuccess = false;
             console.error(`刷新基金 ${c} 失败`, e);
             if (fundCodeStillInStorage(c)) {
               try {
@@ -329,10 +338,24 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
             }
           }
 
+          const hasValidGsz = (row) => row?.gsz != null && row?.gsz !== '' && Number.isFinite(Number(row?.gsz));
+          const hasValidNav = (row) => row?.dwjz != null && row?.dwjz !== '' && Number.isFinite(Number(row?.dwjz));
+
+          if (
+            !fetchSuccess ||
+            !data ||
+            (data.noValuation && !hasValidNav(data)) ||
+            (!data.noValuation && !hasValidGsz(data) && !hasValidNav(data)) ||
+            isNil(data.zzl)
+          ) {
+            priorityRetryQueueRef.current.add(c);
+          } else {
+            priorityRetryQueueRef.current.delete(c);
+          }
+
           if (!data || !fundCodeStillInStorage(c)) return;
 
           const oldData = getStoredFundSnapshot(c);
-          const hasValidGsz = (row) => row?.gsz != null && row?.gsz !== '' && Number.isFinite(Number(row?.gsz));
           if (oldData && !hasValidGsz(data) && hasValidGsz(oldData)) {
             data.gsz = oldData.gsz;
             data.gszzl = oldData.gszzl;
