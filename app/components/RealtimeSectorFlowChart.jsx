@@ -138,7 +138,16 @@ function getValueColorClass(val) {
 }
 
 export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sectorSort = 'change_pct' }) {
-  const chartRef = React.useRef(null);
+  const chartRef = useRef(null);
+  const hoverTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
   const user = useUserStore((s) => s.user);
   const { isVip, loading: vipLoading } = useMembership();
   const [selectedSectorIds, setSelectedSectorIds] = useState([]);
@@ -375,6 +384,28 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
     const lineColor = isLight ? '#475569' : '#9ca3af';
     return {
       id: 'crosshair',
+      afterEvent: (chart, args) => {
+        const { event, replay } = args || {};
+        if (!event || replay) return; // 忽略动画重放
+
+        const type = event.type;
+        if (type === 'mousemove' || type === 'click') {
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
+
+          hoverTimeoutRef.current = setTimeout(() => {
+            if (!chart || !chartRef.current || chart !== chartRef.current) return;
+            chart.setActiveElements([]);
+            if (chart.tooltip) {
+              chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            }
+            chart.update();
+            setTooltipInfo(null);
+          }, 2000);
+        }
+      },
       afterDraw: (chart) => {
         const ctx = chart.ctx;
         let activeElements = [];
@@ -414,6 +445,22 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
       interaction: {
         mode: 'index',
         intersect: false
+      },
+      onHover: (event, chartElement, chart) => {
+        const target = event?.native?.target;
+        const currentChart = chart || chartRef.current;
+        if (!currentChart) return;
+
+        const tooltipActive = currentChart.tooltip?._active ?? [];
+        const activeElements = currentChart.getActiveElements ? currentChart.getActiveElements() : [];
+        const hasActive =
+          (chartElement && chartElement.length > 0) ||
+          (tooltipActive && tooltipActive.length > 0) ||
+          (activeElements && activeElements.length > 0);
+
+        if (target) {
+          target.style.cursor = hasActive ? 'crosshair' : 'default';
+        }
       },
       plugins: {
         legend: {
@@ -894,27 +941,29 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
                       </div>
                       <div className="flex flex-col gap-3">
                         {barChartData.positiveList.map((item, index) => {
-                          const widthPct = Math.max(4, Math.min((item.val / barChartData.maxPosVal) * 72, 72));
+                          const widthPct = Math.max(6, Math.min((item.val / barChartData.maxPosVal) * 100, 100));
                           return (
-                            <div key={item.id} className="flex items-center gap-2 text-xs">
+                            <div key={item.id} className="flex items-center gap-2.5 text-xs">
                               <span className="w-5 text-center font-mono font-medium text-muted-foreground shrink-0">
                                 {index + 1}
                               </span>
-                              <div className="flex-1 flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-foreground shrink-0 whitespace-nowrap min-w-[76px]">
+                                {item.name}
+                              </span>
+                              <div className="flex-1 h-5 rounded-md bg-muted/15 dark:bg-muted/20 overflow-hidden relative min-w-[36px]">
                                 <motion.div
                                   initial={{ width: 0 }}
                                   animate={{ width: `${widthPct}%` }}
                                   transition={{ duration: 0.4, ease: 'easeOut' }}
-                                  className="h-5 rounded-r-md transition-all shrink-0"
+                                  className="h-full rounded-r-md transition-all"
                                   style={{
                                     backgroundColor: theme === 'light' ? '#dc2626' : '#f87171'
                                   }}
                                 />
-                                <span className="font-medium text-foreground truncate">{item.name}</span>
-                                <span className="font-mono text-muted-foreground shrink-0">
-                                  {formatBarValue(item.val, sectorSort, false)}
-                                </span>
                               </div>
+                              <span className="font-mono font-medium text-foreground shrink-0 text-right min-w-[56px]">
+                                {formatBarValue(item.val, sectorSort, false)}
+                              </span>
                             </div>
                           );
                         })}
@@ -939,29 +988,31 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
                       <div className="flex flex-col gap-3">
                         {barChartData.negativeList.map((item, index) => {
                           const widthPct = Math.max(
-                            4,
-                            Math.min((Math.abs(item.val) / barChartData.maxNegVal) * 72, 72)
+                            6,
+                            Math.min((Math.abs(item.val) / barChartData.maxNegVal) * 100, 100)
                           );
                           return (
-                            <div key={item.id} className="flex items-center gap-2 text-xs">
+                            <div key={item.id} className="flex items-center gap-2.5 text-xs">
                               <span className="w-5 text-center font-mono font-medium text-muted-foreground shrink-0">
                                 {index + 1}
                               </span>
-                              <div className="flex-1 flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-foreground shrink-0 whitespace-nowrap min-w-[76px]">
+                                {item.name}
+                              </span>
+                              <div className="flex-1 h-5 rounded-md bg-muted/15 dark:bg-muted/20 overflow-hidden relative min-w-[36px]">
                                 <motion.div
                                   initial={{ width: 0 }}
                                   animate={{ width: `${widthPct}%` }}
                                   transition={{ duration: 0.4, ease: 'easeOut' }}
-                                  className="h-5 rounded-r-md transition-all shrink-0"
+                                  className="h-full rounded-r-md transition-all"
                                   style={{
                                     backgroundColor: theme === 'light' ? '#059669' : '#34d399'
                                   }}
                                 />
-                                <span className="font-medium text-foreground truncate">{item.name}</span>
-                                <span className="font-mono text-muted-foreground shrink-0">
-                                  {formatBarValue(item.val, sectorSort, true)}
-                                </span>
                               </div>
+                              <span className="font-mono font-medium text-foreground shrink-0 text-right min-w-[56px]">
+                                {formatBarValue(item.val, sectorSort, true)}
+                              </span>
                             </div>
                           );
                         })}

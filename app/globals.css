@@ -4977,7 +4977,7 @@ html::-webkit-scrollbar-thumb:active,
 .market-tab-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   padding-bottom: calc(var(--mobile-bottom-nav-height, 60px) + 20px);
 }
 
