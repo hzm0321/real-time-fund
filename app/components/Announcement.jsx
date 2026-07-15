@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.5.0';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.5.1';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -109,9 +109,8 @@ export default function Announcement() {
                 paddingRight: '4px'
               }}
             >
-              <p>v2.5.0 Pro 版本更新内容：</p>
-              <p>1. 行情页面新增实时板块资金流向展示。</p>
-              <p>2. 优化关联板块数据刷新问题。</p>
+              <p>v2.5.1 Pro 版本更新内容：</p>
+              <p>1. 修复净值获取接口失效问题。</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button
