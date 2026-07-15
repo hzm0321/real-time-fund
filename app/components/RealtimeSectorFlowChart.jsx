@@ -654,18 +654,13 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
   return (
     <div className="market-section glass rounded-2xl p-4 sm:p-5 my-4 border border-border/50 shadow-sm transition-all">
       {/* 头部标题区 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/40">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)]">实时板块资金流向追踪</h3>
-          <span className="pro-pill-badge">👑 PRO 专享</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/5 text-muted-foreground">
-            {sectorFilter === 'industry' ? '按行业' : '按概念'} ·{' '}
-            {sectorSort === 'change_pct' ? '涨幅走势' : '净流入走势'}
-          </span>
-        </div>
-        <div className="flex items-center sm:justify-end">
-          <span className="text-xs font-mono font-medium text-muted-foreground">{displayDateStr}</span>
-        </div>
+      <div className="flex items-center gap-2 flex-wrap border-b border-border/40">
+        <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)]">实时板块资金流向追踪</h3>
+        <span className="pro-pill-badge">👑 PRO 专享</span>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/5 text-muted-foreground">
+          {sectorFilter === 'industry' ? '按行业' : '按概念'} ·{' '}
+          {sectorSort === 'change_pct' ? '涨幅走势' : '净流入走势'}
+        </span>
       </div>
 
       {/* 非 PRO 会员锁屏卡片（完全对齐估值趋势图样式） */}
@@ -871,7 +866,7 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
             </AnimatePresence>
           </div>
 
-          {/* 左上角切换控制条：分时走势折线图 / 排名对比柱状图 */}
+          {/* 切换控制条：左侧分时走势/排名对比，右侧展示日期 */}
           <div className="flex items-center justify-between">
             <div className="inline-flex items-center p-0.5 rounded-lg bg-foreground/5 border border-border/40">
               <button
@@ -897,6 +892,7 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
                 <BarChart3 className="size-3.5" /> 排名对比
               </button>
             </div>
+            <span className="text-xs font-mono font-medium text-muted-foreground">{displayDateStr}</span>
           </div>
 
           {/* 视图渲染区域 */}
