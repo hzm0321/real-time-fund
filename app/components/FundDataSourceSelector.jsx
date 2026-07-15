@@ -1,7 +1,7 @@
 'use client';
 import { isNumber } from 'lodash';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Loader2, Lock, Crown, HelpCircle } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
 import { fetchFundValuationBySource, fetchBestValuationSource, fetchFundBestSource, isQdiiFund } from '@/app/api/fund';
@@ -50,6 +50,8 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
   // 自动数据源状态
   const [autoSource, setAutoSource] = useState(!!fund?.autoSource);
   const [autoLoading, setAutoLoading] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const touchFocusRef = useRef(0);
 
   // 调用 RPC 获取最佳数据源
   const fetchAndApplyBestSource = useCallback(async (fundCode) => {
@@ -326,29 +328,51 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                     style={autoSource ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b' } : undefined}
                   />
                 </div>
-                <Tooltip delayDuration={150}>
+                <Tooltip open={tooltipOpen} onOpenChange={setTooltipOpen} delayDuration={150}>
                   <TooltipTrigger asChild>
-                    <div
+                    <button
+                      type="button"
+                      onFocus={() => {
+                        touchFocusRef.current = Date.now();
+                      }}
+                      onPointerDown={(e) => {
+                        if (e.pointerType === 'touch') {
+                          touchFocusRef.current = Date.now();
+                        }
+                      }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (Date.now() - touchFocusRef.current < 250) {
+                          setTooltipOpen(true);
+                        } else {
+                          setTooltipOpen((prev) => {
+                            const next = !prev;
+                            if (!next) e.currentTarget.blur();
+                            return next;
+                          });
+                        }
                       }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        cursor: 'help'
+                        cursor: 'help',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0
                       }}
                     >
                       <HelpCircle
                         size={16}
                         className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       />
-                    </div>
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent
                     side="top"
                     className="max-w-[240px] sm:max-w-none text-balance leading-relaxed"
                     style={{ zIndex: 10000 }}
+                    onPointerDownOutside={() => setTooltipOpen(false)}
                   >
                     自动数据源基于历史估值走势与业绩走势线段拟合程度来选择最优数据源。
                   </TooltipContent>
