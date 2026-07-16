@@ -32,6 +32,7 @@ import { CloseIcon, GridIcon, ListIcon, MoonIcon, PlusIcon, SettingsIcon, SortIc
 import UserMenu from './components/UserMenu';
 import RefreshButton from './components/RefreshButton';
 const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
+const AdBadge = dynamic(() => import('./components/AdBadge'), { ssr: false });
 import MarketIndexAccordion from './components/MarketIndexAccordion';
 import githubImg from './assets/github.svg';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
@@ -4649,6 +4650,7 @@ export default function HomePage() {
             </div>
             <div className={`actions ${isSearchFocused || selectedFunds.length > 0 ? 'search-focused-sibling' : ''}`}>
               <UpdateChecker onModalOpenChange={setIsUpdateModalOpen} />
+              <AdBadge isMobile={isMobile} />
               <span className="github-icon-wrap">
                 <Image
                   unoptimized

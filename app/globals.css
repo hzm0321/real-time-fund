@@ -5626,3 +5626,83 @@ html::-webkit-scrollbar-thumb:active,
 [data-theme='light'] .user-avatar-small.pro-vip {
   border: 1px solid rgba(146, 64, 14, 0.3) !important;
 }
+
+/* --- PC端顶部导航栏右侧广告标签组件 (AdBadge) --- */
+.ad-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.ad-pill-badge:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 65%, transparent);
+  color: var(--primary);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.ad-badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.ad-badge-text {
+  line-height: 1;
+  letter-spacing: 0.3px;
+}
+
+.ad-badge-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  transition: all 0.15s ease;
+}
+
+.ad-badge-close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+/* 亮色模式适配 (Light Theme) */
+[data-theme='light'] .ad-pill-badge {
+  background: color-mix(in srgb, var(--primary) 10%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+[data-theme='light'] .ad-pill-badge:hover {
+  background: color-mix(in srgb, var(--primary) 16%, #ffffff);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+[data-theme='light'] .ad-badge-close:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
