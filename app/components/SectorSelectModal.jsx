@@ -94,15 +94,14 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {loading ? (
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {[1, 2, 3].map((i) => (
                 <div
                   key={`skeleton-${i}`}
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-border/40 bg-card animate-pulse"
+                  className="flex items-center justify-between px-3.5 py-3 rounded-xl border border-border/40 bg-card animate-pulse"
                 >
-                  <div className="flex flex-col gap-2 min-w-0 pr-3">
+                  <div className="flex items-center min-w-0 pr-3">
                     <div className="h-4 w-28 bg-muted/80 rounded"></div>
-                    <div className="h-3 w-16 bg-muted/50 rounded"></div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="h-6 w-14 bg-muted/60 rounded-full"></div>
@@ -120,7 +119,7 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px'
+                gap: '8px'
               }}
             >
               {options.map((tp, idx) => {
@@ -142,7 +141,7 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '16px',
+                      padding: '12px 14px',
                       borderRadius: '12px',
                       border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
                       background: isSelected
@@ -154,8 +153,8 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
                       userSelect: 'none'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', minWidth: 0 }}>
-                      <RadioGroupItem value={tp} id={`sector-${tp}`} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', minWidth: 0 }}>
+                      <RadioGroupItem value={tp} id={`sector-${tp}`} style={{ flexShrink: 0 }} />
 
                       <div
                         style={{
@@ -167,7 +166,7 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
                           gap: '12px'
                         }}
                       >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
                           <span
                             style={{
                               fontSize: '15px',
@@ -175,13 +174,11 @@ export default function SectorSelectModal({ open, fundCode, fundName, currentSec
                               color: 'var(--foreground)',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis'
+                              textOverflow: 'ellipsis',
+                              display: 'block'
                             }}
                           >
                             {name}
-                          </span>
-                          <span style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--muted-foreground)' }}>
-                            {tp}
                           </span>
                         </div>
 
