@@ -87,6 +87,13 @@ const formatHoldingChangeInfo = (h) => {
   };
 };
 
+/** 检查行业标签是否为有效数据（排除 --、-、空值等） */
+const isValidIndexName = (val) => {
+  if (!isString(val)) return false;
+  const trimmed = val.trim();
+  return trimmed !== '' && trimmed !== '--' && trimmed !== '-' && trimmed !== 'null' && trimmed !== 'undefined';
+};
+
 /** 格式化阶段涨跌幅 */
 const fmtPeriodReturn = (val) => {
   if (val == null || !Number.isFinite(val)) return '—';
@@ -963,9 +970,7 @@ export default function Index({
                         style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, overflow: 'hidden' }}
                       >
                         <span className="name">{h.name}</span>
-                        {isString(h.indexName) && h.indexName.trim() !== '' && (
-                          <span className="index-tag-pill">{h.indexName.trim()}</span>
-                        )}
+                        {isValidIndexName(h.indexName) && <span className="index-tag-pill">{h.indexName.trim()}</span>}
                       </div>
                       <div className="values" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         {isNumber(h.change) && (
@@ -1098,7 +1103,7 @@ export default function Index({
                               }}
                             >
                               <span className="name">{h.name}</span>
-                              {isString(h.indexName) && h.indexName.trim() !== '' && (
+                              {isValidIndexName(h.indexName) && (
                                 <span className="index-tag-pill">{h.indexName.trim()}</span>
                               )}
                             </div>
