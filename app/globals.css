@@ -601,6 +601,16 @@ body::before {
   color: var(--accent);
 }
 
+[data-theme='light'] .list .item .index-tag-pill {
+  color: var(--muted-foreground);
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-theme='light'] .list .item .chg-text.neutral {
+  color: #64748b;
+}
+
 /* 亮色主题：业绩走势下方筛选区域 */
 [data-theme='light'] .trend-range-bar {
   background: rgba(0, 0, 0, 0.06);
@@ -1128,12 +1138,16 @@ input[type='number'] {
 
   .item .name {
     max-width: 100px;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .item .badge {
     padding: 2px 4px;
     font-size: 14px;
+  }
+
+  .item .weight {
+    font-size: 13px;
   }
 }
 
@@ -1177,6 +1191,8 @@ input[type='number'] {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .modal .item .name {
@@ -1189,7 +1205,41 @@ input[type='number'] {
 
 .item .weight {
   font-weight: 600;
+  font-size: 13px;
   color: var(--accent);
+}
+
+.item .index-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  width: fit-content;
+}
+
+.item .chg-text {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+  color: var(--muted);
+}
+
+.item .chg-text.up {
+  color: var(--danger);
+}
+
+.item .chg-text.down {
+  color: var(--success);
 }
 
 /* 业绩走势下方筛选区域（近1月/3月/6月/1年/3年） */

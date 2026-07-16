@@ -2054,7 +2054,18 @@ export const fetchFundHoldings = async (code) => {
           const hn = String(s.GPJC || '').trim();
           const hw = s.JZBL ? `${s.JZBL}%` : '';
           if (hc || hn || hw) {
-            holdings.push({ code: hc, name: hn, weight: hw, change: null });
+            const indexName = String(s.INDEXNAME || '').trim();
+            const pctNvChgType = String(s.PCTNVCHGTYPE || '').trim();
+            const pctNvChg = String(s.PCTNVCHG || '').trim();
+            holdings.push({
+              code: hc,
+              name: hn,
+              weight: hw,
+              change: null,
+              indexName,
+              pctNvChgType,
+              pctNvChg
+            });
           }
         }
         holdings = holdings.slice(0, 10);

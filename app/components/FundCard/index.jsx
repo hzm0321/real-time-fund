@@ -54,6 +54,39 @@ const formatDisplayDate = (value) => {
   return showTime ? d.format('MM-DD HH:mm') : d.format('MM-DD');
 };
 
+/** 格式化重仓股较上期变动展示文本与样式判断 */
+const formatHoldingChangeInfo = (h) => {
+  if (!isObject(h)) return { text: '--', isUp: false, isDown: false, hasData: false };
+  const typeStr = isString(h.pctNvChgType) ? h.pctNvChgType.trim() : '';
+  if (typeStr === '新进' || typeStr === '新增') {
+    return {
+      text: typeStr,
+      isUp: true,
+      isDown: false,
+      hasData: true
+    };
+  }
+  const valStr = isString(h.pctNvChg) ? h.pctNvChg.trim() : '';
+  const num = parseFloat(valStr);
+  if (isNumber(num) && !isNaN(num) && num !== 0) {
+    return {
+      text: `${num > 0 ? '↑' : '↓'}${Math.abs(num).toFixed(2)}%`,
+      isUp: num > 0,
+      isDown: num < 0,
+      hasData: true
+    };
+  }
+  if (!typeStr) return { text: '--', isUp: false, isDown: false, hasData: false };
+  const isUp = typeStr === '增持';
+  const isDown = typeStr === '减持';
+  return {
+    text: typeStr,
+    isUp,
+    isDown,
+    hasData: true
+  };
+};
+
 /** 格式化阶段涨跌幅 */
 const fmtPeriodReturn = (val) => {
   if (val == null || !Number.isFinite(val)) return '—';
@@ -919,26 +952,43 @@ export default function Index({
                   <span className="muted">重仓股票：</span>
                   <span style={{ color: 'var(--foreground)' }}>{top10WeightSum.toFixed(2)}%</span>
                 </div>
-                <span className="muted">涨跌幅 / 占比</span>
+                <span className="muted">涨跌幅 / 占比 / 较上期</span>
               </div>
               <div className="list">
-                {topHoldings.holdings.map((h, idx) => (
-                  <div className="item" key={idx}>
-                    <span className="name">{h.name}</span>
-                    <div className="values">
-                      {isNumber(h.change) && (
-                        <span
-                          className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`}
-                          style={{ marginRight: 8 }}
-                        >
-                          {h.change > 0 ? '+' : ''}
-                          {h.change.toFixed(2)}%
+                {topHoldings.holdings.map((h, idx) => {
+                  const chg = formatHoldingChangeInfo(h);
+                  return (
+                    <div className="item" key={idx}>
+                      <div
+                        style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, overflow: 'hidden' }}
+                      >
+                        <span className="name">{h.name}</span>
+                        {isString(h.indexName) && h.indexName.trim() !== '' && (
+                          <span className="index-tag-pill">{h.indexName.trim()}</span>
+                        )}
+                      </div>
+                      <div className="values" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        {isNumber(h.change) && (
+                          <span
+                            className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`}
+                            style={{ marginRight: 2 }}
+                          >
+                            {h.change > 0 ? '+' : ''}
+                            {h.change.toFixed(2)}%
+                          </span>
+                        )}
+                        <span className="weight" style={{ minWidth: 42, textAlign: 'right' }}>
+                          {h.weight}
                         </span>
-                      )}
-                      <span className="weight">{h.weight}</span>
+                        {chg.hasData && (
+                          <span className={`chg-text ${chg.isUp ? 'up' : chg.isDown ? 'down' : 'neutral'}`}>
+                            {chg.text}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </TabsContent>
           )}
@@ -1031,26 +1081,52 @@ export default function Index({
                         <span className="muted">重仓股票：</span>
                         <span style={{ color: 'var(--foreground)' }}>{top10WeightSum.toFixed(2)}%</span>
                       </div>
-                      <span className="muted">涨跌幅 / 占比</span>
+                      <span className="muted">涨跌幅 / 占比 / 较上期</span>
                     </div>
                     <div className="list">
-                      {topHoldings.holdings.map((h, idx) => (
-                        <div className="item" key={idx}>
-                          <span className="name">{h.name}</span>
-                          <div className="values">
-                            {isNumber(h.change) && (
-                              <span
-                                className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`}
-                                style={{ marginRight: 8 }}
-                              >
-                                {h.change > 0 ? '+' : ''}
-                                {h.change.toFixed(2)}%
+                      {topHoldings.holdings.map((h, idx) => {
+                        const chg = formatHoldingChangeInfo(h);
+                        return (
+                          <div className="item" key={idx}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 4,
+                                minWidth: 0,
+                                overflow: 'hidden'
+                              }}
+                            >
+                              <span className="name">{h.name}</span>
+                              {isString(h.indexName) && h.indexName.trim() !== '' && (
+                                <span className="index-tag-pill">{h.indexName.trim()}</span>
+                              )}
+                            </div>
+                            <div
+                              className="values"
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}
+                            >
+                              {isNumber(h.change) && (
+                                <span
+                                  className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`}
+                                  style={{ marginRight: 2 }}
+                                >
+                                  {h.change > 0 ? '+' : ''}
+                                  {h.change.toFixed(2)}%
+                                </span>
+                              )}
+                              <span className="weight" style={{ minWidth: 42, textAlign: 'right' }}>
+                                {h.weight}
                               </span>
-                            )}
-                            <span className="weight">{h.weight}</span>
+                              {chg.hasData && (
+                                <span className={`chg-text ${chg.isUp ? 'up' : chg.isDown ? 'down' : 'neutral'}`}>
+                                  {chg.text}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}
