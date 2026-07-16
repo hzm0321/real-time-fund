@@ -2030,7 +2030,8 @@ export const fetchFundHoldings = async (code) => {
           if (!json || !json.Success) throw new Error(json?.ErrMsg || '数据加载失败');
           return json;
         },
-        staleTime: 60 * 60 * 1000
+        staleTime: ONE_DAY_MS,
+        gcTime: ONE_DAY_MS
       })
       .then(async (json) => {
         let holdings = [];
@@ -2165,7 +2166,7 @@ export const fetchFundHoldings = async (code) => {
 
         let assetAllocation = [];
         try {
-          const pz = await fetchFundPingzhongdata(code);
+          const pz = await fetchFundPingzhongdata(code, { cacheTime: ONE_DAY_MS });
           const rawSeries = pz?.Data_assetAllocation?.series || [];
           let filtered = rawSeries.filter((s) => s.type !== 'line' && !String(s.name || '').includes('净资产'));
           let sum = 0;
@@ -2597,7 +2598,8 @@ export const fetchFundPingzhongdata = async (fundCode, { cacheTime = 60 * 60 * 1
     return await qc.fetchQuery({
       queryKey: key,
       queryFn: () => fetchAndParsePingzhongdata(fundCode),
-      staleTime: cacheTime
+      staleTime: cacheTime,
+      gcTime: cacheTime
     });
   } catch (e) {
     qc.removeQueries({ queryKey: key });
