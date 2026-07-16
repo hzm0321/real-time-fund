@@ -184,6 +184,15 @@ function SortableRow({ row, children, disabled, enableAnimation = true }) {
   );
 }
 
+/** 判断固定列是否为边缘列（最后一个左固定 / 第一个右固定），用于添加阴影 CSS class */
+function getPinEdgeClass(column) {
+  const isPinned = column.getIsPinned();
+  if (!isPinned) return '';
+  if (isPinned === 'left' && column.getAfter('left') === 0) return 'pinned-edge-left';
+  if (isPinned === 'right' && column.getStart('right') === 0) return 'pinned-edge-right';
+  return '';
+}
+
 const MemoizedTableRow = memo(
   ({
     row,
@@ -216,7 +225,7 @@ const MemoizedTableRow = memo(
               <div
                 key={cell.id}
                 data-masked={masked}
-                className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
+                className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''} ${getPinEdgeClass(cell.column)}`}
                 style={style}
               >
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1451,7 +1460,32 @@ const PcFundTable = memo(function PcFundTable({
       Boolean
     );
 
-    if (elements.length <= 1) return;
+    /** 根据滚动位置切换固定列阴影 class */
+    const updatePinShadowClasses = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollEl;
+      const hasScrollLeft = scrollLeft > 0;
+      const hasScrollRight = scrollLeft + clientWidth < scrollWidth - 1;
+      // 同时给主滚动容器和 portal header 加 class
+      [scrollEl, portalHeaderRef.current].forEach((el) => {
+        if (!el) return;
+        el.classList.toggle('has-scroll-left', hasScrollLeft);
+        el.classList.toggle('has-scroll-right', hasScrollRight);
+      });
+    };
+
+    // 初始化一次
+    updatePinShadowClasses();
+
+    if (elements.length <= 1) {
+      // 即使只有一个元素，也要监听滚动来更新阴影
+      scrollEl.addEventListener('scroll', updatePinShadowClasses, { passive: true });
+      const shadowRo = new ResizeObserver(() => updatePinShadowClasses());
+      shadowRo.observe(scrollEl);
+      return () => {
+        scrollEl.removeEventListener('scroll', updatePinShadowClasses);
+        shadowRo.disconnect();
+      };
+    }
 
     const currentScrollLeft = scrollEl.scrollLeft;
     elements.forEach((el) => {
@@ -1471,6 +1505,7 @@ const PcFundTable = memo(function PcFundTable({
         }
       });
       isSyncing = false;
+      updatePinShadowClasses();
     };
 
     const handlers = elements.map((el) => ({
@@ -1482,10 +1517,15 @@ const PcFundTable = memo(function PcFundTable({
       el.addEventListener('scroll', handler, { passive: true });
     });
 
+    // 列宽变化可能影响 overflow，也需要更新阴影
+    const shadowRo = new ResizeObserver(() => updatePinShadowClasses());
+    shadowRo.observe(scrollEl);
+
     return () => {
       handlers.forEach(({ el, handler }) => {
         el.removeEventListener('scroll', handler);
       });
+      shadowRo.disconnect();
     };
   }, [showPortalHeader, showTopScrollbar, tableScrollWidth]);
 
@@ -2763,7 +2803,7 @@ const PcFundTable = memo(function PcFundTable({
           return (
             <div
               key={header.id}
-              className={`table-header-cell ${align} ${isSortEnabled ? 'sortable' : ''}`}
+              className={`table-header-cell ${align} ${isSortEnabled ? 'sortable' : ''} ${getPinEdgeClass(header.column)}`}
               style={{
                 ...style,
                 cursor: isSortEnabled ? 'pointer' : 'default',
@@ -3156,7 +3196,7 @@ const PcFundTable = memo(function PcFundTable({
                               return (
                                 <div
                                   key={header.id}
-                                  className={`table-header-cell ${align} ${isSortEnabled ? 'sortable' : ''}`}
+                                  className={`table-header-cell ${align} ${isSortEnabled ? 'sortable' : ''} ${getPinEdgeClass(header.column)}`}
                                   style={{
                                     ...style,
                                     cursor: isSortEnabled ? 'pointer' : 'default',

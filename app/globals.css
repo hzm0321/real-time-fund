@@ -1426,31 +1426,108 @@ input[type='number'] {
   flex: 1;
   min-width: 0;
   overflow-x: auto;
-  /* 横向滚动条样式与项目整体规范一致：深色背景、边框色、圆角、hover 高亮 */
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--bg);
+  /* 横向滚动条高对比度优化：确保未悬浮时也有清晰可见的常驻圆角滑块，兼顾深/浅色主题 */
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 32%, transparent)
+    color-mix(in srgb, var(--foreground) 5%, transparent);
 }
 
 .table-scroll-area::-webkit-scrollbar {
-  height: 8px;
+  height: 10px;
 }
 
 .table-scroll-area::-webkit-scrollbar-track {
-  background: var(--bg);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  border-radius: 10px;
 }
 
 .table-scroll-area::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 32%, transparent);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .table-scroll-area::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: color-mix(in srgb, var(--foreground) 55%, transparent);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .table-scroll-area::-webkit-scrollbar-thumb:active {
   background: var(--primary);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ═══ 固定列边缘阴影：暗示用户可横向滚动 ═══ */
+/* sticky 已自带 containing block，::after 可直接使用 */
+/* 必须将边缘固定列的 overflow 设置为 visible，避免 .table-row-scroll .table-cell 默认的 overflow: hidden 裁剪掉 ::after 阴影 */
+.table-row-scroll .table-cell.pinned-edge-left,
+.table-row-scroll .table-cell.pinned-edge-right,
+.table-header-row-scroll .table-header-cell.pinned-edge-left,
+.table-header-row-scroll .table-header-cell.pinned-edge-right,
+.pinned-edge-left,
+.pinned-edge-right {
+  overflow: visible !important;
+}
+
+.pinned-edge-left::after,
+.pinned-edge-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1;
+}
+
+/* 延伸 ::after 伪元素的上下边界以覆盖 .table-header-row-scroll 与 .table-row-scroll 的 padding 及 1px 边框，消除行间与表头间的阴影断层 */
+.table-header-row-scroll .table-header-cell.pinned-edge-left::after,
+.table-header-row-scroll .table-header-cell.pinned-edge-right::after {
+  top: -16px;
+  bottom: -17px;
+}
+
+.table-row-scroll .table-cell.pinned-edge-left::after,
+.table-row-scroll .table-cell.pinned-edge-right::after {
+  top: -12px;
+  bottom: -12px;
+}
+
+/* 左固定列右侧阴影 */
+.pinned-edge-left::after {
+  right: -12px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+}
+
+/* 右固定列左侧阴影 */
+.pinned-edge-right::after {
+  left: -12px;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+}
+
+/* 滚动后显示阴影 */
+.has-scroll-left .pinned-edge-left::after {
+  opacity: 1;
+}
+
+.has-scroll-right .pinned-edge-right::after {
+  opacity: 1;
+}
+
+/* 深色主题加强阴影 */
+[data-theme='dark'] .pinned-edge-left::after {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.25), transparent);
+}
+
+[data-theme='dark'] .pinned-edge-right::after {
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.25), transparent);
 }
 
 /* PC 表头固定时的 portal 容器：与 table-scroll-area 横向滚动同步，但隐藏自身滚动条 */
@@ -1469,35 +1546,44 @@ input[type='number'] {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  height: 8px;
-  min-height: 8px;
-  max-height: 8px;
+  height: 10px;
+  min-height: 10px;
+  max-height: 10px;
   line-height: 0;
   font-size: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--bg);
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 32%, transparent)
+    color-mix(in srgb, var(--foreground) 5%, transparent);
 }
 
 .pc-fund-table-top-scrollbar::-webkit-scrollbar {
-  height: 8px;
+  height: 10px;
 }
 
 .pc-fund-table-top-scrollbar::-webkit-scrollbar-track {
-  background: var(--bg);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  border-radius: 10px;
 }
 
 .pc-fund-table-top-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 32%, transparent);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .pc-fund-table-top-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: color-mix(in srgb, var(--foreground) 55%, transparent);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .pc-fund-table-top-scrollbar::-webkit-scrollbar-thumb:active {
   background: var(--primary);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .pc-fund-table-top-scrollbar-inner {
