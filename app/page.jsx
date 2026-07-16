@@ -4595,7 +4595,16 @@ export default function HomePage() {
                   <p>{isSyncing ? '正在同步到云端...' : undefined}</p>
                 </TooltipContent>
               </Tooltip>
-              <span>基估宝</span>
+              <span
+                style={!isMobile ? { cursor: 'pointer' } : undefined}
+                onClick={() => {
+                  if (!isMobile) {
+                    window.open(`https://fund.cc.cd/home/?theme=${theme || 'dark'}`, '_blank');
+                  }
+                }}
+              >
+                基估宝
+              </span>
             </div>
             <div
               className={`glass add-fund-section navbar-add-fund ${isSearchFocused || selectedFunds.length > 0 ? 'search-focused' : ''}`}
