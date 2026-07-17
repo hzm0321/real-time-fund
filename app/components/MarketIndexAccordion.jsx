@@ -434,16 +434,15 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-3 pb-4 pt-0">
-            <div className="flex flex-wrap w-full min-w-0" style={{ gap: 12 }}>
+            <div
+              className="grid w-full min-w-0"
+              style={{
+                gridTemplateColumns: isMobile ? 'repeat(3, minmax(0, 1fr))' : 'repeat(auto-fill, minmax(180px, 1fr))',
+                gap: 12
+              }}
+            >
               {visibleIndices.map((item, i) => (
-                <div
-                  key={item.code || i}
-                  style={{
-                    flex: isMobile ? '0 0 calc((100% - 24px) / 3)' : '0 0 calc((100% - 48px) / 5)'
-                  }}
-                >
-                  <IndexCard item={item} />
-                </div>
+                <IndexCard key={item.code || i} item={item} />
               ))}
             </div>
           </AccordionContent>
