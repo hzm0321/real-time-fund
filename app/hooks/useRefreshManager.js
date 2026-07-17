@@ -17,6 +17,7 @@ import {
   fetchFundConfirmDays,
   fetchFundsBestSources,
   prefetchQdiiValuations,
+  fetchNavFromTencentBatch,
   isFallbackFundName
 } from '../api/fund';
 import { TZ } from '../lib/fundHelpers';
@@ -317,6 +318,14 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           }
         } catch (e) {
           console.warn('批量预取 QDII 估值失败', e);
+        }
+
+        // 批量预取所有基金最新净值（腾讯 jj 接口，一次请求获取多只基金净值）
+        // fetchFundData 内部会调用 fetchNavFromTencent，此处提前触发可将整个刷新周期内的净值请求合并为 1 次批量请求
+        try {
+          await fetchNavFromTencentBatch(uniqueCodes);
+        } catch (e) {
+          console.warn('批量预取腾讯净值失败', e);
         }
 
         await asyncPool(3, uniqueCodes, async (c) => {

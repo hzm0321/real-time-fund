@@ -1030,6 +1030,248 @@ export const fetchNavMetricsFromTrendFallback = async (code) => {
   }
 };
 
+// ============================================================================
+// 腾讯财经 jj 接口批量净值获取 (DataLoader Pattern)
+// 来源: https://qt.gtimg.cn/q=jj{code1},jj{code2},...
+// 返回格式: v_jj110022="110022~基金名称~gsz~gszzl~~DWJZ~LJJZ~RZDF~jzrq~"
+// 优势: 支持批量、无 Referer 限制、CORS 友好、~89 bytes/只、~0.12s
+// ============================================================================
+
+/** 腾讯 jj 批量请求单次最大基金数（实测 100+ 无问题，保守取 50） */
+const TENCENT_JJ_BATCH_MAX = 50;
+/** 腾讯 jj script 加载超时（ms） */
+const TENCENT_JJ_TIMEOUT = 8000;
+
+/**
+ * 解析腾讯 jj 接口返回的单行数据字符串。
+ * @param {string} dataStr - v_jj{code} 的值（~ 分隔）
+ * @returns {{code:string,name:string,gsz:number|null,gszzl:number|null,gztime:string|null,dwjz:string,ljjz:string,zzl:number|null,jzrq:string}|null}
+ */
+const parseTencentJJData = (dataStr) => {
+  if (!isString(dataStr) || !dataStr) return null;
+  const parts = dataStr.split('~');
+  if (parts.length < 9) return null;
+
+  const code = String(parts[0] || '').trim();
+  const name = String(parts[1] || '').trim();
+  const gszRaw = parts[2];
+  const gszzlRaw = parts[3];
+  const gztimeRaw = parts[4];
+  const dwjzRaw = String(parts[5] || '').trim();
+  const ljjzRaw = String(parts[6] || '').trim();
+  const zzlRaw = parts[7];
+  const jzrqRaw = String(parts[8] || '').trim();
+
+  if (!code || !dwjzRaw || !Number.isFinite(Number(dwjzRaw))) return null;
+
+  const gsz = Number(gszRaw);
+  const gszzl = Number(gszzlRaw);
+  const zzl = Number(zzlRaw);
+
+  const navNum = Number(dwjzRaw);
+  const lastNavNum = Number.isFinite(navNum) && Number.isFinite(zzl) && zzl !== -100 ? navNum / (1 + zzl / 100) : null;
+
+  return {
+    code,
+    name: name || null,
+    gsz: Number.isFinite(gsz) && gsz > 0 ? gsz : null,
+    gszzl: Number.isFinite(gszzl) ? gszzl : null,
+    gztime: isString(gztimeRaw) && gztimeRaw.trim() ? gztimeRaw.trim() : null,
+    dwjz: dwjzRaw,
+    lastNav: Number.isFinite(lastNavNum) && lastNavNum > 0 ? lastNavNum.toFixed(4) : null,
+    ljjz: ljjzRaw,
+    zzl: Number.isFinite(zzl) ? zzl : null,
+    jzrq: jzrqRaw || null
+  };
+};
+
+/** DataLoader 队列：微任务合并同一 tick 内的多个单基金请求为一次批量请求 */
+const tencentNavInflight = new Map(); // code -> { promise, resolve, reject }
+const tencentNavQueue = new Set(); // Set(code)
+let tencentNavTimeout = null;
+
+/**
+ * 执行一次腾讯 jj 批量 script 注入请求。
+ * 从队列中取出所有待查代码，分批发起请求，解析全局变量并分发结果。
+ */
+const processTencentNavQueue = async () => {
+  if (tencentNavQueue.size === 0) return;
+
+  const codes = Array.from(tencentNavQueue);
+  tencentNavQueue.clear();
+  tencentNavTimeout = null;
+
+  // 分批：每批最多 TENCENT_JJ_BATCH_MAX 只
+  const batches = [];
+  for (let i = 0; i < codes.length; i += TENCENT_JJ_BATCH_MAX) {
+    batches.push(codes.slice(i, i + TENCENT_JJ_BATCH_MAX));
+  }
+
+  await Promise.all(
+    batches.map(
+      (batch) =>
+        new Promise((batchResolve) => {
+          if (typeof document === 'undefined' || !document.body) {
+            // 非浏览器环境，全部 reject
+            for (const c of batch) {
+              const entry = tencentNavInflight.get(c);
+              if (entry) {
+                entry.reject(new Error('无浏览器环境'));
+                tencentNavInflight.delete(c);
+              }
+            }
+            batchResolve();
+            return;
+          }
+
+          const jjCodes = batch.map((c) => `jj${c}`).join(',');
+          const url = `https://qt.gtimg.cn/q=${jjCodes}&_=${Date.now()}`;
+          const script = document.createElement('script');
+          script.src = url;
+          script.async = true;
+
+          let done = false;
+          let timer = null;
+
+          const cleanup = () => {
+            if (timer) {
+              clearTimeout(timer);
+              timer = null;
+            }
+            script.onload = null;
+            script.onerror = null;
+            if (document.body.contains(script)) document.body.removeChild(script);
+          };
+
+          const settle = (resolverFn) => {
+            if (done) return;
+            done = true;
+            cleanup();
+            for (const c of batch) {
+              const entry = tencentNavInflight.get(c);
+              if (!entry) continue;
+              tencentNavInflight.delete(c);
+              try {
+                const varName = `v_jj${c}`;
+                const dataStr = typeof window !== 'undefined' ? window[varName] : null;
+                if (typeof window !== 'undefined' && varName in window) {
+                  try {
+                    delete window[varName];
+                  } catch (e) {
+                    window[varName] = undefined;
+                  }
+                }
+                if (dataStr) {
+                  const parsed = parseTencentJJData(dataStr);
+                  if (parsed) {
+                    // 写入 TanStack Query 缓存
+                    const qc = getQueryClient();
+                    qc.setQueryData(qk.tencentNav(c), parsed, { staleTime: getNetValueStaleTime() });
+                    entry.resolve(parsed);
+                  } else {
+                    entry.resolve(null);
+                  }
+                } else {
+                  entry.resolve(null);
+                }
+              } catch (e) {
+                entry.resolve(null);
+              }
+            }
+            resolverFn();
+          };
+
+          timer = setTimeout(() => {
+            fundDebugLog('tencentNav batch timeout', { batch });
+            settle(() => batchResolve());
+          }, TENCENT_JJ_TIMEOUT);
+
+          script.onload = () => {
+            fundDebugLog('tencentNav batch loaded', { count: batch.length });
+            settle(() => batchResolve());
+          };
+
+          script.onerror = () => {
+            fundDebugLog('tencentNav batch script error', { batch });
+            settle(() => batchResolve());
+          };
+
+          document.body.appendChild(script);
+        })
+    )
+  );
+};
+
+/**
+ * 获取单只基金的最新净值（腾讯 jj 接口）。
+ * 内部使用 DataLoader 模式：同一微任务窗口内的多个调用会自动合并为一次批量请求。
+ *
+ * @param {string} code - 基金代码
+ * @returns {Promise<object|null>} 解析后的净值数据，或 null（获取失败/基金不存在）
+ */
+export const fetchNavFromTencent = (code) => {
+  const c = code != null ? String(code).trim() : '';
+  if (!c) return Promise.resolve(null);
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve(null);
+  }
+
+  const qc = getQueryClient();
+
+  // 1. 优先从 TanStack Query 缓存中取
+  const cached = qc.getQueryData(qk.tencentNav(c));
+  if (cached !== undefined) {
+    return Promise.resolve(cached);
+  }
+
+  // 2. 检查是否有 inflight 请求
+  const existing = tencentNavInflight.get(c);
+  if (existing) {
+    return existing.promise;
+  }
+
+  // 3. 创建新的 inflight 条目并加入队列
+  let resolveFn;
+  let rejectFn;
+  const promise = new Promise((resolve, reject) => {
+    resolveFn = resolve;
+    rejectFn = reject;
+  });
+  tencentNavInflight.set(c, { promise, resolve: resolveFn, reject: rejectFn });
+  tencentNavQueue.add(c);
+
+  // 4. 触发微任务级别的合并批量查询
+  if (!tencentNavTimeout) {
+    tencentNavTimeout = setTimeout(processTencentNavQueue, 0);
+  }
+
+  return promise;
+};
+
+/**
+ * 批量获取多只基金的最新净值（腾讯 jj 接口）。
+ * 一次调用可获取多只基金数据，内部自动分批（每批最多 50 只）。
+ *
+ * @param {string[]} codes - 基金代码数组
+ * @returns {Promise<Record<string, object|null>>} 以基金代码为 key 的净值数据映射
+ */
+export const fetchNavFromTencentBatch = async (codes) => {
+  if (!isArray(codes) || codes.length === 0) return {};
+
+  const normalized = codes.map((c) => String(c).trim()).filter(Boolean);
+  if (normalized.length === 0) return {};
+
+  const results = {};
+  const promises = normalized.map((c) =>
+    fetchNavFromTencent(c).then((data) => {
+      results[c] = data;
+    })
+  );
+  await Promise.all(promises);
+  return results;
+};
+
 const extractHoldingsReportDate = (html) => {
   if (!html || !isString(html)) return null;
 
@@ -1875,12 +2117,17 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
         const gszzlNum = Number(json.gszzl);
         const gszNum = Number(json.gsz);
         const fundGzName = isString(json.name) && json.name.trim() ? json.name.trim() : null;
+        // fundgz 响应已包含 dwjz（估值基准净值=昨日净值）和 jzrq（净值日期），一并提取
+        const fundGzDwjz = json.dwjz != null ? String(json.dwjz).trim() : null;
+        const fundGzJzrq = json.jzrq != null ? String(json.jzrq).trim() : null;
         safeResolve({
           code: json.fundcode != null ? String(json.fundcode).trim() : c,
           name: fundGzName,
           gsz: Number.isFinite(gszNum) ? gszNum : json.gsz,
           gztime: json.gztime != null ? String(json.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
           gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
+          dwjz: fundGzDwjz && Number.isFinite(Number(fundGzDwjz)) ? fundGzDwjz : null,
+          jzrq: fundGzJzrq || null,
           valuationSource: 'fundgz'
         });
       },
@@ -1961,9 +2208,9 @@ export const fetchFundData = async (c, overrideDataSource) => {
     } catch (e) {}
   }
 
-  // 1. 发起并发的历史净值和重仓请求
-  // F10DataApi.aspx 已失效，直接使用 pingzhongdata 获取历史净值指标
-  const lsjzPromise = fetchNavMetricsFromTrendFallback(code);
+  // 1. 发起并发的净值请求和估值请求
+  // 优先使用腾讯 jj 接口（轻量 89B/只，支持批量），pingzhongdata 作为降级
+  const tencentNavPromise = fetchNavFromTencent(code);
 
   // 2. 发起估值请求
   const gzPromise = fetchFundValuationBySource(code, dataSource);
@@ -1982,25 +2229,42 @@ export const fetchFundData = async (c, overrideDataSource) => {
       }
     }
 
-    const [tData] = await Promise.all([lsjzPromise]);
+    // 等待腾讯净值结果
+    let tData = await tencentNavPromise;
+
+    // 腾讯 jj 无数据时降级到 pingzhongdata（含昨日净值等完整指标）
+    if (!tData) {
+      tData = await fetchNavMetricsFromTrendFallback(code);
+    }
 
     if (tData) {
+      // fundgz 的 dwjz 是估值基准净值（上一交易日），腾讯的 dwjz 是最新已发布净值。
+      // 当腾讯净值日期比 fundgz 更新时，将 fundgz 的 dwjz 保留为 lastNav（昨日净值）。
       if (tData.jzrq && (!baseData.jzrq || tData.jzrq >= baseData.jzrq)) {
+        if (
+          baseData.dwjz &&
+          baseData.jzrq &&
+          tData.jzrq > baseData.jzrq &&
+          !isNil(tData.dwjz) &&
+          String(tData.dwjz) !== String(baseData.dwjz)
+        ) {
+          baseData.lastNav = baseData.dwjz;
+        }
         baseData.dwjz = tData.dwjz;
         baseData.jzrq = tData.jzrq;
         baseData.zzl = tData.zzl;
-        baseData.lastNav = tData.lastNav;
+        if (!isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
       } else if (!baseData.dwjz && tData.dwjz) {
         // Fallback for Sina which doesn't provide dwjz/jzrq
         baseData.dwjz = tData.dwjz;
         baseData.jzrq = tData.jzrq;
         baseData.zzl = tData.zzl;
-        baseData.lastNav = tData.lastNav;
+        if (!isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
       } else if (isNil(baseData.zzl) && !isNil(tData.zzl)) {
         baseData.zzl = tData.zzl;
         if (!baseData.dwjz) baseData.dwjz = tData.dwjz;
         if (!baseData.jzrq) baseData.jzrq = tData.jzrq;
-        if (!baseData.lastNav) baseData.lastNav = tData.lastNav;
+        if (isNil(baseData.lastNav) && !isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
       }
       if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayZzl')) {
         baseData.yesterdayZzl = tData.yesterdayZzl;
