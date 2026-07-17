@@ -1084,6 +1084,18 @@ export const fetchSmartFundNetValueBackward = async (code, startDate) => {
   return null;
 };
 
+/**
+ * 检测基金名称是否为兜底占位名称（如 "基金(110022)"）
+ * @param {string} name - 待检测的基金名称
+ * @param {string} code - 基金代码
+ * @returns {boolean}
+ */
+export const isFallbackFundName = (name, code) => {
+  if (!isString(name) || !name.trim()) return true;
+  if (!isString(code) || !code.trim()) return false;
+  return name.trim() === `基金(${code.trim()})`;
+};
+
 export const fetchFundDataFallback = async (c) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     throw new Error('无浏览器环境');
@@ -1112,8 +1124,18 @@ export const fetchFundDataFallback = async (c) => {
       })();
 
       const namePromise = (async () => {
+        // 优先使用 localStorage 中已存储的真实基金名称，避免不必要的 searchFunds 网络请求
         try {
-          // 通过搜索接口查询该代码对应的基金详情
+          const arr = storageStore.getItem('funds', []);
+          if (isArray(arr)) {
+            const f = arr.find((x) => x.code === c);
+            if (f && f.name && !isFallbackFundName(f.name, c)) {
+              return f.name;
+            }
+          }
+        } catch (e) {}
+        // 存储的名称不可用，尝试通过搜索接口查询该代码对应的基金详情
+        try {
           const results = await searchFunds(c);
           const found = results.find((item) => item.CODE === c);
           return found ? found.NAME || found.SHORTNAME : null;
@@ -1852,8 +1874,10 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
 
         const gszzlNum = Number(json.gszzl);
         const gszNum = Number(json.gsz);
+        const fundGzName = isString(json.name) && json.name.trim() ? json.name.trim() : null;
         safeResolve({
           code: json.fundcode != null ? String(json.fundcode).trim() : c,
+          name: fundGzName,
           gsz: Number.isFinite(gszNum) ? gszNum : json.gsz,
           gztime: json.gztime != null ? String(json.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
           gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
@@ -1995,9 +2019,9 @@ export const fetchFundData = async (c, overrideDataSource) => {
       }
     }
 
-    if (!baseData.name) {
-      // 优先使用 localStorage 中已存储的基金名称，避免不必要的 searchFunds 网络请求
-      if (storedName) {
+    if (!baseData.name || isFallbackFundName(baseData.name, code)) {
+      // 优先使用 localStorage 中已存储的真实基金名称，避免不必要的 searchFunds 网络请求
+      if (storedName && !isFallbackFundName(storedName, code)) {
         baseData.name = storedName;
       } else {
         try {
@@ -2005,6 +2029,10 @@ export const fetchFundData = async (c, overrideDataSource) => {
           const found = results.find((item) => item.CODE === code);
           if (found) baseData.name = found.NAME || found.SHORTNAME;
         } catch (e) {}
+      }
+      // 如果所有途径都未能获取到有效名称，使用兜底占位
+      if (!baseData.name || isFallbackFundName(baseData.name, code)) {
+        baseData.name = `基金(${code})`;
       }
     }
 

@@ -16,7 +16,8 @@ import {
   fetchFundDividends,
   fetchFundConfirmDays,
   fetchFundsBestSources,
-  prefetchQdiiValuations
+  prefetchQdiiValuations,
+  isFallbackFundName
 } from '../api/fund';
 import { TZ } from '../lib/fundHelpers';
 import { getQueryClient } from '../lib/get-query-client';
@@ -598,6 +599,10 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
               if (f.confirmDays != null) merged.confirmDays = f.confirmDays;
               if (f.relatedSector != null) merged.relatedSector = f.relatedSector;
               if (f.relatedSectorQuote != null) merged.relatedSectorQuote = f.relatedSectorQuote;
+              // 如果新数据中的名称是兜底占位（如 "基金(110022)"），保留 localStorage 中已有的真实名称
+              if (isFallbackFundName(merged.name, u.code) && f.name && !isFallbackFundName(f.name, f.code)) {
+                merged.name = f.name;
+              }
               if (merged.addedAt == null || merged.addBaseNav == null || merged.addBaseDate == null) {
                 const snap = getAddBaseSnapshotFromFund(merged);
                 if (merged.addedAt == null) merged.addedAt = Date.now();
