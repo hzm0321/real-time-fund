@@ -2014,208 +2014,332 @@ export const fetchFundData = async (c, overrideDataSource) => {
   });
 };
 
+/**
+ * 解析 stocks/fundStocks 数组为 holdings 格式。
+ * 适用于东方财富 API 响应（json.Datas.fundStocks）和 Supabase RPC 返回的 stocks 数据（结构一致）。
+ * @param {Array} fundStocks - 原始 stocks 数组，每项含 GPDM/GPJC/JZBL/INDEXNAME/PCTNVCHGTYPE/PCTNVCHG 等字段
+ * @returns {Array<{code: string, name: string, weight: string, change: null, indexName: string, pctNvChgType: string, pctNvChg: string}>}
+ */
+const parseFundStocksToHoldings = (fundStocks) => {
+  if (!isArray(fundStocks)) return [];
+  const holdings = [];
+  for (const s of fundStocks) {
+    if (!isObject(s)) continue;
+    const hc = String(s.GPDM || '').trim();
+    const hn = String(s.GPJC || '').trim();
+    const hw = s.JZBL ? `${s.JZBL}%` : '';
+    if (hc || hn || hw) {
+      const rawIndexName = String(s.INDEXNAME || '').trim();
+      const indexName =
+        rawIndexName !== '--' && rawIndexName !== '-' && rawIndexName !== 'null' && rawIndexName !== 'undefined'
+          ? rawIndexName
+          : '';
+      const pctNvChgType = String(s.PCTNVCHGTYPE || '').trim();
+      const pctNvChg = String(s.PCTNVCHG || '').trim();
+      holdings.push({
+        code: hc,
+        name: hn,
+        weight: hw,
+        change: null,
+        indexName,
+        pctNvChgType,
+        pctNvChg
+      });
+    }
+  }
+  return holdings.slice(0, 10);
+};
+
+/**
+ * 将股票代码标准化为腾讯财经接口格式
+ */
+const normalizeTencentCode = (input) => {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  // already normalized tencent styles (normalize prefix casing)
+  const mPref = raw.match(/^(us|hk|sh|sz|bj)(.+)$/i);
+  if (mPref) {
+    const p = mPref[1].toLowerCase();
+    const rest = String(mPref[2] || '').trim();
+    // usAAPL / usIXIC: rest use upper; hk00700 keep digits
+    return `${p}${/^\d+$/.test(rest) ? rest : rest.toUpperCase()}`;
+  }
+  const mSPref = raw.match(/^s_(sh|sz|bj|hk)(.+)$/i);
+  if (mSPref) {
+    const p = mSPref[1].toLowerCase();
+    const rest = String(mSPref[2] || '').trim();
+    return `s_${p}${/^\d+$/.test(rest) ? rest : rest.toUpperCase()}`;
+  }
+
+  // A股/北证
+  if (/^\d{6}$/.test(raw)) {
+    const pfx =
+      raw.startsWith('6') || raw.startsWith('9') ? 'sh' : raw.startsWith('4') || raw.startsWith('8') ? 'bj' : 'sz';
+    return `s_${pfx}${raw}`;
+  }
+  // 港股（数字）
+  if (/^\d{5}$/.test(raw)) return `s_hk${raw}`;
+
+  // 形如 0700.HK / 00001.HK
+  const mHkDot = raw.match(/^(\d{4,5})\.(?:HK)$/i);
+  if (mHkDot) return `s_hk${mHkDot[1].padStart(5, '0')}`;
+
+  // 形如 AAPL / TSLA.US / AAPL.O / BRK.B（腾讯接口对“.”支持不稳定，优先取主代码）
+  const mUsDot = raw.match(/^([A-Za-z]{1,10})(?:\.[A-Za-z]{1,6})$/);
+  if (mUsDot) return `us${mUsDot[1].toUpperCase()}`;
+  if (/^[A-Za-z]{1,10}$/.test(raw)) return `us${raw.toUpperCase()}`;
+
+  return null;
+};
+
+/**
+ * 获取腾讯财经接口的全局变量名
+ */
+const getTencentVarName = (tencentCode) => {
+  const cd = String(tencentCode || '').trim();
+  if (!cd) return '';
+  // s_* uses v_s_*
+  if (/^s_/i.test(cd)) return `v_${cd}`;
+  // us/hk/sh/sz/bj uses v_{code}
+  return `v_${cd}`;
+};
+
+/**
+ * 通过腾讯财经 script 注入获取重仓股实时涨跌幅，直接写入 holdings[].change。
+ * @param {Array} holdings - parseFundStocksToHoldings 的返回值（会被原地修改 change 字段）
+ */
+const enrichHoldingsWithTencentQuotes = (holdings) => {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined' || !isArray(holdings) || holdings.length === 0) {
+      resolve();
+      return;
+    }
+    const needQuotes = holdings
+      .map((h) => ({ h, tencentCode: normalizeTencentCode(h.code) }))
+      .filter((x) => Boolean(x.tencentCode));
+    if (needQuotes.length === 0) {
+      resolve();
+      return;
+    }
+    try {
+      const tencentCodes = needQuotes.map((x) => x.tencentCode).join(',');
+      if (!tencentCodes) {
+        resolve();
+        return;
+      }
+      const quoteUrl = `https://qt.gtimg.cn/q=${tencentCodes}`;
+      const scriptQuote = document.createElement('script');
+      scriptQuote.src = quoteUrl;
+      let quoteDone = false;
+      let quoteTimer;
+      const cleanupQuote = () => {
+        quoteDone = true;
+        if (quoteTimer) clearTimeout(quoteTimer);
+        if (document.body.contains(scriptQuote)) document.body.removeChild(scriptQuote);
+      };
+      quoteTimer = setTimeout(() => {
+        if (quoteDone) return;
+        cleanupQuote();
+        resolve();
+      }, 10000);
+      scriptQuote.onload = () => {
+        if (quoteDone) return;
+        needQuotes.forEach(({ h, tencentCode }) => {
+          const varName = getTencentVarName(tencentCode);
+          const dataStr = varName ? window[varName] : null;
+          if (dataStr) {
+            const parts = dataStr.split('~');
+            const isUS = /^us/i.test(String(tencentCode || ''));
+            const idx = isUS ? 32 : 5;
+            if (parts.length > idx) {
+              h.change = parseFloat(parts[idx]);
+            }
+          }
+        });
+        cleanupQuote();
+        resolve();
+      };
+      scriptQuote.onerror = () => {
+        cleanupQuote();
+        resolve();
+      };
+      document.body.appendChild(scriptQuote);
+    } catch {
+      resolve();
+    }
+  });
+};
+
+/**
+ * 从 pingzhongdata 获取资产配置数据
+ * @param {string} code - 基金代码
+ * @returns {Promise<Array<{name: string, value: number}>>}
+ */
+const fetchAssetAllocationForFund = async (code) => {
+  try {
+    const pz = await fetchFundPingzhongdata(code, { cacheTime: ONE_DAY_MS });
+    const rawSeries = pz?.Data_assetAllocation?.series || [];
+    const filtered = rawSeries.filter((s) => s.type !== 'line' && !String(s.name || '').includes('净资产'));
+    let sum = 0;
+    const parsedSeries = [];
+    filtered.forEach((s) => {
+      if (s.data && s.data.length > 0) {
+        const val = Number(s.data[s.data.length - 1]);
+        if (!Number.isNaN(val) && val > 0) {
+          sum += val;
+          parsedSeries.push({ name: String(s.name).replace('占净比', ''), value: val });
+        }
+      }
+    });
+    if (sum < 100 && parsedSeries.length > 0) {
+      const other = 100 - sum;
+      if (other >= 0.01) {
+        parsedSeries.push({ name: '其他', value: other });
+      }
+    }
+    return parsedSeries;
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * 调用 Supabase RPC 获取基金重仓股数据（从 fund_pingzhongdata.stocks）。
+ * 作为东方财富 FundMNInverstPosition 接口报错时的降级数据源。
+ * 返回的 stocks 数组结构与东方财富 API 的 fundStocks 完全一致。
+ * @param {string} fundCode - 基金代码
+ * @returns {Promise<{stocks: Array, updated_at: string}|null>} stocks 数据或 null
+ */
+export const fetchFundStocksFromSupabase = async (fundCode) => {
+  if (!isSupabaseConfigured) return null;
+  const code = fundCode != null ? String(fundCode).trim() : '';
+  if (!code) return null;
+
+  const qc = getQueryClient();
+  try {
+    return await qc.fetchQuery({
+      queryKey: qk.fundStocks(code),
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc('get_fund_stocks', { p_fund_code: code });
+        if (error || !data || !isArray(data.stocks) || data.stocks.length === 0) return null;
+        return data;
+      },
+      staleTime: ONE_DAY_MS,
+      gcTime: ONE_DAY_MS,
+      retry: false
+    });
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * 获取基金前 10 重仓股数据。
+ *
+ * 数据获取策略（双源降级）：
+ * 1. 优先使用东方财富移动端 API（FundMNInverstPosition），该接口提供报告期日期；
+ * 2. 当东方财富接口报错时，降级到 Supabase RPC（fund_pingzhongdata.stocks），
+ *    使用 updated_at 作为报告日期判断依据。
+ *
+ * 两个数据源的 stocks 结构完全一致，共用解析逻辑。
+ *
+ * @param {string} code - 基金代码
+ * @returns {Promise<{holdings: Array, holdingsReportDate: string|null, holdingsIsLastQuarter: boolean, assetAllocation: Array}>}
+ */
 export const fetchFundHoldings = async (code) => {
   if (!code) return { holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false };
-  return new Promise((resolveH) => {
-    fundDebugLog('fetchFundHoldings start', { code });
-    // FundArchivesDatas.aspx 已失效，改用移动端 API FundMNInverstPosition
+  fundDebugLog('fetchFundHoldings start', { code });
+
+  // --- 1. 优先尝试东方财富移动端 API ---
+  try {
     const holdingsUrl = `https://fundmobapi.eastmoney.com/FundMNewApi/FundMNInverstPosition?FCODE=${code}&deviceid=Wap&plat=WAP&product=EFund&version=2.0.0`;
-    getQueryClient()
-      .fetchQuery({
-        queryKey: qk.fundHoldingsArchives(code),
-        queryFn: async () => {
-          const resp = await fetch(holdingsUrl);
-          if (!resp.ok) throw new Error('数据加载失败');
-          const json = await resp.json();
-          if (!json || !json.Success) throw new Error(json?.ErrMsg || '数据加载失败');
-          return json;
-        },
-        staleTime: ONE_DAY_MS,
-        gcTime: ONE_DAY_MS
-      })
-      .then(async (json) => {
-        let holdings = [];
-        const holdingsReportDate = extractHoldingsReportDate(
-          isString(json?.Expansion) ? json.Expansion : String(json?.Expansion || '')
-        );
+    const json = await getQueryClient().fetchQuery({
+      queryKey: qk.fundHoldingsArchives(code),
+      queryFn: async () => {
+        const resp = await fetch(holdingsUrl);
+        if (!resp.ok) throw new Error('数据加载失败');
+        const j = await resp.json();
+        if (!j || !j.Success) throw new Error(j?.ErrMsg || '数据加载失败');
+        return j;
+      },
+      staleTime: ONE_DAY_MS,
+      gcTime: ONE_DAY_MS,
+      retry: false
+    });
+
+    const holdingsReportDate = extractHoldingsReportDate(
+      isString(json?.Expansion) ? json.Expansion : String(json?.Expansion || '')
+    );
+    const holdingsIsLastQuarter = isLastQuarterReport(holdingsReportDate);
+
+    // 如果不是上一季度末的披露数据，则不展示重仓（并避免继续解析/请求行情）
+    if (!holdingsIsLastQuarter) {
+      return { holdings: [], holdingsReportDate, holdingsIsLastQuarter: false, assetAllocation: [] };
+    }
+
+    const fundStocks = isArray(json?.Datas?.fundStocks) ? json.Datas.fundStocks : [];
+    const holdings = parseFundStocksToHoldings(fundStocks);
+    if (holdings.length === 0) throw new Error('东方财富 API 解析重仓为空');
+
+    // 获取腾讯实时行情
+    await enrichHoldingsWithTencentQuotes(holdings);
+
+    // 获取资产配置
+    const assetAllocation = await fetchAssetAllocationForFund(code);
+
+    fundDebugLog('fetchFundHoldings resolved (eastmoney)', {
+      code,
+      holdingsCount: holdings.length,
+      holdingsReportDate,
+      holdingsIsLastQuarter
+    });
+
+    return { holdings, holdingsReportDate, holdingsIsLastQuarter, assetAllocation };
+  } catch (eastmoneyErr) {
+    fundDebugLog('fetchFundHoldings eastmoney failed, trying supabase RPC', {
+      code,
+      error: eastmoneyErr?.message
+    });
+  }
+
+  // --- 2. 降级：Supabase RPC（fund_pingzhongdata.stocks） ---
+  if (isSupabaseConfigured) {
+    try {
+      const rpcData = await fetchFundStocksFromSupabase(code);
+      if (rpcData && isArray(rpcData.stocks) && rpcData.stocks.length > 0) {
+        const holdings = parseFundStocksToHoldings(rpcData.stocks);
+        if (holdings.length === 0) throw new Error('RPC stocks 解析为空');
+
+        // 使用 updated_at 作为报告日期判断依据（backend 定期刷新，数据应为最新季度）
+        const holdingsReportDate = rpcData.updated_at ? toTz(rpcData.updated_at).format('YYYY-MM-DD') : null;
         const holdingsIsLastQuarter = isLastQuarterReport(holdingsReportDate);
 
-        // 如果不是上一季度末的披露数据，则不展示重仓（并避免继续解析/请求行情）
         if (!holdingsIsLastQuarter) {
-          resolveH({ holdings: [], holdingsReportDate, holdingsIsLastQuarter: false });
-          return;
+          return { holdings: [], holdingsReportDate, holdingsIsLastQuarter: false, assetAllocation: [] };
         }
 
-        // 从移动端 API 响应中解析重仓股
-        const fundStocks = isArray(json?.Datas?.fundStocks) ? json.Datas.fundStocks : [];
-        for (const s of fundStocks) {
-          if (!isObject(s)) continue;
-          const hc = String(s.GPDM || '').trim();
-          const hn = String(s.GPJC || '').trim();
-          const hw = s.JZBL ? `${s.JZBL}%` : '';
-          if (hc || hn || hw) {
-            const rawIndexName = String(s.INDEXNAME || '').trim();
-            const indexName =
-              rawIndexName !== '--' && rawIndexName !== '-' && rawIndexName !== 'null' && rawIndexName !== 'undefined'
-                ? rawIndexName
-                : '';
-            const pctNvChgType = String(s.PCTNVCHGTYPE || '').trim();
-            const pctNvChg = String(s.PCTNVCHG || '').trim();
-            holdings.push({
-              code: hc,
-              name: hn,
-              weight: hw,
-              change: null,
-              indexName,
-              pctNvChgType,
-              pctNvChg
-            });
-          }
-        }
-        holdings = holdings.slice(0, 10);
-        const normalizeTencentCode = (input) => {
-          const raw = String(input || '').trim();
-          if (!raw) return null;
-          // already normalized tencent styles (normalize prefix casing)
-          const mPref = raw.match(/^(us|hk|sh|sz|bj)(.+)$/i);
-          if (mPref) {
-            const p = mPref[1].toLowerCase();
-            const rest = String(mPref[2] || '').trim();
-            // usAAPL / usIXIC: rest use upper; hk00700 keep digits
-            return `${p}${/^\d+$/.test(rest) ? rest : rest.toUpperCase()}`;
-          }
-          const mSPref = raw.match(/^s_(sh|sz|bj|hk)(.+)$/i);
-          if (mSPref) {
-            const p = mSPref[1].toLowerCase();
-            const rest = String(mSPref[2] || '').trim();
-            return `s_${p}${/^\d+$/.test(rest) ? rest : rest.toUpperCase()}`;
-          }
+        // 获取腾讯实时行情
+        await enrichHoldingsWithTencentQuotes(holdings);
 
-          // A股/北证
-          if (/^\d{6}$/.test(raw)) {
-            const pfx =
-              raw.startsWith('6') || raw.startsWith('9')
-                ? 'sh'
-                : raw.startsWith('4') || raw.startsWith('8')
-                  ? 'bj'
-                  : 'sz';
-            return `s_${pfx}${raw}`;
-          }
-          // 港股（数字）
-          if (/^\d{5}$/.test(raw)) return `s_hk${raw}`;
+        // 获取资产配置
+        const assetAllocation = await fetchAssetAllocationForFund(code);
 
-          // 形如 0700.HK / 00001.HK
-          const mHkDot = raw.match(/^(\d{4,5})\.(?:HK)$/i);
-          if (mHkDot) return `s_hk${mHkDot[1].padStart(5, '0')}`;
-
-          // 形如 AAPL / TSLA.US / AAPL.O / BRK.B（腾讯接口对“.”支持不稳定，优先取主代码）
-          const mUsDot = raw.match(/^([A-Za-z]{1,10})(?:\.[A-Za-z]{1,6})$/);
-          if (mUsDot) return `us${mUsDot[1].toUpperCase()}`;
-          if (/^[A-Za-z]{1,10}$/.test(raw)) return `us${raw.toUpperCase()}`;
-
-          return null;
-        };
-
-        const getTencentVarName = (tencentCode) => {
-          const cd = String(tencentCode || '').trim();
-          if (!cd) return '';
-          // s_* uses v_s_*
-          if (/^s_/i.test(cd)) return `v_${cd}`;
-          // us/hk/sh/sz/bj uses v_{code}
-          return `v_${cd}`;
-        };
-
-        const needQuotes = holdings
-          .map((h) => ({
-            h,
-            tencentCode: normalizeTencentCode(h.code)
-          }))
-          .filter((x) => Boolean(x.tencentCode));
-        if (needQuotes.length) {
-          try {
-            const tencentCodes = needQuotes.map((x) => x.tencentCode).join(',');
-            if (!tencentCodes) {
-              resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter });
-              return;
-            }
-            const quoteUrl = `https://qt.gtimg.cn/q=${tencentCodes}`;
-            await new Promise((resQuote) => {
-              const scriptQuote = document.createElement('script');
-              scriptQuote.src = quoteUrl;
-              let quoteDone = false;
-              const cleanupQuote = () => {
-                quoteDone = true;
-                if (quoteTimer) clearTimeout(quoteTimer);
-                if (document.body.contains(scriptQuote)) document.body.removeChild(scriptQuote);
-              };
-              const quoteTimer = setTimeout(() => {
-                if (quoteDone) return;
-                cleanupQuote();
-                resQuote();
-              }, 10000);
-              scriptQuote.onload = () => {
-                if (quoteDone) return;
-                needQuotes.forEach(({ h, tencentCode }) => {
-                  const varName = getTencentVarName(tencentCode);
-                  const dataStr = varName ? window[varName] : null;
-                  if (dataStr) {
-                    const parts = dataStr.split('~');
-                    const isUS = /^us/i.test(String(tencentCode || ''));
-                    const idx = isUS ? 32 : 5;
-                    if (parts.length > idx) {
-                      h.change = parseFloat(parts[idx]);
-                    }
-                  }
-                });
-                cleanupQuote();
-                resQuote();
-              };
-              scriptQuote.onerror = () => {
-                cleanupQuote();
-                resQuote();
-              };
-              document.body.appendChild(scriptQuote);
-            });
-          } catch (e) {}
-        }
-
-        let assetAllocation = [];
-        try {
-          const pz = await fetchFundPingzhongdata(code, { cacheTime: ONE_DAY_MS });
-          const rawSeries = pz?.Data_assetAllocation?.series || [];
-          let filtered = rawSeries.filter((s) => s.type !== 'line' && !String(s.name || '').includes('净资产'));
-          let sum = 0;
-          let parsedSeries = [];
-          filtered.forEach((s) => {
-            if (s.data && s.data.length > 0) {
-              const val = Number(s.data[s.data.length - 1]);
-              if (!Number.isNaN(val) && val > 0) {
-                sum += val;
-                parsedSeries.push({ name: String(s.name).replace('占净比', ''), value: val });
-              }
-            }
-          });
-          if (sum < 100 && parsedSeries.length > 0) {
-            const other = 100 - sum;
-            if (other >= 0.01) {
-              parsedSeries.push({ name: '其他', value: other });
-            }
-          }
-          assetAllocation = parsedSeries;
-        } catch (e) {}
-
-        resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter, assetAllocation });
-        fundDebugLog('fetchFundHoldings resolved', {
+        fundDebugLog('fetchFundHoldings resolved (supabase RPC)', {
           code,
-          holdingsCount: holdings?.length || 0,
+          holdingsCount: holdings.length,
           holdingsReportDate,
           holdingsIsLastQuarter
         });
-      })
-      .catch(() =>
-        resolveH({ holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false, assetAllocation: [] })
-      );
-  });
+
+        return { holdings, holdingsReportDate, holdingsIsLastQuarter, assetAllocation };
+      }
+    } catch (rpcErr) {
+      fundDebugLog('fetchFundHoldings supabase RPC failed', { code, error: rpcErr?.message });
+    }
+  }
+
+  // --- 3. 全部失败，返回空 ---
+  return { holdings: [], holdingsReportDate: null, holdingsIsLastQuarter: false, assetAllocation: [] };
 };
 
 export const searchFunds = async (val) => {

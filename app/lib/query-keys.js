@@ -55,6 +55,9 @@ export const bestValuationSourceBatch = (itemsKey) => ['bestValuationSourceBatch
 /** @param {string} fundCode */
 export const fundBestSource = (fundCode) => ['fundBestSource', String(fundCode).trim()];
 
+/** @param {string} fundCode — 基金重仓股数据（fund_pingzhongdata.stocks，RPC 降级数据源） */
+export const fundStocks = (fundCode) => ['fundStocks', String(fundCode).trim()];
+
 /** @param {string} fundCode */
 export const isQdiiFund = (fundCode) => ['isQdiiFund', String(fundCode).trim()];
 
