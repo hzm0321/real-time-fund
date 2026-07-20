@@ -61,11 +61,20 @@ export const fundStocks = (fundCode) => ['fundStocks', String(fundCode).trim()];
 /** @param {string} fundCode */
 export const isQdiiFund = (fundCode) => ['isQdiiFund', String(fundCode).trim()];
 
+/** @param {string} fundCode — 检查指定基金编码是否存在于 gs_tt 表中 */
+export const isTtFund = (fundCode) => ['isTtFund', String(fundCode).trim()];
+
 /** @param {string} fundCode — QDII 估值数据（gs_qdii 表） */
 export const qdiiValuation = (fundCode) => ['qdiiValuation', String(fundCode).trim()];
 
 /** @param {string} fundCode — 腾讯财经 jj 接口最新净值快照 */
 export const tencentNav = (fundCode) => ['tencentNav', String(fundCode).trim()];
+
+/** @param {string} fundCode — OCR 解析 pic6 图片估值缓存 */
+export const ocrValuation = (fundCode) => ['ocrValuation', String(fundCode).trim()];
+
+/** @param {string} fundCode — gs_tt 表估值数据缓存 */
+export const ttValuation = (fundCode) => ['ttValuation', String(fundCode).trim()];
 
 /** @param {string} userId */
 export const membershipStatus = (userId) => ['membershipStatus', String(userId || '').trim()];

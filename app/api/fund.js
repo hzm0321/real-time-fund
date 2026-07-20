@@ -1417,8 +1417,6 @@ export const fetchFundDataFallback = async (c) => {
   });
 };
 
-// fundgz JSONP 固定回调名为 window.jsonpgz；这里做成“常驻分发器”以支持并发请求，避免覆盖全局回调导致串数据/悬挂。
-const JSONPGZ_DISPATCHER_KEY = '__rtf_jsonpgz_dispatcher_v1__';
 const RTF_FUND_DEBUG_LS_KEY = 'rtf_debug_fund';
 function fundDebugEnabled() {
   try {
@@ -1438,92 +1436,57 @@ function fundDebugLog(...args) {
     console.debug('[fund][debug]', ...args);
   } catch (e) {}
 }
-function ensureJsonpgzDispatcher() {
-  if (typeof window === 'undefined') return null;
-  if (window[JSONPGZ_DISPATCHER_KEY]) return window[JSONPGZ_DISPATCHER_KEY];
+/**
+ * 从 OCR 识别的 pic6 净值估算图文本中解析估值数据。
+ *
+ * pic6 图片底部固定格式示例（OCR 会在字符间插入空格）：
+ *   "净值 估算 :3. 3521 元 估算 涨幅 : 0.24% 2023-12-27 15:00"
+ *   "净值 估算 :0. 7608 元 估算 张 幅 : -0. 68% 2023-12-27 15:00"
+ *
+ * @param {string} text - Tesseract OCR 输出的原始文本
+ * @param {string} code - 基金编码
+ * @returns {UnifiedFundValuation}
+ */
+function parseOcrValuationText(text, code) {
+  // 先去除 OCR 在数字内部插入的多余空格，如 "3. 3521" -> "3.3521"、"-0. 68" -> "-0.68"
+  const cleaned = text.replace(/(\d)\s*\.\s*(\d)/g, '$1.$2').replace(/(-\s*)(\d)/g, '-$2');
 
-  const previous = typeof window.jsonpgz === 'function' ? window.jsonpgz : null;
-  const pendingByCode = new Map(); // code -> Set(entry)
+  // 1. 提取净值估算（gsz）：匹配 "净值估算" 后跟的数值
+  //    OCR 可能输出 "净值 估算" 或 "净值估算"，冒号可能有空格
+  const gszMatch = cleaned.match(/净\s*值\s*估\s*算\s*[:：]?\s*([\d.]+)\s*元/i);
+  const gsz = gszMatch ? parseFloat(gszMatch[1]) : null;
 
-  const dispatcher = (json) => {
-    try {
-      if (!json || !isObject(json)) {
-        fundDebugLog('jsonpgz called with invalid payload', json);
-        // 部分情况下接口会回调 jsonpgz() 但不给参数（undefined）。
-        // 若当前只有 1 个 pending，可视为该请求失败信号，直接触发其 fallback，避免一直等到超时。
-        if (pendingByCode.size === 1) {
-          const onlyKey = Array.from(pendingByCode.keys())[0];
-          const set = pendingByCode.get(onlyKey);
-          if (set && set.size > 0) {
-            fundDebugLog('jsonpgz invalid payload -> fail single pending', { fundcode: onlyKey, listeners: set.size });
-            pendingByCode.delete(onlyKey);
-            for (const entry of set) {
-              try {
-                entry?.cleanup?.();
-              } catch (e) {}
-              try {
-                entry?.onError?.(new Error('jsonpgz invalid payload'));
-              } catch (e) {}
-            }
-            return;
-          }
-        }
-        if (previous) previous(json);
-        return;
-      }
-      const code = json.fundcode != null ? String(json.fundcode).trim() : '';
-      const set = code ? pendingByCode.get(code) : null;
-      if (!set || set.size === 0) {
-        fundDebugLog('jsonpgz no pending match', { fundcode: code, pendingKeys: Array.from(pendingByCode.keys()) });
-        if (previous) previous(json);
-        return;
-      }
+  // 2. 提取估算涨幅（gszzl）：匹配 "估算涨幅" / "估算张幅" 后跟的百分比
+  //    OCR 常将 "涨" 误识别为 "张"
+  const gszzlMatch = cleaned.match(/估\s*算\s*[涨张]\s*幅\s*[:：]?\s*([+-]?[\d.]+)\s*%/i);
+  const gszzl = gszzlMatch ? parseFloat(gszzlMatch[1]) : null;
 
-      fundDebugLog('jsonpgz dispatch', { fundcode: code, listeners: set.size });
-      pendingByCode.delete(code);
-      for (const entry of set) {
-        try {
-          entry?.cleanup?.();
-        } catch (e) {}
-        try {
-          entry?.onJson?.(json);
-        } catch (e) {
-          try {
-            entry?.onError?.(e);
-          } catch (e2) {}
-        }
-      }
-    } catch (e) {
-      if (previous) previous(json);
-    }
+  // 3. 提取日期时间（gztime）：匹配 "YYYY-MM-DD HH:MM"
+  const dateMatch = cleaned.match(/(\d{4}-\d{1,2}-\d{1,2})\s+(\d{1,2}:\d{2})/);
+  const gztime = dateMatch ? `${dateMatch[1]} ${dateMatch[2]}` : null;
+
+  // 必须成功匹配出完整日期时间，且年份必须等于当前自然年
+  if (!gztime) {
+    throw new Error('OCR 无法解析完整估值时间');
+  }
+  const yearMatch = gztime.match(/^(\d{4})/);
+  const currentYear = String(new Date().getFullYear());
+  if (!yearMatch || yearMatch[1] !== currentYear) {
+    throw new Error(`OCR 估值时间非今年数据（解析年份：${yearMatch ? yearMatch[1] : '未知'}）`);
+  }
+
+  // 至少需要解析出 gsz 或 gszzl
+  if (gsz == null && gszzl == null) {
+    throw new Error('OCR 无法解析估值净值或涨幅数据');
+  }
+
+  return {
+    code,
+    gsz: Number.isFinite(gsz) ? gsz : null,
+    gztime,
+    gszzl: Number.isFinite(gszzl) ? gszzl : null,
+    valuationSource: 'fundgz'
   };
-
-  const api = {
-    add(code, entry) {
-      const k = code != null ? String(code).trim() : '';
-      if (!k) return () => {};
-      let set = pendingByCode.get(k);
-      if (!set) {
-        set = new Set();
-        pendingByCode.set(k, set);
-      }
-      set.add(entry);
-      fundDebugLog('jsonpgz add pending', { fundcode: k, pendingCount: set.size });
-      return () => {
-        const cur = pendingByCode.get(k);
-        if (!cur) return;
-        cur.delete(entry);
-        if (cur.size === 0) pendingByCode.delete(k);
-        fundDebugLog('jsonpgz remove pending', { fundcode: k, remaining: cur.size });
-      };
-    },
-    previous
-  };
-
-  window.jsonpgz = dispatcher;
-  window[JSONPGZ_DISPATCHER_KEY] = api;
-  fundDebugLog('jsonpgz dispatcher installed', { hadPrevious: Boolean(previous) });
-  return api;
 }
 
 /** 同一基金代码并发的新浪估值 JSONP 去重，避免数据源 2/3 各打一遍 */
@@ -1659,6 +1622,52 @@ export const fetchQdiiValuationFromSupabase = async (code) => {
 };
 
 /**
+ * 从 Supabase gs_tt 表获取基金的估值数据（作为 OCR 识别异常时的降级方案）。
+ * 通过 TanStack Query 缓存 2 分钟。
+ *
+ * @param {string} code - 基金编码
+ * @returns {Promise<{ gztime: string|null, gszzl: number|null, gsz: number|null, valuationSource: string }|null>}
+ */
+export const fetchTtValuationFromSupabase = async (code) => {
+  if (!code || !isSupabaseConfigured) return null;
+  const normalized = String(code).trim();
+  if (!normalized) return null;
+
+  const qc = getQueryClient();
+  try {
+    return await qc.fetchQuery({
+      queryKey: qk.ttValuation(normalized),
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('gs_tt')
+          .select('gztime, gszzl, gsz')
+          .eq('fund_code', normalized)
+          .maybeSingle();
+
+        if (error || !data || !data.gztime) return null;
+
+        const gztime = String(data.gztime).replace(/:(\d{2}):\d{2}$/, ':$1');
+        const yearMatch = gztime.match(/^(\d{4})/);
+        const currentYear = String(new Date().getFullYear());
+        if (!yearMatch || yearMatch[1] !== currentYear) {
+          return null; // 年份非今年数据，判定为过期/无效
+        }
+
+        return {
+          gztime,
+          gszzl: data.gszzl != null && Number.isFinite(Number(data.gszzl)) ? Number(data.gszzl) : null,
+          gsz: data.gsz != null && Number.isFinite(Number(data.gsz)) ? Number(data.gsz) : null,
+          valuationSource: 'fundgz'
+        };
+      },
+      staleTime: 2 * 60 * 1000 // 2 分钟缓存
+    });
+  } catch {
+    return null;
+  }
+};
+
+/**
  * 批量预取多个 QDII 基金的估值数据并写入 TanStack Query 缓存。
  *
  * 使用单次 PostgREST IN 查询替代原先 N 次 Edge Function 调用，
@@ -1745,6 +1754,34 @@ export const isQdiiFund = async (code) => {
       queryFn: async () => {
         const { data, error } = await withRetry(() =>
           supabase.from('gs_qdii').select('fund_code').eq('fund_code', normalized).maybeSingle()
+        );
+        return !error && data != null;
+      },
+      staleTime: 12 * 60 * 60 * 1000
+    });
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * 检查指定基金编码是否存在于 Supabase gs_tt 表中
+ * 结果通过 TanStack Query 缓存 12 小时。
+ * @param {string} code - 基金编码
+ * @returns {Promise<boolean>}
+ */
+export const isTtFund = async (code) => {
+  if (!code || !isSupabaseConfigured) return false;
+  const normalized = String(code).trim();
+  if (!normalized) return false;
+
+  const qc = getQueryClient();
+  try {
+    return await qc.fetchQuery({
+      queryKey: qk.isTtFund(normalized),
+      queryFn: async () => {
+        const { data, error } = await withRetry(() =>
+          supabase.from('gs_tt').select('fund_code').eq('fund_code', normalized).maybeSingle()
         );
         return !error && data != null;
       },
@@ -2062,89 +2099,48 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
     };
   }
 
-  const dispatcher = ensureJsonpgzDispatcher();
-  if (!dispatcher) throw new Error('无浏览器环境');
-
-  fundDebugLog('fetchFundValuationBySource fundgz', { code: c });
-  const gzUrl = `https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`;
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const settleOnce = (fn) => (arg) => {
-      if (settled) return;
-      settled = true;
-      fn(arg);
-    };
-    const safeResolve = settleOnce(resolve);
-    const safeReject = settleOnce(reject);
-
-    const scriptGz = document.createElement('script');
-    scriptGz.src = gzUrl;
-    scriptGz.async = true;
-
-    const cleanupScript = () => {
-      try {
-        if (timer) clearTimeout(timer);
-      } catch (e) {}
-      try {
-        if (document.body && document.body.contains(scriptGz)) document.body.removeChild(scriptGz);
-      } catch (e) {}
-      try {
-        if (removePending) removePending();
-      } catch (e) {}
-    };
-
-    const onTimeout = () => {
-      fundDebugLog('fetchFundValuationBySource gz timeout', { code: c, timeoutMs: 5000 });
-      cleanupScript();
-      safeReject(new Error('gz timeout'));
-    };
-
-    const timer = setTimeout(onTimeout, 5000);
-
-    let removePending = null;
-    removePending = dispatcher.add(c, {
-      cleanup: cleanupScript,
-      onJson: (json) => {
-        fundDebugLog('fetchFundValuationBySource jsonpgz', { code: c, fundcode: json?.fundcode });
-        cleanupScript();
-
-        if (!json || !isObject(json)) {
-          safeReject(new Error('invalid json'));
-          return;
-        }
-
-        const gszzlNum = Number(json.gszzl);
-        const gszNum = Number(json.gsz);
-        const fundGzName = isString(json.name) && json.name.trim() ? json.name.trim() : null;
-        // fundgz 响应已包含 dwjz（估值基准净值=昨日净值）和 jzrq（净值日期），一并提取
-        const fundGzDwjz = json.dwjz != null ? String(json.dwjz).trim() : null;
-        const fundGzJzrq = json.jzrq != null ? String(json.jzrq).trim() : null;
-        safeResolve({
-          code: json.fundcode != null ? String(json.fundcode).trim() : c,
-          name: fundGzName,
-          gsz: Number.isFinite(gszNum) ? gszNum : json.gsz,
-          gztime: json.gztime != null ? String(json.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
-          gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
-          dwjz: fundGzDwjz && Number.isFinite(Number(fundGzDwjz)) ? fundGzDwjz : null,
-          jzrq: fundGzJzrq || null,
-          valuationSource: 'fundgz'
-        });
+  // 数据源 1：OCR 解析东方财富 pic6 净值估算图
+  fundDebugLog('fetchFundValuationBySource ocr_pic6', { code: c });
+  const inGsTt = await isTtFund(c);
+  if (!inGsTt) {
+    fundDebugLog('fetchFundValuationBySource ocr_pic6 not in gs_tt', { code: c });
+    throw new Error('基金编码不存在于 gs_tt 表中');
+  }
+  const qc = getQueryClient();
+  try {
+    return await qc.fetchQuery({
+      queryKey: qk.ocrValuation(c),
+      queryFn: async () => {
+        const { getOcrWorker } = await import('@/app/lib/ocr');
+        const worker = await getOcrWorker('chi_sim+eng');
+        const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(
+          `j4.dfcfw.com/charts/pic6/${c}.png?v=${Date.now()}`
+        )}`;
+        const res = await worker.recognize(proxyUrl);
+        const text = res?.data?.text || '';
+        fundDebugLog('fetchFundValuationBySource ocr_pic6 text', { code: c, text });
+        return parseOcrValuationText(text, c);
       },
-      onError: (e) => {
-        cleanupScript();
-        safeReject(e || new Error('gz error callback'));
-      }
+      staleTime: 2 * 60 * 1000, // 2 分钟缓存
+      retry: false // OCR 解析不需要失败后重试，出现异常立刻抛出并降级到 gs_tt
     });
-
-    scriptGz.onerror = () => {
-      fundDebugLog('fetchFundValuationBySource gz script error', { code: c, url: gzUrl });
-      cleanupScript();
-      safeReject(new Error('gz script error'));
+  } catch (ocrErr) {
+    fundDebugLog('fetchFundValuationBySource ocr_pic6 failed, falling back to gs_tt', {
+      code: c,
+      err: ocrErr?.message || String(ocrErr)
+    });
+    const ttVal = await fetchTtValuationFromSupabase(c);
+    if (!ttVal) {
+      throw new Error('OCR 与 gs_tt 降级均失败或数据非今年');
+    }
+    return {
+      code: c,
+      gsz: ttVal.gsz,
+      gztime: ttVal.gztime,
+      gszzl: ttVal.gszzl,
+      valuationSource: ttVal.valuationSource
     };
-
-    document.body.appendChild(scriptGz);
-  });
+  }
 }
 
 /**
