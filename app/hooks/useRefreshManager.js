@@ -17,6 +17,7 @@ import {
   fetchFundConfirmDays,
   fetchFundsBestSources,
   prefetchQdiiValuations,
+  prefetchTtValuations,
   fetchNavFromTencentBatch,
   isFallbackFundName
 } from '../api/fund';
@@ -301,6 +302,15 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           }
         } catch (e) {
           console.error('批量获取自动数据源失败', e);
+        }
+
+        // 批量预取目标基金在 gs_tt 表中的存在状态与估值数据（通过 RPC/IN 批量合并查询替代 N 次单查）
+        try {
+          if (uniqueCodes.length > 0) {
+            await prefetchTtValuations(uniqueCodes);
+          }
+        } catch (e) {
+          console.warn('批量预取 gs_tt 估值失败', e);
         }
 
         // 预取所有 QDII（数据源 4）基金估值，单次 PostgREST 批量查询替代 N 次 Edge Function 调用

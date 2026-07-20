@@ -81,10 +81,12 @@ export default function FundIntradayChart({
     queryFn: async () => {
       if (!isFundgzToday) return false;
       try {
-        const { getOcrWorker } = await import('@/app/lib/ocr');
-        const worker = await getOcrWorker('chi_sim+eng');
-        const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(`j4.dfcfw.com/charts/pic6/${fundCode}.png?v=${Date.now()}`)}`;
-        const res = await worker.recognize(proxyUrl);
+        const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
+        const [worker, imageInput] = await Promise.all([
+          getOcrWorker('chi_sim+eng'),
+          fetchPic6ImageAndCrop(fundCode, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.5 })
+        ]);
+        const res = await worker.recognize(imageInput);
 
         const text = res?.data?.text || '';
         const parts = todayStr.split('-');

@@ -1667,6 +1667,145 @@ export const fetchTtValuationFromSupabase = async (code) => {
   }
 };
 
+let activeTtBatchPromise = null;
+let activeTtBatchSignature = null;
+
+/**
+ * 批量预取多个基金在 gs_tt 表中的存在状态与估值数据，同时填充 TanStack Query 缓存。
+ *
+ * 带有请求去重机制（Deduplication）：当并发触发时直接复用。
+ * 支持 RPC 批量调用与单次 PostgREST IN 降级方案，高效解决单次查 gs_tt 的瓶颈。
+ *
+ * @param {string[]} codes - 基金编码数组
+ * @returns {Promise<Record<string, { gztime: string|null, gszzl: number|null, gsz: number|null, valuationSource: string }|null>>}
+ */
+export async function prefetchTtValuations(codes) {
+  if (!isSupabaseConfigured || !isArray(codes) || codes.length === 0) return {};
+
+  const qc = getQueryClient();
+  const results = {};
+  const missing = [];
+  const seenCodes = new Set();
+
+  for (const c of codes) {
+    const code = c != null ? String(c).trim() : '';
+    if (!code || seenCodes.has(code)) continue;
+    seenCodes.add(code);
+
+    const cachedVal = qc.getQueryData(qk.ttValuation(code));
+    const cachedExist = qc.getQueryData(qk.isTtFund(code));
+    const isValStale = qc.getQueryState(qk.ttValuation(code))?.isStale ?? true;
+    const isExistStale = qc.getQueryState(qk.isTtFund(code))?.isStale ?? true;
+
+    if (cachedVal !== undefined) {
+      results[code] = cachedVal;
+    }
+    // 只要估值或存在性其一缺失或已过期，即放入待批量获取队列
+    if (cachedVal === undefined || cachedExist === undefined || isValStale || isExistStale) {
+      missing.push(code);
+    }
+  }
+
+  if (missing.length === 0) return results;
+
+  missing.sort();
+  const signature = missing.join(',');
+  if (activeTtBatchPromise && activeTtBatchSignature === signature) {
+    try {
+      await activeTtBatchPromise;
+      for (const code of missing) {
+        const cached = qc.getQueryData(qk.ttValuation(code));
+        if (cached !== undefined) results[code] = cached;
+      }
+      return results;
+    } catch (e) {}
+  }
+
+  activeTtBatchSignature = signature;
+  activeTtBatchPromise = (async () => {
+    let data = null;
+    let error = null;
+
+    try {
+      const rpcRes = await supabase.rpc('get_tt_valuations_batch', {
+        p_fund_codes: missing
+      });
+      if (!rpcRes.error) {
+        data = rpcRes.data;
+      } else {
+        error = rpcRes.error;
+      }
+    } catch (e) {
+      error = e;
+    }
+
+    // 若 RPC 调用失败（如未部署或签名不匹配），降级为 PostgREST IN 批量查询
+    if (error || !isArray(data)) {
+      try {
+        const restRes = await supabase.from('gs_tt').select('fund_code, gztime, gszzl, gsz').in('fund_code', missing);
+        if (!restRes.error && isArray(restRes.data)) {
+          data = restRes.data;
+          error = null;
+        }
+      } catch (e) {}
+    }
+
+    const foundMap = new Map();
+    const currentYear = String(new Date().getFullYear());
+
+    if (isArray(data)) {
+      for (const row of data) {
+        const code = String(row?.fund_code || '').trim();
+        if (!code) continue;
+
+        // 1. 存在于数据返回集中即说明 gs_tt 中存在
+        foundMap.set(code, { exist: true, valuation: null });
+
+        if (!row.gztime) continue;
+        const gztime = String(row.gztime).replace(/:(\d{2}):\d{2}$/, ':$1');
+        const yearMatch = gztime.match(/^(\d{4})/);
+        if (yearMatch && yearMatch[1] === currentYear) {
+          foundMap.set(code, {
+            exist: true,
+            valuation: {
+              gztime,
+              gszzl: row.gszzl != null && Number.isFinite(Number(row.gszzl)) ? Number(row.gszzl) : null,
+              gsz: row.gsz != null && Number.isFinite(Number(row.gsz)) ? Number(row.gsz) : null,
+              valuationSource: 'fundgz'
+            }
+          });
+        }
+      }
+    }
+
+    // 双向写入 TanStack Query 缓存
+    for (const code of missing) {
+      const entry = foundMap.get(code);
+      if (entry) {
+        qc.setQueryData(qk.isTtFund(code), true, { staleTime: 12 * 60 * 60 * 1000 });
+        qc.setQueryData(qk.ttValuation(code), entry.valuation, { staleTime: 2 * 60 * 1000 });
+        if (entry.valuation !== undefined) results[code] = entry.valuation;
+      } else {
+        // 未从表中查出该代码记录：写 false 并写 null 避免后续重复触发请求
+        qc.setQueryData(qk.isTtFund(code), false, { staleTime: 12 * 60 * 60 * 1000 });
+        qc.setQueryData(qk.ttValuation(code), null, { staleTime: 2 * 60 * 1000 });
+        results[code] = null;
+      }
+    }
+  })();
+
+  try {
+    await activeTtBatchPromise;
+  } finally {
+    if (activeTtBatchSignature === signature) {
+      activeTtBatchPromise = null;
+      activeTtBatchSignature = null;
+    }
+  }
+
+  return results;
+}
+
 /**
  * 批量预取多个 QDII 基金的估值数据并写入 TanStack Query 缓存。
  *
@@ -2111,12 +2250,12 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
     return await qc.fetchQuery({
       queryKey: qk.ocrValuation(c),
       queryFn: async () => {
-        const { getOcrWorker } = await import('@/app/lib/ocr');
-        const worker = await getOcrWorker('chi_sim+eng');
-        const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(
-          `j4.dfcfw.com/charts/pic6/${c}.png?v=${Date.now()}`
-        )}`;
-        const res = await worker.recognize(proxyUrl);
+        const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
+        const [worker, imageInput] = await Promise.all([
+          getOcrWorker('chi_sim+eng'),
+          fetchPic6ImageAndCrop(c, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.5 })
+        ]);
+        const res = await worker.recognize(imageInput);
         const text = res?.data?.text || '';
         fundDebugLog('fetchFundValuationBySource ocr_pic6 text', { code: c, text });
         return parseOcrValuationText(text, c);
