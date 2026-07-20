@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - pro
   pull_request:
 
 jobs:
@@ -22,10 +23,13 @@ jobs:
           NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
           NEXT_PUBLIC_GA_ID=${{ secrets.NEXT_PUBLIC_GA_ID }}
           NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL=${{ secrets.NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL }}
+          NEXT_PUBLIC_IS_GITHUB_LOGIN=${{ secrets.NEXT_PUBLIC_IS_GITHUB_LOGIN }}
           EOF
 
       - name: Build Dockerfile image
-        run: docker build -t real-time-fund .
+        run: |
+          docker build \
+            -t real-time-fund .
 
       - name: Run Dockerfile container
         run: |
@@ -57,6 +61,7 @@ jobs:
           NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=${{ secrets.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY }}
           NEXT_PUBLIC_GA_ID=${{ secrets.NEXT_PUBLIC_GA_ID }}
           NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL=${{ secrets.NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL }}
+          NEXT_PUBLIC_IS_GITHUB_LOGIN=${{ secrets.NEXT_PUBLIC_IS_GITHUB_LOGIN }}
           EOF
 
       - name: Docker Compose up

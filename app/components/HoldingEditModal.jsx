@@ -1,18 +1,44 @@
 'use client';
+import { isFunction } from 'lodash';
 
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { CloseIcon, SettingsIcon } from './Icons';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import { CloseIcon, SettingsIcon, SwitchIcon } from './Icons';
+import { DatePicker } from './Common';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
-export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TZ =
+  typeof Intl !== 'undefined' && Intl.DateTimeFormat
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
+    : 'Asia/Shanghai';
+
+export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, onOpenTrade }) {
   const [mode, setMode] = useState('amount'); // 'amount' | 'share'
+  const [dateMode, setDateMode] = useState('date'); // 'date' | 'days'
 
-  const dwjz = fund?.dwjz || fund?.gsz || 0;
+  const dwjz = nav ?? (fund?.dwjz || fund?.gsz || 0);
+  const dwjzRef = useRef(dwjz);
+  useEffect(() => {
+    dwjzRef.current = dwjz;
+  }, [dwjz]);
 
   const [share, setShare] = useState('');
   const [cost, setCost] = useState('');
   const [amount, setAmount] = useState('');
   const [profit, setProfit] = useState('');
+  const [firstPurchaseDate, setFirstPurchaseDate] = useState('');
+  const [holdingDaysInput, setHoldingDaysInput] = useState('');
+
+  const holdingSig = useMemo(() => {
+    if (!holding) return '';
+    return `${holding.id ?? ''}|${holding.share ?? ''}|${holding.cost ?? ''}|${holding.firstPurchaseDate ?? ''}`;
+  }, [holding]);
 
   useEffect(() => {
     if (holding) {
@@ -20,15 +46,25 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
       const c = holding.cost || 0;
       setShare(String(s));
       setCost(String(c));
+      setFirstPurchaseDate(holding.firstPurchaseDate || '');
 
-      if (dwjz > 0) {
-        const a = s * dwjz;
-        const p = (dwjz - c) * s;
+      if (holding.firstPurchaseDate) {
+        const days = dayjs.tz(undefined, TZ).diff(dayjs.tz(holding.firstPurchaseDate, TZ), 'day');
+        setHoldingDaysInput(days > 0 ? String(days) : '');
+      } else {
+        setHoldingDaysInput('');
+      }
+
+      const price = dwjzRef.current;
+      if (price > 0) {
+        const a = s * price;
+        const p = (price - c) * s;
         setAmount(a.toFixed(2));
         setProfit(p.toFixed(2));
       }
     }
-  }, [holding, fund, dwjz]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdingSig]);
 
   const handleModeChange = (newMode) => {
     if (newMode === mode) return;
@@ -42,8 +78,8 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
         const principal = a - p;
         const c = s > 0 ? principal / s : 0;
 
-        setShare(s.toFixed(2));
-        setCost(c.toFixed(4));
+        setShare(Number(s.toFixed(6)).toString());
+        setCost(Number(c.toFixed(6)).toString());
       }
     } else {
       if (share && dwjz > 0) {
@@ -55,6 +91,41 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
         setAmount(a.toFixed(2));
         setProfit(p.toFixed(2));
       }
+    }
+  };
+
+  const handleDateModeToggle = () => {
+    const newMode = dateMode === 'date' ? 'days' : 'date';
+    setDateMode(newMode);
+
+    if (newMode === 'days' && firstPurchaseDate) {
+      const days = dayjs.tz(undefined, TZ).diff(dayjs.tz(firstPurchaseDate, TZ), 'day');
+      setHoldingDaysInput(days > 0 ? String(days) : '');
+    } else if (newMode === 'date' && holdingDaysInput) {
+      const days = parseInt(holdingDaysInput, 10);
+      if (Number.isFinite(days) && days >= 0) {
+        const date = dayjs.tz(undefined, TZ).subtract(days, 'day').format('YYYY-MM-DD');
+        setFirstPurchaseDate(date);
+      }
+    }
+  };
+
+  const handleHoldingDaysChange = (value) => {
+    setHoldingDaysInput(value);
+    const days = parseInt(value, 10);
+    if (Number.isFinite(days) && days >= 0) {
+      const date = dayjs.tz(undefined, TZ).subtract(days, 'day').format('YYYY-MM-DD');
+      setFirstPurchaseDate(date);
+    }
+  };
+
+  const handleFirstPurchaseDateChange = (value) => {
+    setFirstPurchaseDate(value);
+    if (value) {
+      const days = dayjs.tz(undefined, TZ).diff(dayjs.tz(value, TZ), 'day');
+      setHoldingDaysInput(days > 0 ? String(days) : '');
+    } else {
+      setHoldingDaysInput('');
     }
   };
 
@@ -73,45 +144,62 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
       const a = Number(amount);
       const p = Number(profit || 0);
       const rawShare = a / dwjz;
-      finalShare = Number(rawShare.toFixed(2));
+      finalShare = Number(rawShare.toFixed(6));
       const principal = a - p;
       finalCost = finalShare > 0 ? principal / finalShare : 0;
     }
 
+    const trimmedDate = firstPurchaseDate ? firstPurchaseDate.trim() : '';
+
     onSave({
       share: finalShare,
-      cost: finalCost
+      cost: finalCost,
+      ...(trimmedDate && { firstPurchaseDate: trimmedDate })
     });
     onClose();
   };
 
-  const isValid = mode === 'share'
-    ? (share && cost && !isNaN(share) && !isNaN(cost))
-    : (amount && !isNaN(amount) && (!profit || !isNaN(profit)) && dwjz > 0);
+  const isValid =
+    mode === 'share'
+      ? share && cost && !isNaN(share) && !isNaN(cost)
+      : amount && !isNaN(amount) && (!profit || !isNaN(profit)) && dwjz > 0;
+
+  const handleOpenChange = (open) => {
+    if (!open) {
+      onClose?.();
+    }
+  };
 
   return (
-    <motion.div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="编辑持仓"
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+    <Dialog open onOpenChange={handleOpenChange}>
+      <DialogContent
+        showCloseButton={false}
         className="glass card modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '400px' }}
+        overlayClassName="modal-overlay"
+        style={{ maxWidth: '400px', zIndex: 999, width: '90vw' }}
       >
+        <DialogTitle className="sr-only">编辑持仓</DialogTitle>
         <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <SettingsIcon width="20" height="20" />
             <span>设置持仓</span>
+            {isFunction(onOpenTrade) && (
+              <button
+                type="button"
+                onClick={onOpenTrade}
+                className="button secondary"
+                style={{
+                  height: 28,
+                  padding: '0 10px',
+                  borderRadius: 999,
+                  fontSize: 12,
+                  background: 'rgba(255,255,255,0.06)',
+                  color: 'var(--primary)'
+                }}
+              >
+                今日买入？去加仓。
+              </button>
+            )}
           </div>
           <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
@@ -119,16 +207,23 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>{fund?.name}</div>
+          <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>
+            {fund?.name}
+          </div>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="muted" style={{ fontSize: '12px' }}>#{fund?.code}</div>
+            <div className="muted" style={{ fontSize: '12px' }}>
+              #{fund?.code}
+            </div>
             <div className="badge" style={{ fontSize: '12px' }}>
               最新净值：<span style={{ fontWeight: 600, color: 'var(--primary)' }}>{dwjz}</span>
             </div>
           </div>
         </div>
 
-        <div className="tabs-container" style={{ marginBottom: 20, background: 'rgba(255,255,255,0.05)', padding: 4, borderRadius: 12 }}>
+        <div
+          className="tabs-container"
+          style={{ marginBottom: 20, background: 'rgba(255,255,255,0.05)', padding: 4, borderRadius: 12 }}
+        >
           <div className="row" style={{ gap: 0 }}>
             <button
               type="button"
@@ -226,8 +321,64 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
             </>
           )}
 
+          <div className="form-group" style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span className="muted" style={{ fontSize: '14px' }}>
+                {dateMode === 'date' ? '首次买入日期' : '持有天数'}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleDateModeToggle}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      color: 'var(--primary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <SwitchIcon />
+                    {dateMode === 'date' ? '按天数' : '按日期'}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{dateMode === 'date' ? '切换到持有天数' : '切换到日期'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            {dateMode === 'date' ? (
+              <DatePicker value={firstPurchaseDate} onChange={handleFirstPurchaseDateChange} position="top" />
+            ) : (
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                className="input"
+                value={holdingDaysInput}
+                onChange={(e) => handleHoldingDaysChange(e.target.value)}
+                placeholder="请输入持有天数"
+                style={{ width: '100%' }}
+              />
+            )}
+          </div>
+
           <div className="row" style={{ gap: 12 }}>
-            <button type="button" className="button secondary" onClick={onClose} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}>取消</button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={onClose}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}
+            >
+              取消
+            </button>
             <button
               type="submit"
               className="button"
@@ -238,7 +389,7 @@ export default function HoldingEditModal({ fund, holding, onClose, onSave }) {
             </button>
           </div>
         </form>
-      </motion.div>
-    </motion.div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -83,5 +83,16 @@ fabric.properties
 
 .env.local
 .DS_Store
-.idea
+.idea/*
 .husky/_/
+
+# Sentry Config File
+.env.sentry-build-plugin
+
+# CLI
+cli/
+.agents/
+/CLI.md
+/.mcp.json
+/.codex/
+/jgb-cli/

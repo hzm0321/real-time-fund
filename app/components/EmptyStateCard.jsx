@@ -1,0 +1,31 @@
+'use client';
+
+import { SUMMARY_TAB_ID } from '@/app/constants';
+
+export default function EmptyStateCard({ fundsLength = 0, currentTab = 'all', onAddToGroup }) {
+  const isEmpty = fundsLength === 0;
+  const isGroupTab = currentTab !== 'all' && currentTab !== 'fav' && currentTab !== SUMMARY_TAB_ID;
+
+  return (
+    <div
+      className="glass card empty"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '60px 20px'
+      }}
+    >
+      <div style={{ fontSize: '48px', marginBottom: 16, opacity: 0.5 }}>📂</div>
+      <div className="muted" style={{ marginBottom: 20 }}>
+        {isEmpty ? '尚未添加基金，请从顶部搜索基金名称添加到分组' : '该分组下暂无数据'}
+      </div>
+      {isGroupTab && fundsLength > 0 && (
+        <button className="button" onClick={onAddToGroup}>
+          添加基金到此分组
+        </button>
+      )}
+    </div>
+  );
+}

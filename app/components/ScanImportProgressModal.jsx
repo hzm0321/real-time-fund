@@ -21,15 +21,18 @@ export default function ScanImportProgressModal({ scanImportProgress }) {
         style={{ width: 320, maxWidth: '90vw', textAlign: 'center', padding: '24px' }}
       >
         <div style={{ marginBottom: 16 }}>
-          <div className="loading-spinner" style={{
-            width: 40,
-            height: 40,
-            border: '3px solid var(--muted)',
-            borderTopColor: 'var(--primary)',
-            borderRadius: '50%',
-            margin: '0 auto',
-            animation: 'spin 1s linear infinite'
-          }} />
+          <div
+            className="loading-spinner"
+            style={{
+              width: 40,
+              height: 40,
+              border: '3px solid var(--muted)',
+              borderTopColor: 'var(--primary)',
+              borderRadius: '50%',
+              margin: '0 auto',
+              animation: 'spin 1s linear infinite'
+            }}
+          />
         </div>
         <div className="title" style={{ justifyContent: 'center', marginBottom: 8 }}>
           正在导入基金…

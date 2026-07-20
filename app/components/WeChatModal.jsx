@@ -2,7 +2,9 @@
 
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { AlertTriangle } from 'lucide-react';
 import { CloseIcon } from './Icons';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import weChatGroupImg from '../assets/weChatGroup.jpg';
 
 export default function WeChatModal({ onClose }) {
@@ -11,7 +13,7 @@ export default function WeChatModal({ onClose }) {
       className="modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="微信用户交流群"
+      aria-label="微信用户支持群"
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -28,12 +30,16 @@ export default function WeChatModal({ onClose }) {
       >
         <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span>💬 微信用户交流群</span>
+            <span>💬 微信用户支持群</span>
           </div>
           <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
           </button>
         </div>
+        <Alert style={{ marginBottom: 16 }} variant="warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>入群须知：禁止讨论和基金买卖以及投资的有关内容，可反馈软件相关需求。</AlertDescription>
+        </Alert>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <Image
             src={weChatGroupImg}

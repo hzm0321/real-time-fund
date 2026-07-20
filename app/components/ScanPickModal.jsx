@@ -2,24 +2,42 @@
 
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOcrDailyRemaining } from '../api/fund';
+import { ocrDailyRemaining } from '../lib/query-keys';
+import { useUserStore } from '../stores';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function getDroppedImageFiles(dataTransfer) {
   if (!dataTransfer?.files?.length) return [];
-  return Array.from(dataTransfer.files).filter((f) =>
-    IMAGE_TYPES.includes(f.type)
-  );
+  return Array.from(dataTransfer.files).filter((f) => IMAGE_TYPES.includes(f.type));
 }
 
 export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning }) {
   const [isDragging, setIsDragging] = useState(false);
+  const user = useUserStore((s) => s.user);
 
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isScanning) setIsDragging(true);
-  }, [isScanning]);
+  const { data: ocrUsage } = useQuery({
+    queryKey: ocrDailyRemaining(user?.id),
+    queryFn: () => fetchOcrDailyRemaining(user?.id),
+    enabled: !!user?.id,
+    staleTime: 30_000
+  });
+
+  const remaining = ocrUsage?.remaining ?? null;
+  const max = ocrUsage?.max ?? 10;
+  const isExhausted = remaining !== null && remaining <= 0;
+  const isWarning = remaining !== null && remaining > 0 && remaining <= 3;
+
+  const handleDragOver = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isScanning) setIsDragging(true);
+    },
+    [isScanning]
+  );
 
   const handleDragLeave = useCallback((e) => {
     e.preventDefault();
@@ -27,14 +45,17 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
     if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    if (isScanning || !onFilesDrop) return;
-    const files = getDroppedImageFiles(e.dataTransfer);
-    if (files.length) onFilesDrop(files);
-  }, [isScanning, onFilesDrop]);
+  const handleDrop = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      if (isScanning || !onFilesDrop) return;
+      const files = getDroppedImageFiles(e.dataTransfer);
+      if (files.length) onFilesDrop(files);
+    },
+    [isScanning, onFilesDrop]
+  );
 
   const dropZoneStyle = {
     marginBottom: 12,
@@ -42,7 +63,7 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
     borderRadius: 12,
     transition: 'border-color 0.2s ease, background 0.2s ease',
     cursor: isScanning ? 'not-allowed' : 'pointer',
-    pointerEvents: isScanning ? 'none' : 'auto',
+    pointerEvents: isScanning ? 'none' : 'auto'
   };
 
   return (
@@ -66,9 +87,15 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
       >
         <div className="title" style={{ marginBottom: 12 }}>
           <span>选择持仓截图</span>
+          {remaining !== null && (
+            <span className={`ocr-quota-badge${isExhausted ? ' exhausted' : isWarning ? ' warning' : ''}`}>
+              今日剩余识别次数 {remaining}/{max}
+            </span>
+          )}
         </div>
         <div className="muted" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
-          从相册选择一张或多张持仓截图，系统将自动识别其中的<span style={{ color: 'var(--primary)' }}>基金代码（6位数字）</span>，并支持批量导入。
+          从相册选择一张或多张持仓截图，系统将自动识别其中的
+          <span style={{ color: 'var(--primary)' }}>基金代码（6位数字）</span>，并支持批量导入。
         </div>
         <div
           className={`scan-pick-dropzone muted ${isDragging ? 'dragging' : ''}`}
@@ -87,12 +114,21 @@ export default function ScanPickModal({ onClose, onPick, onFilesDrop, isScanning
             }
           }}
         >
-          <div style={{ fontSize: 13, lineHeight: 1.5, color: isDragging ? 'var(--primary)' : 'var(--muted)', textAlign: 'center' }}>
+          <div
+            style={{
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: isDragging ? 'var(--primary)' : 'var(--muted)',
+              textAlign: 'center'
+            }}
+          >
             {isDragging ? '松开即可导入' : '拖拽图片到此处，或点击选择'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button className="button secondary" onClick={onClose}>取消</button>
+          <button className="button secondary" onClick={onClose}>
+            取消
+          </button>
           <button className="button" onClick={onPick} disabled={isScanning}>
             {isScanning ? '处理中…' : '选择图片'}
           </button>
