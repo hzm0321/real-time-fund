@@ -109,7 +109,7 @@ export default function Announcement() {
                 paddingRight: '4px'
               }}
             >
-              <p>v2.5.2 Pro 版本更新内容：</p>
+              <p>v2.5.3 Pro 版本更新内容：</p>
               <p>1. 更换数据源1接口调用方案。</p>
               <p>2. 优化 OCR 识别方案。</p>
               <p>3. 优化市场指数卡片布局展示。</p>
