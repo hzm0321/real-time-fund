@@ -96,13 +96,13 @@ async function fetchBlobWithRetry(url, timeoutMs = 4000, maxRetries = 1) {
 }
 
 /**
- * 主线程网络获取 pic6 图片并发执行 Canvas 顶部裁剪（截取上方核心文本区域过滤下半部走势图网格）
+ * 主线程网络获取 pic6 图片并发执行 Canvas 底部裁剪（从下至上截取 20% 核心区域）
  * @param {string} code - 基金编码
  * @param {object} [options] - 配置选项
  * @returns {Promise<Blob|string>} 裁剪后的 Blob 或 DataURL
  */
 export async function fetchPic6ImageAndCrop(code, options = {}) {
-  const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.5 } = options;
+  const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.2 } = options;
   const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(
     `j4.dfcfw.com/charts/pic6/${code}.png?v=${Date.now()}`
   )}`;
@@ -121,6 +121,7 @@ export async function fetchPic6ImageAndCrop(code, options = {}) {
         const width = img.width || 100;
         const height = img.height || 100;
         const cropHeight = Math.max(1, Math.floor(height * cropRatio));
+        const startY = Math.max(0, height - cropHeight);
 
         const canvas = document.createElement('canvas');
         canvas.width = width;
@@ -130,7 +131,7 @@ export async function fetchPic6ImageAndCrop(code, options = {}) {
           resolve(blob);
           return;
         }
-        ctx.drawImage(img, 0, 0, width, cropHeight, 0, 0, width, cropHeight);
+        ctx.drawImage(img, 0, startY, width, cropHeight, 0, 0, width, cropHeight);
         if (canvas.toBlob) {
           canvas.toBlob((croppedBlob) => {
             resolve(croppedBlob || blob);

@@ -2253,7 +2253,7 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
         const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
         const [worker, imageInput] = await Promise.all([
           getOcrWorker('chi_sim+eng'),
-          fetchPic6ImageAndCrop(c, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.5 })
+          fetchPic6ImageAndCrop(c, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.2 })
         ]);
         const res = await worker.recognize(imageInput);
         const text = res?.data?.text || '';
