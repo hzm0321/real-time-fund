@@ -1,73 +1,9 @@
-import { createWorker } from 'tesseract.js';
-
-let sharedWorker = null;
-let workerPromise = null;
-
-export async function getOcrWorker(lang = 'chi_sim+eng') {
-  if (sharedWorker) return sharedWorker;
-  if (workerPromise) return workerPromise;
-
-  workerPromise = (async () => {
-    const cdnBases = ['https://cdn.jsdelivr.net/npm', 'https://fastly.jsdelivr.net/npm'];
-    const coreCandidates = ['tesseract-core-simd-lstm.wasm.js', 'tesseract-core-lstm.wasm.js'];
-    let lastErr = null;
-    for (const base of cdnBases) {
-      for (const coreFile of coreCandidates) {
-        try {
-          const worker = await createWorker(lang, 1, {
-            workerPath: `${base}/tesseract.js@v5.1.1/dist/worker.min.js`,
-            corePath: `${base}/tesseract.js-core@v5.1.1/${coreFile}`
-          });
-          try {
-            await worker.setParameters({
-              load_system_dawg: '0',
-              load_freq_dawg: '0'
-            });
-          } catch (pErr) {}
-          sharedWorker = worker;
-          workerPromise = null;
-          return worker;
-        } catch (e) {
-          lastErr = e;
-        }
-      }
-      if (!lastErr) break;
-    }
-    workerPromise = null;
-    if (lastErr) throw lastErr;
-    return sharedWorker;
-  })();
-
-  return workerPromise;
-}
-
-export async function terminateOcrWorker() {
-  if (workerPromise) {
-    try {
-      const w = await workerPromise;
-      if (w) await w.terminate();
-    } catch (e) {}
-    workerPromise = null;
-  }
-  if (sharedWorker) {
-    try {
-      await sharedWorker.terminate();
-    } catch (e) {}
-    sharedWorker = null;
-  }
-}
-
 /**
- * 提前预热 OCR 引擎（可在闲置时间异步触发）
+ * OCR 相关工具：抓取并裁剪东方财富 pic6 净值估算图。
+ *
+ * 说明：本项目已统一改用云端 ocr.space 识别（见 lib/ocrSpace.js），
+ * 不再使用 Tesseract.js 本地 OCR。
  */
-export async function warmupOcrWorker(lang = 'chi_sim+eng') {
-  if (typeof window === 'undefined') return null;
-  try {
-    return await getOcrWorker(lang);
-  } catch (e) {
-    return null;
-  }
-}
 
 /**
  * 内部重试拉取图片 Blob 工具
@@ -96,13 +32,13 @@ async function fetchBlobWithRetry(url, timeoutMs = 4000, maxRetries = 1) {
 }
 
 /**
- * 主线程网络获取 pic6 图片并发执行 Canvas 顶部裁剪（截取上方核心文本区域过滤下半部走势图网格）
+ * 主线程网络获取 pic6 图片并发执行 Canvas 底部裁剪（截取下方核心文本区域过滤上半部走势图网格）
  * @param {string} code - 基金编码
  * @param {object} [options] - 配置选项
  * @returns {Promise<Blob|string>} 裁剪后的 Blob 或 DataURL
  */
 export async function fetchPic6ImageAndCrop(code, options = {}) {
-  const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.5 } = options;
+  const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.25 } = options;
   const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(
     `j4.dfcfw.com/charts/pic6/${code}.png?v=${Date.now()}`
   )}`;
@@ -130,7 +66,8 @@ export async function fetchPic6ImageAndCrop(code, options = {}) {
           resolve(blob);
           return;
         }
-        ctx.drawImage(img, 0, 0, width, cropHeight, 0, 0, width, cropHeight);
+        // 从原图底部向上截取 cropHeight 高度的区域（保留下半部分文本信息）
+        ctx.drawImage(img, 0, height - cropHeight, width, cropHeight, 0, 0, width, cropHeight);
         if (canvas.toBlob) {
           canvas.toBlob((croppedBlob) => {
             resolve(croppedBlob || blob);

@@ -7,12 +7,31 @@ const OCR_SPACE_API_KEY = 'K89995261788957';
 const DEFAULT_TIMEOUT = 25000; // 默认 25 秒超时
 
 /**
+ * 将 Blob 转为 data URL (base64)
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
  * 调用 ocr.space 识别图片文字
- * @param {string} base64Image - data URL 格式图片 (data:image/jpeg;base64,...)
+ * @param {string|Blob} image - data URL 格式图片 (data:image/jpeg;base64,...) 或 Blob
  * @param {number} [timeoutMs=25000] - 超时毫秒数
  * @returns {Promise<string>} - 识别出来的文字，按行分割
  */
-export async function recognizeWithOcrSpace(base64Image, timeoutMs = DEFAULT_TIMEOUT) {
+export async function recognizeWithOcrSpace(image, timeoutMs = DEFAULT_TIMEOUT) {
+  // 兼容 Blob 输入：内部转为 data URL 后再提交 ocr.space
+  let base64Image = image;
+  if (typeof Blob !== 'undefined' && image instanceof Blob) {
+    base64Image = await blobToDataURL(image);
+  }
   if (!base64Image) {
     throw new Error('未提供有效的图片数据');
   }

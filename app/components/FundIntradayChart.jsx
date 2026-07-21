@@ -81,14 +81,15 @@ export default function FundIntradayChart({
     queryFn: async () => {
       if (!isFundgzToday) return false;
       try {
-        const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
-        const [worker, imageInput] = await Promise.all([
-          getOcrWorker('chi_sim+eng'),
-          fetchPic6ImageAndCrop(fundCode, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.5 })
-        ]);
-        const res = await worker.recognize(imageInput);
+        const { fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
+        const { recognizeWithOcrSpace } = await import('@/app/lib/ocrSpace');
+        const imageInput = await fetchPic6ImageAndCrop(fundCode, {
+          timeoutMs: 4000,
+          maxRetries: 1,
+          cropRatio: 0.25
+        });
+        const text = await recognizeWithOcrSpace(imageInput);
 
-        const text = res?.data?.text || '';
         const parts = todayStr.split('-');
         if (parts.length === 3) {
           const shortDate1 = `${parts[1]}-${parts[2]}`;
