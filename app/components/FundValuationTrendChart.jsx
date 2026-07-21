@@ -100,7 +100,7 @@ export default function FundValuationTrendChart({
   } = useQuery({
     queryKey: qk.fundValuationTrend(code, range),
     queryFn: () => fetchFundValuationTrend(code, range),
-    enabled: Boolean(code && isExpanded && isSupabaseConfigured && userId),
+    enabled: Boolean(code && isExpanded && isSupabaseConfigured && userId && (isVip || vipLoading)),
     staleTime: 10 * 60 * 1000
   });
 
@@ -111,7 +111,7 @@ export default function FundValuationTrendChart({
   } = useQuery({
     queryKey: qk.fundHistory(code, range),
     queryFn: () => fetchFundHistory(code, range),
-    enabled: Boolean(code && isExpanded),
+    enabled: Boolean(code && isExpanded && (isVip || vipLoading)),
     staleTime: 10 * 60 * 1000
   });
 
@@ -504,37 +504,6 @@ export default function FundValuationTrendChart({
   const lastIndex = processedData.labels.length > 0 ? processedData.labels.length - 1 : null;
   const currentIndex = activeIndex != null && activeIndex < processedData.labels.length ? activeIndex : lastIndex;
 
-  if (!isSupabaseConfigured || !userId) {
-    return null;
-  }
-
-  if (!isVip && !vipLoading) {
-    return (
-      <div
-        className="glass card"
-        style={{
-          padding: '28px 20px',
-          margin: '12px 0',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          border: '1px solid rgba(245, 158, 11, 0.35)',
-          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%)',
-          borderRadius: '16px'
-        }}
-      >
-        <div style={{ fontSize: '28px', lineHeight: 1 }}>👑</div>
-        <div style={{ fontWeight: 600, fontSize: '16PX', color: '#f59e0b' }}>PRO 会员专享功能</div>
-        <div className="muted" style={{ fontSize: '13px', lineHeight: 1.6, maxWidth: '300px' }}>
-          开通 PRO 会员即可解锁基金历史估值走势图，追踪基金估值变化轨迹。
-        </div>
-      </div>
-    );
-  }
-
   const renderTrendTooltip = (className) =>
     tooltipInfo ? (
       <div
@@ -596,136 +565,160 @@ export default function FundValuationTrendChart({
       </div>
     ) : null;
 
-  const chartBlock = (
-    <div className="trend-chart-panel" style={{ position: 'relative' }}>
-      {renderTrendTooltip('trend-tooltip-mobile')}
+  const chartBlock =
+    !isVip && !vipLoading ? (
+      <div
+        className="glass card"
+        style={{
+          padding: '28px 20px',
+          margin: '12px 0',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%)',
+          borderRadius: '16px'
+        }}
+      >
+        <div style={{ fontSize: '28px', lineHeight: 1 }}>👑</div>
+        <div style={{ fontWeight: 600, fontSize: '16PX', color: '#f59e0b' }}>PRO 会员专享功能</div>
+        <div className="muted" style={{ fontSize: '13px', lineHeight: 1.6, maxWidth: '300px' }}>
+          开通 PRO 会员即可解锁基金历史估值走势图，追踪基金估值变化轨迹。
+        </div>
+      </div>
+    ) : (
+      <div className="trend-chart-panel" style={{ position: 'relative' }}>
+        {renderTrendTooltip('trend-tooltip-mobile')}
 
-      <div className="row" style={{ marginBottom: 8, gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 11 }}>
-        {processedData.datasets.map((series, displayIdx) => {
-          const color = series.borderColor;
-          const isHidden = hiddenSources.has(series.sourceKey);
-          let valueText = '--';
+        <div className="row" style={{ marginBottom: 8, gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 11 }}>
+          {processedData.datasets.map((series, displayIdx) => {
+            const color = series.borderColor;
+            const isHidden = hiddenSources.has(series.sourceKey);
+            let valueText = '--';
 
-          if (!isHidden && currentIndex != null && series.data[currentIndex] != null) {
-            valueText = `${Number(series.data[currentIndex]).toFixed(2)}%`;
-          }
+            if (!isHidden && currentIndex != null && series.data[currentIndex] != null) {
+              valueText = `${Number(series.data[currentIndex]).toFixed(2)}%`;
+            }
 
-          return (
-            <div
-              key={series.sourceKey}
-              style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: 'pointer' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setHiddenSources((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(series.sourceKey)) {
-                    next.delete(series.sourceKey);
-                  } else {
-                    next.add(series.sourceKey);
-                  }
-                  return next;
-                });
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span
-                  style={{
-                    width: 10,
-                    height: 2,
-                    borderRadius: 999,
-                    backgroundColor: isHidden ? '#4b5563' : color
-                  }}
-                />
-                <span className="muted" style={{ opacity: isHidden ? 0.5 : 1 }}>
-                  {series.label}
-                </span>
-                <button
-                  className="muted"
-                  type="button"
-                  style={{
-                    border: 'none',
-                    padding: 0,
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    style={{ opacity: isHidden ? 0.4 : 0.9 }}
-                  >
-                    <path
-                      d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                    />
-                    {isHidden && <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="1.6" />}
-                  </svg>
-                </button>
-              </div>
-              <span
-                className="muted"
-                style={{
-                  fontSize: 10,
-                  fontVariantNumeric: 'tabular-nums',
-                  paddingLeft: 16,
-                  minHeight: 14,
-                  visibility: isHidden || valueText === '--' ? 'hidden' : 'visible'
+            return (
+              <div
+                key={series.sourceKey}
+                style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHiddenSources((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(series.sourceKey)) {
+                      next.delete(series.sourceKey);
+                    } else {
+                      next.add(series.sourceKey);
+                    }
+                    return next;
+                  });
                 }}
               >
-                {valueText}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    style={{
+                      width: 10,
+                      height: 2,
+                      borderRadius: 999,
+                      backgroundColor: isHidden ? '#4b5563' : color
+                    }}
+                  />
+                  <span className="muted" style={{ opacity: isHidden ? 0.5 : 1 }}>
+                    {series.label}
+                  </span>
+                  <button
+                    className="muted"
+                    type="button"
+                    style={{
+                      border: 'none',
+                      padding: 0,
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      style={{ opacity: isHidden ? 0.4 : 0.9 }}
+                    >
+                      <path
+                        d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      />
+                      {isHidden && <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="1.6" />}
+                    </svg>
+                  </button>
+                </div>
+                <span
+                  className="muted"
+                  style={{
+                    fontSize: 10,
+                    fontVariantNumeric: 'tabular-nums',
+                    paddingLeft: 16,
+                    minHeight: 14,
+                    visibility: isHidden || valueText === '--' ? 'hidden' : 'visible'
+                  }}
+                >
+                  {valueText}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+          {loading && (
+            <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
+              <span className="muted" style={{ fontSize: '12px' }}>
+                加载中...
               </span>
             </div>
-          );
-        })}
+          )}
+
+          {!loading && (isError || processedData.labels.length === 0) && (
+            <div className="chart-overlay">
+              <span className="muted" style={{ fontSize: '12px' }}>
+                {isError ? '加载失败' : '暂无数据'}
+              </span>
+            </div>
+          )}
+
+          {processedData.labels.length > 0 && (
+            <Line ref={chartRef} data={processedData} options={options} plugins={plugins} />
+          )}
+
+          {renderTrendTooltip('trend-tooltip-desktop')}
+        </div>
+
+        <div className="trend-range-bar">
+          {ranges.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              className={`trend-range-btn ${range === r.value ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setRange(r.value);
+              }}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
-
-      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
-        {loading && (
-          <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
-            <span className="muted" style={{ fontSize: '12px' }}>
-              加载中...
-            </span>
-          </div>
-        )}
-
-        {!loading && (isError || processedData.labels.length === 0) && (
-          <div className="chart-overlay">
-            <span className="muted" style={{ fontSize: '12px' }}>
-              {isError ? '加载失败' : '暂无数据'}
-            </span>
-          </div>
-        )}
-
-        {processedData.labels.length > 0 && (
-          <Line ref={chartRef} data={processedData} options={options} plugins={plugins} />
-        )}
-
-        {renderTrendTooltip('trend-tooltip-desktop')}
-      </div>
-
-      <div className="trend-range-bar">
-        {ranges.map((r) => (
-          <button
-            key={r.value}
-            type="button"
-            className={`trend-range-btn ${range === r.value ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setRange(r.value);
-            }}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+    );
 
   return (
     <div style={{ marginTop: hideHeader ? 0 : 16 }} onClick={(e) => e.stopPropagation()}>

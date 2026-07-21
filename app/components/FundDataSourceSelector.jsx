@@ -2,7 +2,7 @@
 import { isNumber } from 'lodash';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Loader2, Lock, Crown, HelpCircle } from 'lucide-react';
+import { Loader2, Lock, Crown, HelpCircle, User } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
 import { fetchFundValuationBySource, fetchBestValuationSource, fetchFundBestSource, isQdiiFund } from '@/app/api/fund';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -510,6 +510,23 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
                               >
                                 {item.name}
                               </Label>
+                            )}
+                            {!user?.id && item.id === '1' && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-[18px] min-h-0 leading-none font-medium flex items-center gap-1 shrink-0"
+                                style={{
+                                  borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)',
+                                  color: 'var(--primary)',
+                                  background: 'color-mix(in srgb, var(--primary) 14%, var(--card))',
+                                  boxShadow: '0 2px 8px color-mix(in srgb, var(--primary) 12%, transparent)',
+                                  backdropFilter: 'blur(8px)',
+                                  WebkitBackdropFilter: 'blur(8px)'
+                                }}
+                              >
+                                <User size={10} className="shrink-0" />
+                                <span>需登录</span>
+                              </Badge>
                             )}
                             {isVip && bestSource === Number(item.id) && (isYesterdayAccuracy || isTodayAccuracy) && (
                               <DataSourceAccuracyBadge label={isTodayAccuracy ? '今日最准' : '昨日最准'} />
