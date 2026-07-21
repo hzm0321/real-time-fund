@@ -106,8 +106,9 @@ export default function FundDataSourceSelector({ fund, onClose, onSelect }) {
       setIsQdii(qdii);
 
       // 并行获取实时估算值（用于展示）和历史最准数据源（用于标签判断）
+      // 数据源 1 强制刷新（不走缓存），确保弹框展示最新估值；无估值时降级走 gs_tt
       const estimatePromises = [
-        fetchFundValuationBySource(fund.code, 1).catch(() => null),
+        fetchFundValuationBySource(fund.code, 1, { forceRefresh: true }).catch(() => null),
         fetchFundValuationBySource(fund.code, 2).catch(() => null),
         fetchFundValuationBySource(fund.code, 3).catch(() => null)
       ];

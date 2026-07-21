@@ -986,7 +986,7 @@ export const fetchNavMetricsFromTrendFallback = async (code) => {
   if (!isString(code) || !String(code).trim()) return null;
 
   try {
-    const pz = await fetchFundPingzhongdata(String(code).trim(), { cacheTime: 60 * 60 * 1000 });
+    const pz = await fetchFundPingzhongdata(String(code).trim(), { cacheTime: getNetValueStaleTime() });
     const trend = pz?.Data_netWorthTrend;
     if (!isArray(trend) || trend.length === 0) return null;
 
@@ -1829,8 +1829,13 @@ const getTtValuationLastStaleTime = () => {
 
 /**
  * 解析 FundValuationLast 接口单条记录为统一估值结构。
+ *
+ * 无论基金是否有实时估值数据，只要存在单位净值(NAV)就返回有效记录。
+ * 对于仅有 NAV 而无估值字段的记录（如货币基金），会标记 noValuation: true，
+ * 调用方可据此跳过估值降级路径。
+ *
  * @param {object} item - 接口返回的 data 数组中的单条记录
- * @returns {{code:string,gsz:number|null,gszzl:number|null,gztime:string|null,dwjz:string|null,jzrq:string|null,name:string|null,valuationSource:string}|null}
+ * @returns {{code:string,gsz:number|null,gszzl:number|null,gztime:string|null,dwjz:string|null,jzrq:string|null,name:string|null,valuationSource:string,noValuation:boolean}|null}
  */
 function parseTtValuationLastItem(item) {
   if (!isObject(item)) return null;
@@ -1856,9 +1861,10 @@ function parseTtValuationLastItem(item) {
   const hasGsz = Number.isFinite(gsz);
   const hasGszzl = Number.isFinite(gszzl);
   const hasNav = Number.isFinite(nav);
-  // 必须至少有估值净值(GSZ)或估算涨幅(GSZZL)才算有效估值数据；
-  // 仅返回 NAV 而无估值字段的记录（如货币基金）应返回 null，以触发降级路径
-  if (!hasGsz && !hasGszzl) return null;
+  // 必须至少有估值净值(GSZ)、估算涨幅(GSZZL) 或 单位净值(NAV) 才算有效记录
+  if (!hasGsz && !hasGszzl && !hasNav) return null;
+
+  const noValuation = !hasGsz && !hasGszzl;
 
   return {
     code,
@@ -1868,7 +1874,8 @@ function parseTtValuationLastItem(item) {
     dwjz: hasNav ? String(nav) : null,
     jzrq: pdate,
     name: shortname,
-    valuationSource: 'fundgz'
+    valuationSource: 'fundgz',
+    noValuation
   };
 }
 
@@ -1934,20 +1941,27 @@ async function fetchTtValuationLastBatch(codes) {
  * 获取单个基金的天天基金实时估值（FundValuationLast 接口）。
  * 优先读取 TanStack Query 缓存（由 prefetchTtValuationLast 批量预热），缓存未命中时单次请求。
  * @param {string} code - 基金编码
+ * @param {{ bypassCache?: boolean }} [options] - bypassCache 为 true 时跳过缓存强制重新请求
  * @returns {Promise<object|null>}
  */
-export const fetchTtValuationLast = async (code) => {
+export const fetchTtValuationLast = async (code, { bypassCache = false } = {}) => {
   const c = code != null ? String(code).trim() : '';
   if (!c) return null;
 
   const qc = getQueryClient();
-  const cached = qc.getQueryData(qk.ttValuationLast(c));
-  if (cached !== undefined) return cached;
+  if (!bypassCache) {
+    const cached = qc.getQueryData(qk.ttValuationLast(c));
+    if (cached !== undefined) return cached;
+  }
 
   const staleTime = getTtValuationLastStaleTime();
   const batchMap = await fetchTtValuationLastBatch([c]);
   const val = batchMap.get(c) || null;
-  qc.setQueryData(qk.ttValuationLast(c), val, { staleTime });
+  const prev = qc.getQueryData(qk.ttValuationLast(c));
+  // 当 bypassCache 为 true（强制刷新），或者本次拉取结果为 null 但已有有效旧缓存时，不使用 null 覆盖现有的有效缓存
+  if (!isNil(val) || (!bypassCache && isNil(prev))) {
+    qc.setQueryData(qk.ttValuationLast(c), val, { staleTime });
+  }
   return val;
 };
 
@@ -2001,7 +2015,11 @@ export async function prefetchTtValuationLast(codes) {
       const batchMap = await fetchTtValuationLastBatch(missing);
       for (const code of missing) {
         const val = batchMap.get(code) || null;
-        qc.setQueryData(qk.ttValuationLast(code), val, { staleTime });
+        const prev = qc.getQueryData(qk.ttValuationLast(code));
+        // 若本次拉取为 null 但旧缓存已存在有效数据（即过期重拉失败），不使用 null 覆盖已有有效缓存
+        if (!isNil(val) || isNil(prev)) {
+          qc.setQueryData(qk.ttValuationLast(code), val, { staleTime });
+        }
       }
     })();
     try {
@@ -2385,14 +2403,15 @@ export async function fetchFundsBestSources(fundCodes) {
 
 /**
  * 按基金编码与数据源类型获取估值。
- * - 数据源 1：优先天天基金 FundValuationLast 批量接口（CORS 直连），降级 OCR pic6 → gs_tt
+ * - 数据源 1：优先天天基金 FundValuationLast 批量接口（CORS 直连），降级 gs_tt
  * - 数据源 2/3：新浪估算曲线末点（不同口径）
  * - 数据源 4：Supabase gs_qdii 表
  * @param {string} code - 基金编码
  * @param {number | string} [dataSource=1] - 1 天天基金；2、3 新浪估算不同口径；4 Supabase QDII
+ * @param {{ forceRefresh?: boolean }} [options] - forceRefresh 为 true 时跳过缓存强制重新请求（数据源 1）
  * @returns {Promise<UnifiedFundValuation>}
  */
-export async function fetchFundValuationBySource(code, dataSource = 1) {
+export async function fetchFundValuationBySource(code, dataSource = 1, { forceRefresh = false } = {}) {
   const c = code != null ? String(code).trim() : '';
   if (!c) throw new Error('基金编码无效');
 
@@ -2458,55 +2477,69 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
   }
 
   // 数据源 1：优先使用天天基金 FundValuationLast 批量接口（CORS 直连），
-  // 无数据或无估值字段时降级到 OCR pic6 → gs_tt
-  fundDebugLog('fetchFundValuationBySource ttValuationLast', { code: c });
-  const lastVal = await fetchTtValuationLast(c);
+  // 无数据或无估值字段时降级到 gs_tt（OCR pic6 降级路径临时禁用）
+  fundDebugLog('fetchFundValuationBySource ttValuationLast', { code: c, forceRefresh });
+  const lastVal = await fetchTtValuationLast(c, { bypassCache: forceRefresh });
   if (lastVal && (lastVal.gsz != null || lastVal.gszzl != null)) {
     return lastVal;
   }
 
-  // FundValuationLast 无数据或无估值字段时降级到 OCR pic6
-  fundDebugLog('fetchFundValuationBySource ttValuationLast no valuation, falling back to ocr_pic6', { code: c });
-  const inGsTt = await isTtFund(c);
-  if (!inGsTt) {
-    fundDebugLog('fetchFundValuationBySource ocr_pic6 not in gs_tt', { code: c });
-    throw new Error('FundValuationLast 无数据且基金编码不存在于 gs_tt 表中');
+  // FundValuationLast 无数据、无估值字段或标记 noValuation 时，统一降级到 gs_tt
+  // TODO: OCR pic6 降级路径临时禁用，后续如需恢复取消下方注释即可
+  // fundDebugLog('fetchFundValuationBySource ttValuationLast no valuation, falling back to ocr_pic6', { code: c });
+  // const inGsTt = await isTtFund(c);
+  // if (!inGsTt) {
+  //   fundDebugLog('fetchFundValuationBySource ocr_pic6 not in gs_tt', { code: c });
+  //   throw new Error('FundValuationLast 无数据且基金编码不存在于 gs_tt 表中');
+  // }
+  // const qc = getQueryClient();
+  // try {
+  //   return await qc.fetchQuery({
+  //     queryKey: qk.ocrValuation(c),
+  //     queryFn: async () => {
+  //       const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
+  //       const [worker, imageInput] = await Promise.all([
+  //         getOcrWorker('chi_sim+eng'),
+  //         fetchPic6ImageAndCrop(c, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.15 })
+  //       ]);
+  //       const res = await worker.recognize(imageInput);
+  //       const text = res?.data?.text || '';
+  //       fundDebugLog('fetchFundValuationBySource ocr_pic6 text', { code: c, text });
+  //       return parseOcrValuationText(text, c);
+  //     },
+  //     staleTime: 2 * 60 * 1000, // 2 分钟缓存
+  //     retry: false // OCR 解析不需要失败后重试，出现异常立刻抛出并降级到 gs_tt
+  //   });
+  // } catch (ocrErr) {
+  //   fundDebugLog('fetchFundValuationBySource ocr_pic6 failed, falling back to gs_tt', {
+  //     code: c,
+  //     err: ocrErr?.message || String(ocrErr)
+  //   });
+  //   const ttVal = await fetchTtValuationFromSupabase(c);
+  //   if (!ttVal) {
+  //     throw new Error('FundValuationLast、OCR 与 gs_tt 降级均失败或数据非今年');
+  //   }
+  //   return {
+  //     code: c,
+  //     gsz: ttVal.gsz,
+  //     gztime: ttVal.gztime,
+  //     gszzl: ttVal.gszzl,
+  //     valuationSource: ttVal.valuationSource
+  //   };
+  // }
+
+  fundDebugLog('fetchFundValuationBySource falling back to gs_tt', { code: c });
+  const ttVal = await fetchTtValuationFromSupabase(c);
+  if (!ttVal) {
+    throw new Error('FundValuationLast 与 gs_tt 降级均失败或数据非今年');
   }
-  const qc = getQueryClient();
-  try {
-    return await qc.fetchQuery({
-      queryKey: qk.ocrValuation(c),
-      queryFn: async () => {
-        const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
-        const [worker, imageInput] = await Promise.all([
-          getOcrWorker('chi_sim+eng'),
-          fetchPic6ImageAndCrop(c, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.15 })
-        ]);
-        const res = await worker.recognize(imageInput);
-        const text = res?.data?.text || '';
-        fundDebugLog('fetchFundValuationBySource ocr_pic6 text', { code: c, text });
-        return parseOcrValuationText(text, c);
-      },
-      staleTime: 2 * 60 * 1000, // 2 分钟缓存
-      retry: false // OCR 解析不需要失败后重试，出现异常立刻抛出并降级到 gs_tt
-    });
-  } catch (ocrErr) {
-    fundDebugLog('fetchFundValuationBySource ocr_pic6 failed, falling back to gs_tt', {
-      code: c,
-      err: ocrErr?.message || String(ocrErr)
-    });
-    const ttVal = await fetchTtValuationFromSupabase(c);
-    if (!ttVal) {
-      throw new Error('FundValuationLast、OCR 与 gs_tt 降级均失败或数据非今年');
-    }
-    return {
-      code: c,
-      gsz: ttVal.gsz,
-      gztime: ttVal.gztime,
-      gszzl: ttVal.gszzl,
-      valuationSource: ttVal.valuationSource
-    };
-  }
+  return {
+    code: c,
+    gsz: ttVal.gsz,
+    gztime: ttVal.gztime,
+    gszzl: ttVal.gszzl,
+    valuationSource: ttVal.valuationSource
+  };
 }
 
 /**
@@ -2570,64 +2603,117 @@ export const fetchFundData = async (c, overrideDataSource) => {
     } catch (e) {}
   }
 
-  // 1. 发起并发的净值请求和估值请求
-  // 优先使用腾讯 jj 接口（轻量 89B/只，支持批量），pingzhongdata 作为降级
-  const tencentNavPromise = fetchNavFromTencent(code);
+  // 1. 始终获取 FundValuationLast 数据（包含最新净值 NAV/PDATE 和数据源1的估值数据）
+  // 已在 useRefreshManager 中通过 prefetchTtValuationLast 批量预取，此处直接命中缓存
+  const ttLastPromise = fetchTtValuationLast(code);
 
-  // 2. 发起估值请求
-  const gzPromise = fetchFundValuationBySource(code, dataSource);
+  // 2. 对于非数据源 1，发起各自数据源的估值请求
+  const ds = normalizeValuationDataSource(dataSource);
+  let gzPromise = null;
+  if (ds !== 1) {
+    gzPromise = fetchFundValuationBySource(code, dataSource);
+  }
 
   // 3. 编排并合并数据
   return new Promise(async (resolve, reject) => {
+    // 获取 FundValuationLast 数据（含最新净值 NAV/PDATE）
+    const ttLastData = await ttLastPromise;
+
     let baseData = null;
-    try {
-      baseData = await gzPromise;
-    } catch (e) {
+
+    if (ds === 1) {
+      // 数据源 1：优先直接使用 FundValuationLast 的估值数据，无需额外请求
+      if (ttLastData && (ttLastData.gsz != null || ttLastData.gszzl != null)) {
+        baseData = { ...ttLastData };
+      } else {
+        // FundValuationLast 无估值字段（可能仅有 NAV，如非交易时段或货币基金）
+        // 降级到 fetchFundValuationBySource（→ gs_tt）尝试获取估值
+        try {
+          baseData = await fetchFundValuationBySource(code, dataSource);
+        } catch (e) {
+          // gs_tt 也无估值数据
+          if (ttLastData && !isNil(ttLastData.dwjz)) {
+            // 有 NAV 但无估值 → 使用 NAV，标记无估值
+            baseData = { ...ttLastData, noValuation: true };
+          } else {
+            try {
+              baseData = await fetchFundDataFallback(code);
+            } catch (fbErr) {
+              reject(fbErr);
+              return;
+            }
+          }
+        }
+      }
+    } else {
+      // 数据源 2/3/4：从各自数据源获取估值
       try {
-        baseData = await fetchFundDataFallback(code);
-      } catch (fbErr) {
-        reject(fbErr);
-        return;
+        baseData = await gzPromise;
+      } catch (e) {
+        try {
+          baseData = await fetchFundDataFallback(code);
+        } catch (fbErr) {
+          reject(fbErr);
+          return;
+        }
       }
     }
 
-    // 等待腾讯净值结果
-    let tData = await tencentNavPromise;
-
-    // 腾讯 jj 无数据时降级到 pingzhongdata（含昨日净值等完整指标）
-    if (!tData) {
-      tData = await fetchNavMetricsFromTrendFallback(code);
+    // 合并 FundValuationLast 的最新净值（NAV/PDATE）到 baseData
+    // FundValuationLast 的 dwjz 是最新已发布净值，优先于 pingzhongdata
+    if (ttLastData && !isNil(ttLastData.dwjz)) {
+      const ttNav = String(ttLastData.dwjz);
+      const ttDate = ttLastData.jzrq;
+      if (!baseData.dwjz) {
+        // baseData 无净值（如 Sina 数据源）
+        baseData.dwjz = ttNav;
+        baseData.jzrq = ttDate;
+      } else if (ttDate && (!baseData.jzrq || String(ttDate) > String(baseData.jzrq))) {
+        // FundValuationLast 净值日期更新 → 更新净值，旧净值保留为 lastNav
+        if (String(baseData.dwjz) !== ttNav) {
+          baseData.lastNav = baseData.dwjz;
+        }
+        baseData.dwjz = ttNav;
+        baseData.jzrq = ttDate;
+      }
     }
 
+    // 使用 pingzhongdata 补充昨日净值等完整指标（zzl、lastNav、yesterdayZzl、yesterdayNavDelta）
+    const tData = await fetchNavMetricsFromTrendFallback(code);
+
     if (tData) {
-      // fundgz 的 dwjz 是估值基准净值（上一交易日），腾讯的 dwjz 是最新已发布净值。
-      // 当腾讯净值日期比 fundgz 更新时，将 fundgz 的 dwjz 保留为 lastNav（昨日净值）。
-      if (tData.jzrq && (!baseData.jzrq || tData.jzrq >= baseData.jzrq)) {
-        if (
-          baseData.dwjz &&
-          baseData.jzrq &&
-          tData.jzrq > baseData.jzrq &&
-          !isNil(tData.dwjz) &&
-          String(tData.dwjz) !== String(baseData.dwjz)
-        ) {
+      const sameDate = tData.jzrq && baseData.jzrq && String(tData.jzrq) === String(baseData.jzrq);
+
+      if (sameDate) {
+        // 同一净值日期：pingzhongdata 的 zzl/lastNav 对应当前净值，可直接使用
+        if (isNil(baseData.zzl) && !isNil(tData.zzl)) baseData.zzl = tData.zzl;
+        if (isNil(baseData.lastNav) && !isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
+      } else if (tData.jzrq && baseData.jzrq && String(tData.jzrq) > String(baseData.jzrq)) {
+        // pingzhongdata 净值日期更新（FundValuationLast 未更新）→ 使用 pingzhongdata 的净值
+        if (baseData.dwjz && !isNil(tData.dwjz) && String(tData.dwjz) !== String(baseData.dwjz)) {
           baseData.lastNav = baseData.dwjz;
         }
         baseData.dwjz = tData.dwjz;
         baseData.jzrq = tData.jzrq;
         baseData.zzl = tData.zzl;
         if (!isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
-      } else if (!baseData.dwjz && tData.dwjz) {
-        // Fallback for Sina which doesn't provide dwjz/jzrq
+      } else {
+        // pingzhongdata 净值日期更旧：
+        // - zzl 属于 tData 的日期，不能用于 baseData 的日期，不设置
+        // - lastNav 应为 tData.dwjz（最近可用净值，即 baseData 前一日的净值），
+        //   而非 tData.lastNav（那是前两日的净值）
+        if (isNil(baseData.lastNav) && !isNil(tData.dwjz)) baseData.lastNav = tData.dwjz;
+      }
+
+      // baseData 仍无净值时使用 pingzhongdata 兑底
+      if (isNil(baseData.dwjz) && !isNil(tData.dwjz)) {
         baseData.dwjz = tData.dwjz;
         baseData.jzrq = tData.jzrq;
-        baseData.zzl = tData.zzl;
-        if (!isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
-      } else if (isNil(baseData.zzl) && !isNil(tData.zzl)) {
-        baseData.zzl = tData.zzl;
-        if (!baseData.dwjz) baseData.dwjz = tData.dwjz;
-        if (!baseData.jzrq) baseData.jzrq = tData.jzrq;
+        if (isNil(baseData.zzl)) baseData.zzl = tData.zzl;
         if (isNil(baseData.lastNav) && !isNil(tData.lastNav)) baseData.lastNav = tData.lastNav;
       }
+
+      // 昨日指标始终从 pingzhongdata 获取
       if (Object.prototype.hasOwnProperty.call(tData, 'yesterdayZzl')) {
         baseData.yesterdayZzl = tData.yesterdayZzl;
       }

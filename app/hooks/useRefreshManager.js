@@ -19,7 +19,6 @@ import {
   prefetchQdiiValuations,
   prefetchTtValuations,
   prefetchTtValuationLast,
-  fetchNavFromTencentBatch,
   isFallbackFundName
 } from '../api/fund';
 import { TZ } from '../lib/fundHelpers';
@@ -305,13 +304,14 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           console.error('批量获取自动数据源失败', e);
         }
 
-        // 批量预取天天基金 FundValuationLast 实时估值（数据源 1 主接口，支持批量 CORS 直连）
+        // 批量预取天天基金 FundValuationLast 数据（支持批量 CORS 直连，最大 50 只/批）
+        // 该接口同时提供：数据源 1 的实时估值（gsz/gszzl/gztime）+ 所有数据源的 最新净值（NAV/PDATE）
         try {
           if (uniqueCodes.length > 0) {
             await prefetchTtValuationLast(uniqueCodes);
           }
         } catch (e) {
-          console.warn('批量预取 FundValuationLast 估值失败', e);
+          console.warn('批量预取 FundValuationLast 失败', e);
         }
 
         // 批量预取目标基金在 gs_tt 表中的存在状态与估值数据（降级数据源，通过 RPC/IN 批量合并查询替代 N 次单查）
@@ -340,13 +340,8 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           console.warn('批量预取 QDII 估值失败', e);
         }
 
-        // 批量预取所有基金最新净值（腾讯 jj 接口，一次请求获取多只基金净值）
-        // fetchFundData 内部会调用 fetchNavFromTencent，此处提前触发可将整个刷新周期内的净值请求合并为 1 次批量请求
-        try {
-          await fetchNavFromTencentBatch(uniqueCodes);
-        } catch (e) {
-          console.warn('批量预取腾讯净值失败', e);
-        }
+        // 最新净值改由 FundValuationLast 接口的 NAV/PDATE 字段提供（已在 prefetchTtValuationLast 中批量预取），
+        // 不再使用腾讯财经 jj 行情接口获取净值
 
         await asyncPool(3, uniqueCodes, async (c) => {
           if (!fundCodeStillInStorage(c)) {
