@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isArray, isNil, isNumber, isObject, isString } from 'lodash';
+import { chunk, isArray, isNil, isNumber, isObject, isString } from 'lodash';
 import { storageStore } from '../stores';
 import { withRetry, withRetrySmart } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
@@ -1806,6 +1806,222 @@ export async function prefetchTtValuations(codes) {
   return results;
 }
 
+// ============================================================================
+// 天天基金 FundValuationLast 实时估值接口（CORS 直连，支持批量）
+// 作为数据源 1 的主接口，替代原先的 OCR pic6 方案；OCR pic6 → gs_tt 保留为降级路径
+// ============================================================================
+
+const FUND_VALUATION_LAST_URL = 'https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast';
+const FUND_VALUATION_LAST_FIELDS = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE';
+// 单次批量请求的基金编码上限，避免 URL 过长
+const FUND_VALUATION_LAST_BATCH_SIZE = 50;
+
+/** FundValuationLast 实时估值缓存时长：交易时段 2 分钟，非交易时段 10 分钟 */
+const getTtValuationLastStaleTime = () => {
+  const now = nowInTz();
+  const tradingDay = isTradingDay(now);
+  const hour = now.hour();
+  const minute = now.minute();
+  const timeNum = hour * 100 + minute;
+  const isTradingTime = tradingDay && ((timeNum >= 925 && timeNum <= 1135) || (timeNum >= 1255 && timeNum <= 1505));
+  return isTradingTime ? 2 * 60 * 1000 : 10 * 60 * 1000;
+};
+
+/**
+ * 解析 FundValuationLast 接口单条记录为统一估值结构。
+ * @param {object} item - 接口返回的 data 数组中的单条记录
+ * @returns {{code:string,gsz:number|null,gszzl:number|null,gztime:string|null,dwjz:string|null,jzrq:string|null,name:string|null,valuationSource:string}|null}
+ */
+function parseTtValuationLastItem(item) {
+  if (!isObject(item)) return null;
+  const code = isString(item.FCODE) ? item.FCODE.trim() : String(item.FCODE || '').trim();
+  if (!code) return null;
+
+  const toNum = (v) => (v != null && v !== '' ? Number(v) : NaN);
+  const gsz = toNum(item.GSZ);
+  const gszzl = toNum(item.GSZZL);
+  const nav = toNum(item.NAV);
+  const gztimeRaw = isString(item.GZTIME) ? item.GZTIME.trim() : '';
+  const gztime = gztimeRaw ? gztimeRaw.replace(/:(\d{2}):\d{2}$/, ':$1') : null;
+  const pdate = isString(item.PDATE) ? item.PDATE.trim() : null;
+  const shortname = isString(item.SHORTNAME) ? item.SHORTNAME.trim() : null;
+
+  // 年份校验：GZTIME 存在时必须是今年数据
+  if (gztime) {
+    const yearMatch = gztime.match(/^(\d{4})/);
+    const currentYear = String(new Date().getFullYear());
+    if (!yearMatch || yearMatch[1] !== currentYear) return null;
+  }
+
+  const hasGsz = Number.isFinite(gsz);
+  const hasGszzl = Number.isFinite(gszzl);
+  const hasNav = Number.isFinite(nav);
+  // 必须至少有估值净值(GSZ)或估算涨幅(GSZZL)才算有效估值数据；
+  // 仅返回 NAV 而无估值字段的记录（如货币基金）应返回 null，以触发降级路径
+  if (!hasGsz && !hasGszzl) return null;
+
+  return {
+    code,
+    gsz: hasGsz ? gsz : null,
+    gszzl: hasGszzl ? gszzl : null,
+    gztime,
+    dwjz: hasNav ? String(nav) : null,
+    jzrq: pdate,
+    name: shortname,
+    valuationSource: 'fundgz'
+  };
+}
+
+/**
+ * 批量调用天天基金 FundValuationLast 接口获取实时估值。
+ *
+ * 该接口支持 CORS（Access-Control-Allow-Origin: *），可直接使用 fetch。
+ * 单次请求最多 {@link FUND_VALUATION_LAST_BATCH_SIZE} 只基金（通过 chunk 分批），每批独立容错。
+ *
+ * @param {string[]} codes - 基金编码数组
+ * @returns {Promise<Map<string, object>>} code -> 估值对象
+ */
+async function fetchTtValuationLastBatch(codes) {
+  if (typeof fetch === 'undefined') return new Map();
+
+  const validCodes = [];
+  const seen = new Set();
+  for (const c of codes) {
+    const code = c != null ? String(c).trim() : '';
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    validCodes.push(code);
+  }
+  if (validCodes.length === 0) return new Map();
+
+  const result = new Map();
+  const chunks = chunk(validCodes, FUND_VALUATION_LAST_BATCH_SIZE);
+
+  await Promise.all(
+    chunks.map(async (chunkCodes) => {
+      const params = new URLSearchParams();
+      params.set('FCODES', chunkCodes.join(','));
+      params.set('FIELDS', FUND_VALUATION_LAST_FIELDS);
+      const url = `${FUND_VALUATION_LAST_URL}?${params.toString()}`;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        fundDebugLog('fetchTtValuationLastBatch request', { count: chunkCodes.length });
+        const resp = await fetch(url, { signal: controller.signal });
+        if (!resp.ok) {
+          fundDebugLog('fetchTtValuationLastBatch http error', { status: resp.status });
+          return;
+        }
+        const json = await resp.json();
+        if (!json || !json.success || !isArray(json.data)) return;
+        for (const item of json.data) {
+          const parsed = parseTtValuationLastItem(item);
+          if (parsed) result.set(parsed.code, parsed);
+        }
+      } catch (e) {
+        fundDebugLog('fetchTtValuationLastBatch chunk error', { err: e?.message, count: chunkCodes.length });
+      } finally {
+        clearTimeout(timer);
+      }
+    })
+  );
+
+  return result;
+}
+
+/**
+ * 获取单个基金的天天基金实时估值（FundValuationLast 接口）。
+ * 优先读取 TanStack Query 缓存（由 prefetchTtValuationLast 批量预热），缓存未命中时单次请求。
+ * @param {string} code - 基金编码
+ * @returns {Promise<object|null>}
+ */
+export const fetchTtValuationLast = async (code) => {
+  const c = code != null ? String(code).trim() : '';
+  if (!c) return null;
+
+  const qc = getQueryClient();
+  const cached = qc.getQueryData(qk.ttValuationLast(c));
+  if (cached !== undefined) return cached;
+
+  const staleTime = getTtValuationLastStaleTime();
+  const batchMap = await fetchTtValuationLastBatch([c]);
+  const val = batchMap.get(c) || null;
+  qc.setQueryData(qk.ttValuationLast(c), val, { staleTime });
+  return val;
+};
+
+let activeLastBatchPromise = null;
+let activeLastBatchSignature = null;
+
+/**
+ * 批量预取多个基金的天天基金实时估值并写入 TanStack Query 缓存。
+ *
+ * 利用 FundValuationLast 接口的批量能力，一次请求获取多只基金估值，
+ * 后续 fetchTtValuationLast 单基金调用将直接命中缓存。
+ * 带有请求去重机制：相同 signature 的并发调用复用同一 Promise。
+ *
+ * @param {string[]} codes - 基金编码数组
+ * @returns {Promise<Record<string, object|null>>}
+ */
+export async function prefetchTtValuationLast(codes) {
+  if (!isArray(codes) || codes.length === 0) return {};
+
+  const qc = getQueryClient();
+  const staleTime = getTtValuationLastStaleTime();
+  const results = {};
+  const missing = [];
+  const seen = new Set();
+
+  for (const c of codes) {
+    const code = c != null ? String(c).trim() : '';
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+
+    const cached = qc.getQueryData(qk.ttValuationLast(code));
+    const isStale = qc.getQueryState(qk.ttValuationLast(code))?.isStale ?? true;
+    if (cached !== undefined && !isStale) {
+      if (cached) results[code] = cached;
+    } else {
+      missing.push(code);
+    }
+  }
+
+  if (missing.length === 0) return results;
+
+  missing.sort();
+  const signature = missing.join(',');
+  if (activeLastBatchPromise && activeLastBatchSignature === signature) {
+    try {
+      await activeLastBatchPromise;
+    } catch (e) {}
+  } else {
+    activeLastBatchSignature = signature;
+    activeLastBatchPromise = (async () => {
+      const batchMap = await fetchTtValuationLastBatch(missing);
+      for (const code of missing) {
+        const val = batchMap.get(code) || null;
+        qc.setQueryData(qk.ttValuationLast(code), val, { staleTime });
+      }
+    })();
+    try {
+      await activeLastBatchPromise;
+    } finally {
+      if (activeLastBatchSignature === signature) {
+        activeLastBatchPromise = null;
+        activeLastBatchSignature = null;
+      }
+    }
+  }
+
+  for (const code of missing) {
+    const cached = qc.getQueryData(qk.ttValuationLast(code));
+    if (cached) results[code] = cached;
+  }
+
+  return results;
+}
+
 /**
  * 批量预取多个 QDII 基金的估值数据并写入 TanStack Query 缓存。
  *
@@ -2168,7 +2384,10 @@ export async function fetchFundsBestSources(fundCodes) {
 }
 
 /**
- * 按基金编码与数据源类型获取估值（天天基金 fundgz 或新浪估算曲线末点）。
+ * 按基金编码与数据源类型获取估值。
+ * - 数据源 1：优先天天基金 FundValuationLast 批量接口（CORS 直连），降级 OCR pic6 → gs_tt
+ * - 数据源 2/3：新浪估算曲线末点（不同口径）
+ * - 数据源 4：Supabase gs_qdii 表
  * @param {string} code - 基金编码
  * @param {number | string} [dataSource=1] - 1 天天基金；2、3 新浪估算不同口径；4 Supabase QDII
  * @returns {Promise<UnifiedFundValuation>}
@@ -2238,12 +2457,20 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
     };
   }
 
-  // 数据源 1：OCR 解析东方财富 pic6 净值估算图
-  fundDebugLog('fetchFundValuationBySource ocr_pic6', { code: c });
+  // 数据源 1：优先使用天天基金 FundValuationLast 批量接口（CORS 直连），
+  // 无数据或无估值字段时降级到 OCR pic6 → gs_tt
+  fundDebugLog('fetchFundValuationBySource ttValuationLast', { code: c });
+  const lastVal = await fetchTtValuationLast(c);
+  if (lastVal && (lastVal.gsz != null || lastVal.gszzl != null)) {
+    return lastVal;
+  }
+
+  // FundValuationLast 无数据或无估值字段时降级到 OCR pic6
+  fundDebugLog('fetchFundValuationBySource ttValuationLast no valuation, falling back to ocr_pic6', { code: c });
   const inGsTt = await isTtFund(c);
   if (!inGsTt) {
     fundDebugLog('fetchFundValuationBySource ocr_pic6 not in gs_tt', { code: c });
-    throw new Error('基金编码不存在于 gs_tt 表中');
+    throw new Error('FundValuationLast 无数据且基金编码不存在于 gs_tt 表中');
   }
   const qc = getQueryClient();
   try {
@@ -2270,7 +2497,7 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
     });
     const ttVal = await fetchTtValuationFromSupabase(c);
     if (!ttVal) {
-      throw new Error('OCR 与 gs_tt 降级均失败或数据非今年');
+      throw new Error('FundValuationLast、OCR 与 gs_tt 降级均失败或数据非今年');
     }
     return {
       code: c,

@@ -76,5 +76,8 @@ export const ocrValuation = (fundCode) => ['ocrValuation', String(fundCode).trim
 /** @param {string} fundCode — gs_tt 表估值数据缓存 */
 export const ttValuation = (fundCode) => ['ttValuation', String(fundCode).trim()];
 
+/** @param {string} fundCode — 天天基金 FundValuationLast 实时估值接口（CORS 直连，支持批量）缓存 */
+export const ttValuationLast = (fundCode) => ['ttValuationLast', String(fundCode).trim()];
+
 /** @param {string} userId */
 export const membershipStatus = (userId) => ['membershipStatus', String(userId || '').trim()];

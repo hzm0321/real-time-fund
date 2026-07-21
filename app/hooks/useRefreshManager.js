@@ -18,6 +18,7 @@ import {
   fetchFundsBestSources,
   prefetchQdiiValuations,
   prefetchTtValuations,
+  prefetchTtValuationLast,
   fetchNavFromTencentBatch,
   isFallbackFundName
 } from '../api/fund';
@@ -304,7 +305,16 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
           console.error('批量获取自动数据源失败', e);
         }
 
-        // 批量预取目标基金在 gs_tt 表中的存在状态与估值数据（通过 RPC/IN 批量合并查询替代 N 次单查）
+        // 批量预取天天基金 FundValuationLast 实时估值（数据源 1 主接口，支持批量 CORS 直连）
+        try {
+          if (uniqueCodes.length > 0) {
+            await prefetchTtValuationLast(uniqueCodes);
+          }
+        } catch (e) {
+          console.warn('批量预取 FundValuationLast 估值失败', e);
+        }
+
+        // 批量预取目标基金在 gs_tt 表中的存在状态与估值数据（降级数据源，通过 RPC/IN 批量合并查询替代 N 次单查）
         try {
           if (uniqueCodes.length > 0) {
             await prefetchTtValuations(uniqueCodes);
