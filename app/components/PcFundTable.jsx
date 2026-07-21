@@ -1167,7 +1167,12 @@ const PcFundTable = memo(function PcFundTable({
       setPortalHorizontal((prev) => {
         const next = {
           left: rect.left,
-          right: typeof window !== 'undefined' ? Math.max(0, window.innerWidth - rect.right) : 0
+          // 使用 clientWidth 而非 innerWidth：position:fixed 的偏移基于不含滚动条的视口，
+          // innerWidth 包含滚动条宽度会导致 portal 右侧多出一段偏移，操作列向左错位
+          right:
+            typeof window !== 'undefined'
+              ? Math.max(0, (document.documentElement.clientWidth || window.innerWidth) - rect.right)
+              : 0
         };
         if (prev.left === next.left && prev.right === next.right) return prev;
         return next;
@@ -3161,7 +3166,9 @@ const PcFundTable = memo(function PcFundTable({
                           top: effectiveStickyTop,
                           left: portalHorizontal.left,
                           right: portalHorizontal.right,
-                          zIndex: 10
+                          zIndex: 10,
+                          // 固定表头容器需要不透明背景，防止表体内容滚动时透过半透明滚动条/表头透出
+                          background: 'var(--bg)'
                         }}
                       >
                         {showTopScrollbar && (
