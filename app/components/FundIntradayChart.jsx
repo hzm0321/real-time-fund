@@ -84,7 +84,7 @@ export default function FundIntradayChart({
         const { getOcrWorker, fetchPic6ImageAndCrop } = await import('@/app/lib/ocr');
         const [worker, imageInput] = await Promise.all([
           getOcrWorker('chi_sim+eng'),
-          fetchPic6ImageAndCrop(fundCode, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.2 })
+          fetchPic6ImageAndCrop(fundCode, { timeoutMs: 4000, maxRetries: 1, cropRatio: 0.15 })
         ]);
         const res = await worker.recognize(imageInput);
 

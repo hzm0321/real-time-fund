@@ -96,13 +96,13 @@ async function fetchBlobWithRetry(url, timeoutMs = 4000, maxRetries = 1) {
 }
 
 /**
- * 主线程网络获取 pic6 图片并发执行 Canvas 底部裁剪（从下至上截取 20% 核心区域）
+ * 主线程网络获取 pic6 图片并发执行 Canvas 底部裁剪（从下至上截取 15% 核心区域）
  * @param {string} code - 基金编码
  * @param {object} [options] - 配置选项
  * @returns {Promise<Blob|string>} 裁剪后的 Blob 或 DataURL
  */
 export async function fetchPic6ImageAndCrop(code, options = {}) {
-  const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.2 } = options;
+  const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.15 } = options;
   const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(
     `j4.dfcfw.com/charts/pic7/${code}.png?v=${Date.now()}`
   )}`;
