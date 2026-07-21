@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { formatMoney } from '@/lib/utils';
 import { useUserStore } from '@/app/stores';
+import { useMembership } from '@/app/hooks/useMembership';
 import { useFundFuzzyMatcher } from '@/app/hooks/useFundFuzzyMatcher';
 
 export default function ScanImportConfirmModal({
@@ -26,10 +27,18 @@ export default function ScanImportConfirmModal({
   currentGroup = 'all'
 }) {
   const user = useUserStore((s) => s.user);
+  const { isVip, loading: membershipLoading } = useMembership();
   const [selectedGroupId, setSelectedGroupId] = useState(currentGroup);
   const [expandAfterAdd, setExpandAfterAdd] = useState(true);
   const [autoDataSource, setAutoDataSource] = useState(!!user);
   const [autoImportTags, setAutoImportTags] = useState(true);
+
+  // 非 PRO 会员不展示自动数据源选项，且强制关闭状态以确保传值正确
+  useEffect(() => {
+    if (!membershipLoading && !isVip) {
+      setAutoDataSource(false);
+    }
+  }, [isVip, membershipLoading]);
   const allCodeSet = useMemo(() => new Set((existingAllCodes || []).filter(Boolean)), [existingAllCodes]);
   const favCodeSet = useMemo(() => new Set((existingFavCodes || []).filter(Boolean)), [existingFavCodes]);
 
@@ -488,7 +497,7 @@ export default function ScanImportConfirmModal({
               </span>
               <Switch checked={expandAfterAdd} onCheckedChange={(checked) => setExpandAfterAdd(!!checked)} />
             </div>
-            {user && (
+            {user && isVip && (
               <div
                 style={{
                   marginTop: 12,
