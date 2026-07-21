@@ -399,7 +399,9 @@
       enabled: boolean   // 是否启用
     }
   ],
-  localSortDisplayMode: string,       // 排序显示模式 'buttons' | 'dropdown'
+  localSortDisplayMode: string,       // 排序显示模式 'buttons' | 'dropdown'（兼容旧版）
+  pcLocalSortDisplayMode: string,     // PC端排序显示模式 'buttons' | 'dropdown'（默认 'buttons'）
+  mobileLocalSortDisplayMode: string, // 移动端排序显示模式 'buttons' | 'dropdown'（默认 'dropdown'）
   pcContainerWidth: number,           // PC端容器宽度（桌面版）
   showMarketIndexPc: boolean,         // PC端是否显示大盘指数
   showMarketIndexMobile: boolean,     // 移动端是否显示大盘指数

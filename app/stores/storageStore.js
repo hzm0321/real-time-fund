@@ -167,7 +167,7 @@ export const useStorageStore = create((set, get) => ({
   sortBy: 'default',
   sortOrder: 'desc',
   pcSortDisplayMode: 'buttons',
-  mobileSortDisplayMode: 'buttons',
+  mobileSortDisplayMode: 'dropdown',
   sortRules: DEFAULT_SORT_RULES,
 
   initFunds: () => {
