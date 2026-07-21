@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.5.2';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.5.3';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -110,8 +110,11 @@ export default function Announcement() {
               }}
             >
               <p>v2.5.2 Pro 版本更新内容：</p>
-              <p>1. 更换前 10 重仓接口调用方案。</p>
-              <p>2. 优化 PC 端滚动条样式及横向滚动态表格样式。</p>
+              <p>1. 更换数据源1接口调用方案。</p>
+              <p>2. 优化 OCR 识别方案。</p>
+              <p>3. 优化市场指数卡片布局展示。</p>
+              <p>4. 修复 PC 端横向滚动条与固定列样式问题。</p>
+              <p>5. 修复基金名称显示问题。</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button
