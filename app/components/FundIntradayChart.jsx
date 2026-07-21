@@ -392,7 +392,7 @@ export default function FundIntradayChart({
             <PhotoView
               src={
                 isMobile
-                  ? `https://j4.dfcfw.com/charts/pic6/${fundCode}.png${gztime ? '?v=' + encodeURIComponent(gztime) : ''}`
+                  ? `https://j4.dfcfw.com/charts/pic7/${fundCode}.png${gztime ? '?v=' + encodeURIComponent(gztime) : ''}`
                   : undefined
               }
               width={isMobile ? undefined : 817}
@@ -404,7 +404,7 @@ export default function FundIntradayChart({
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           {...attrs}
-                          src={`https://j4.dfcfw.com/charts/pic6/${fundCode}.png${gztime ? '?v=' + encodeURIComponent(gztime) : ''}`}
+                          src={`https://j4.dfcfw.com/charts/pic7/${fundCode}.png${gztime ? '?v=' + encodeURIComponent(gztime) : ''}`}
                           alt="净值估算图"
                           style={{
                             ...attrs.style,
@@ -421,7 +421,7 @@ export default function FundIntradayChart({
               <CenterOrigin>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`https://j4.dfcfw.com/charts/pic6/${fundCode}.png${gztime ? '?v=' + encodeURIComponent(gztime) : ''}`}
+                  src={`https://j4.dfcfw.com/charts/pic7/${fundCode}.png${gztime ? '?v=' + encodeURIComponent(gztime) : ''}`}
                   alt="净值估算图"
                   style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }}
                   onError={(e) => {

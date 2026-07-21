@@ -104,7 +104,7 @@ async function fetchBlobWithRetry(url, timeoutMs = 4000, maxRetries = 1) {
 export async function fetchPic6ImageAndCrop(code, options = {}) {
   const { timeoutMs = 4000, maxRetries = 1, cropRatio = 0.2 } = options;
   const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(
-    `j4.dfcfw.com/charts/pic6/${code}.png?v=${Date.now()}`
+    `j4.dfcfw.com/charts/pic7/${code}.png?v=${Date.now()}`
   )}`;
   const blob = await fetchBlobWithRetry(proxyUrl, timeoutMs, maxRetries);
 
