@@ -4,6 +4,7 @@ import { toast as sonnerToast } from 'sonner';
 import { parseFundTextWithLLM, fetchFundData, searchFunds, fetchFundsBestSources } from '../api/fund';
 import { recordValuation } from '../lib/valuationTimeseries';
 import { useFundFuzzyMatcher } from './useFundFuzzyMatcher';
+import { useMembership } from './useMembership';
 import { useStorageStore, useUserStore, useModalStore } from '../stores';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -27,6 +28,7 @@ export function useScanImport({
 }) {
   const setSuccessModal = (state) => useModalStore.setState({ successModal: state });
   const user = useUserStore((s) => s.user);
+  const { isVip } = useMembership();
   const funds = useStorageStore((s) => s.funds);
   const favorites = useStorageStore((s) => s.favorites);
   const groups = useStorageStore((s) => s.groups);
@@ -80,6 +82,7 @@ export function useScanImport({
 
   const abortScanRef = useRef(false);
   const fileInputRef = useRef(null);
+  const ocrWorkerRef = useRef(null);
 
   const { resolveFundCodeByFuzzy } = useFundFuzzyMatcher();
 
@@ -269,6 +272,10 @@ export function useScanImport({
     abortScanRef.current = true;
     setIsScanning(false);
     setScanProgress({ stage: 'ocr', current: 0, total: 0 });
+    if (ocrWorkerRef.current) {
+      import('../lib/ocr').then(({ terminateOcrWorker }) => terminateOcrWorker());
+      ocrWorkerRef.current = null;
+    }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -281,27 +288,92 @@ export function useScanImport({
     setScanProgress({ stage: 'ocr', current: 0, total: files.length });
 
     try {
-      // 统一使用云端 ocr.space 提取文字，再提交大模型解析（彻底避免 150s 超时及传输大图）
-      const { compressImageToBase64 } = await import('../lib/imageCompress');
-      const { recognizeWithOcrSpace } = await import('../lib/ocrSpace');
+      // PRO 用户：前端直接调云端 OCR (ocr.space) 提取文字，再提交大模型解析（彻底避免 150s 超时及传输大图）
+      if (isVip) {
+        const { compressImageToBase64 } = await import('../lib/imageCompress');
+        const { recognizeWithOcrSpace } = await import('../lib/ocrSpace');
+        const extractedTexts = [];
+        for (let i = 0; i < files.length; i++) {
+          if (abortScanRef.current) break;
+          const f = files[i];
+          setScanProgress((prev) => ({ ...prev, current: i + 1 }));
+          let text = '';
+          try {
+            const base64 = await compressImageToBase64(f);
+            text = await recognizeWithOcrSpace(base64);
+          } catch (e) {
+            // 如果只有一个文件，或是超时异常，直接向上抛出在前端展示具体错误信息
+            if (files.length === 1 || String(e?.message || '').includes('超时')) {
+              throw e;
+            }
+            console.error(`第 ${i + 1} 张图片云端 OCR 识别报错:`, e);
+            text = '';
+          }
+          if (text) extractedTexts.push(text);
+        }
+
+        if (abortScanRef.current) return;
+
+        setLastOcrTexts(extractedTexts);
+        setLastIsImage(false);
+
+        if (extractedTexts.length > 0) {
+          setScanProgress({ stage: 'ocr', current: 0, total: extractedTexts.length });
+          await processTextsInternal(extractedTexts, false);
+        } else {
+          setScannedFunds([]);
+          setSelectedScannedCodes(new Set());
+          setIsOcrScan(true);
+          setScanConfirmModalOpen(true);
+        }
+        return;
+      }
+
+      // 普通用户：走原有 Tesseract OCR 流程
+      let worker = ocrWorkerRef.current;
+      if (!worker) {
+        const { getOcrWorker } = await import('../lib/ocr');
+        worker = await getOcrWorker('chi_sim+eng');
+        ocrWorkerRef.current = worker;
+      }
+
+      const recognizeWithTimeout = async (file, ms) => {
+        let timer = null;
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('OCR_TIMEOUT')), ms);
+        });
+        try {
+          return await Promise.race([worker.recognize(file), timeout]);
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      };
+
       const extractedTexts = [];
       for (let i = 0; i < files.length; i++) {
         if (abortScanRef.current) break;
+
         const f = files[i];
         setScanProgress((prev) => ({ ...prev, current: i + 1 }));
+
         let text = '';
         try {
-          const base64 = await compressImageToBase64(f);
-          text = await recognizeWithOcrSpace(base64);
+          const res = await recognizeWithTimeout(f, 30000);
+          text = res?.data?.text || '';
         } catch (e) {
-          // 如果只有一个文件，或是超时异常，直接向上抛出在前端展示具体错误信息
-          if (files.length === 1 || String(e?.message || '').includes('超时')) {
+          if (String(e?.message || '').includes('OCR_TIMEOUT')) {
+            if (worker) {
+              const { terminateOcrWorker } = await import('../lib/ocr');
+              await terminateOcrWorker();
+              ocrWorkerRef.current = null;
+            }
             throw e;
           }
-          console.error(`第 ${i + 1} 张图片云端 OCR 识别报错:`, e);
           text = '';
         }
-        if (text) extractedTexts.push(text);
+        if (text) {
+          extractedTexts.push(text);
+        }
       }
 
       if (abortScanRef.current) return;
@@ -311,7 +383,7 @@ export function useScanImport({
 
       if (extractedTexts.length > 0) {
         setScanProgress({ stage: 'ocr', current: 0, total: extractedTexts.length });
-        await processTextsInternal(extractedTexts, false);
+        await processTextsInternal(extractedTexts);
       } else {
         setScannedFunds([]);
         setSelectedScannedCodes(new Set());

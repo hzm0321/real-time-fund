@@ -234,10 +234,19 @@ export default function HomePage() {
   const [, startTransition] = useTransition();
   const hasLocalTabInitRef = useRef(false);
 
-  // 调用 store 的 initSort，在 mount 时恢复持久化的排序偏好
+  // 调用 store 的 initSort，在 mount 时恢复持久化的排序偏好，并在闲置时后台预热 OCR 引擎
   useEffect(() => {
     if (typeof window !== 'undefined') {
       initSort();
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(() => {
+          import('@/app/lib/ocr').then((m) => m.warmupOcrWorker());
+        });
+      } else {
+        setTimeout(() => {
+          import('@/app/lib/ocr').then((m) => m.warmupOcrWorker());
+        }, 3000);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
