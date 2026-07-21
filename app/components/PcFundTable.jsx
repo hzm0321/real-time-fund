@@ -2792,10 +2792,10 @@ const PcFundTable = memo(function PcFundTable({
     [sortBy, sortRules]
   );
 
-  const renderTableHeader = (forPortal = false) => {
+  const renderTableHeader = (rowStyle = null) => {
     if (!headerGroup) return null;
     return (
-      <div className="table-header-row table-header-row-scroll">
+      <div className="table-header-row table-header-row-scroll" style={rowStyle}>
         {headerGroup.headers.map((header) => {
           const style = getCommonPinningStyles(header.column, true);
           const isNameColumn = header.column.id === 'fundName' || header.column.columnDef?.accessorKey === 'fundName';
@@ -2844,16 +2844,14 @@ const PcFundTable = memo(function PcFundTable({
                   </span>
                 )}
               </div>
-              {!forPortal && (
-                <div
-                  onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  className={`resizer ${
-                    header.column.getIsResizing() ? 'isResizing' : ''
-                  } ${header.column.getCanResize() ? '' : 'disabled'}`}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
+              <div
+                onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
+                onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
+                className={`resizer ${
+                  header.column.getIsResizing() ? 'isResizing' : ''
+                } ${header.column.getCanResize() ? '' : 'disabled'}`}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           );
         })}
@@ -2995,7 +2993,7 @@ const PcFundTable = memo(function PcFundTable({
         }
       `}</style>
                   {/* 表头 */}
-                  {renderTableHeader(false)}
+                  {renderTableHeader()}
 
                   {/* 表体 */}
                   {enableVirtualization ? (
@@ -3188,63 +3186,7 @@ const PcFundTable = memo(function PcFundTable({
                             scrollbarWidth: 'none'
                           }}
                         >
-                          <div
-                            className="table-header-row table-header-row-scroll"
-                            style={{ minWidth: totalHeaderWidth, width: 'fit-content' }}
-                          >
-                            {headerGroup?.headers.map((header) => {
-                              const style = getCommonPinningStyles(header.column, true);
-                              const isNameColumn =
-                                header.column.id === 'fundName' || header.column.columnDef?.accessorKey === 'fundName';
-                              const isRightAligned = NON_FROZEN_COLUMN_IDS.includes(header.column.id);
-                              const align = isNameColumn ? '' : isRightAligned ? 'text-right' : 'text-center';
-                              const colId = header.column.id || header.column.columnDef?.accessorKey;
-                              const { sortKey, isSorted, isSortEnabled } = getSortHeaderMeta(colId);
-                              return (
-                                <div
-                                  key={header.id}
-                                  className={`table-header-cell ${align} ${isSortEnabled ? 'sortable' : ''} ${getPinEdgeClass(header.column)}`}
-                                  style={{
-                                    ...style,
-                                    cursor: isSortEnabled ? 'pointer' : 'default',
-                                    userSelect: isSortEnabled ? 'none' : 'auto'
-                                  }}
-                                  onClick={() => {
-                                    if (isSortEnabled && onSortChange) {
-                                      onSortChange(sortKey);
-                                    }
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      paddingRight: isRightAligned ? '20px' : '0',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 4
-                                    }}
-                                  >
-                                    {header.isPlaceholder
-                                      ? null
-                                      : flexRender(header.column.columnDef.header, header.getContext())}
-                                    {isSortEnabled && (
-                                      <span
-                                        style={{
-                                          display: 'inline-flex',
-                                          flexDirection: 'column',
-                                          lineHeight: 1,
-                                          fontSize: '8px',
-                                          opacity: isSorted ? 1 : 0.3
-                                        }}
-                                      >
-                                        <span style={{ opacity: isSorted && sortOrder === 'asc' ? 1 : 0.3 }}>▲</span>
-                                        <span style={{ opacity: isSorted && sortOrder === 'desc' ? 1 : 0.3 }}>▼</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          {renderTableHeader({ minWidth: totalHeaderWidth, width: 'fit-content' })}
                         </div>
                       </div>,
                       document.body
