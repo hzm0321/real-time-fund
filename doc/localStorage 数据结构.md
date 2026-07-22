@@ -721,6 +721,30 @@ groupId; // 分组ID，如 'group_xxx'
 - 用户在确认导入基金弹框中手动切换开关时保存设置
 - 重新打开确认导入基金弹框时恢复用户上一次调整的开关偏好
 
+### 24. sectorFlowSelectedSectors
+
+**类型**: `Object`
+**默认值**: `{}`
+**说明**: 存储用户在实时板块资金流向追踪组件中手动勾选的板块编码列表（区分行业与概念）
+**云端同步**: 否（本地设备专用）
+**导入/导出**: 否（仅存本地设备）
+
+**数据结构**:
+
+```javascript
+{
+  industry: [ 'BK0475', 'BK0480' ], // 行业分类手选板块编码列表
+  concept: [ 'BK0800', 'BK0910' ]   // 概念分类手选板块编码列表
+}
+```
+
+**使用场景**:
+
+- 用户在实时板块资金流向追踪组件中手动勾选或取消勾选对比板块时记录
+- 页面加载或切换「按行业/按概念」分类时恢复对应的手选板块列表
+- 当板块列表中检测到失效/不存在的板块编码时自动剔除
+- 点击「一键复位」时自动清除当前分类的本地记录并恢复默认推荐（前5名与倒数5名）
+
 ---
 
 ## 数据同步机制
@@ -759,6 +783,7 @@ groupId; // 分组ID，如 'group_xxx'
 - marketIndexSelected（通过 customSettings 同步）
 - viewMode（通过 customSettings 同步）
 - scanImportConfirmSettings（本地专用，确认导入弹框开关偏好）
+- sectorFlowSelectedSectors（本地专用，实时板块资金流向组件手选板块）
 
 **同步流程**:
 
@@ -941,6 +966,7 @@ const SYNC_KEYS = new Set([
 
 ## 更新日志
 
+- **2026-07-22**: 新增 `sectorFlowSelectedSectors` 键说明，记录实时板块资金流向追踪组件中用户在本地手动勾选的板块对比列表（区分行业与概念），包含失效板块编码剔除机制与一键复位逻辑。
 - **2026-05-25**: 检查并更新 `funds` 基金数据结构，详尽补充基金对象所有可能的属性字段（如 `lastNav`, `zzl`, `yesterdayZzl`, `yesterdayNavDelta`, `noValuation`, `valuationSource`, `dataSource`, `addedAt`, `addBaseNav`, `addBaseDate` 等），剔除了非实际存在的 legacy `type` 字段，并修正 `dwjz` 的类型说明为字符串类型。
 - **2026-04-13**: 完善 `fundDailyEarnings` 文档（更新为按作用域分桶结构，补充旧版兼容说明）；补充 `customSettings` 中 `showGroupFundSearchPc`、`showGroupFundSearchMobile` 字段；完善导入/导出格式说明（新增 `customSettings`、`fundDailyEarnings`、`collapsedEarnings` 导出支持）；新增导入合并策略详细表格；补充 storageHelper 同步键集合；为每个键标注导入/导出和云端同步状态
 - **2026-04-05（分组独立持仓）**: 新增 `groupHoldings`；`pendingTrades` / `transactions` 支持可选 `groupId`；`dcaPlans` 改为分桶结构（`__global__` + 分组 ID）；同步键与导入导出格式已更新；说明分组持仓从历史全局 `holdings` 的幂等深拷贝迁移规则

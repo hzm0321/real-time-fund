@@ -18,17 +18,21 @@ import {
   Legend,
   Filler
 } from 'chart.js';
+import { toast as sonnerToast } from 'sonner';
 import { Line } from 'react-chartjs-2';
-import { supabase } from '../lib/supabase';
-import { useUserStore } from '../stores';
-import { useMembership } from '../hooks/useMembership';
-import { getChartTooltipPosition } from '../lib/chartTooltipPosition';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { useUserStore, storageStore } from '../stores';
+import { getChartTooltipPosition } from '../lib/chartTooltipPosition';
+import { useMembership } from '../hooks/useMembership';
+import { supabase } from '../lib/supabase';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+const SECTOR_FLOW_LS_KEY = 'sectorFlowSelectedSectors';
 
 const TOOLTIP_SIZE = {
   width: 170,
@@ -263,39 +267,72 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
     return Array.from(new Set(combined.map((s) => s.id)));
   }, []);
 
-  // 当初次拿到数据且尚未选择板块时，默认选中前5 + 倒数前5
+  // 恢复本地保存的手选板块，或在本地无记录/完全失效时恢复默认算法推荐（前5+倒数5名），并自动清洗失效板块编码
   useEffect(() => {
-    if (allSectors.length > 0 && selectedSectorIds.length === 0) {
-      setSelectedSectorIds(getDefaultSectorIds(allSectors));
-    }
-  }, [allSectors, selectedSectorIds.length, getDefaultSectorIds]);
+    if (!allSectors || allSectors.length === 0) return;
 
-  // 类别切换时重置选中的板块为默认推荐（前5 + 倒数前5）
-  const prevSectorFilterRef = useRef(sectorFilter);
-  useEffect(() => {
-    if (prevSectorFilterRef.current !== sectorFilter && allSectors.length > 0) {
-      prevSectorFilterRef.current = sectorFilter;
+    const validIdSet = new Set(allSectors.map((s) => s.id));
+    const savedStore = storageStore.getItem(SECTOR_FLOW_LS_KEY, {}) || {};
+    const savedIdsForCategory = isArray(savedStore?.[sectorFilter]) ? savedStore[sectorFilter] : null;
+
+    if (savedIdsForCategory && savedIdsForCategory.length > 0) {
+      // 过滤出依然存在于当前接口数据中的有效编码
+      const prunedIds = savedIdsForCategory.filter((id) => validIdSet.has(id));
+
+      if (prunedIds.length > 0) {
+        setSelectedSectorIds(prunedIds);
+        // 如果有失效编码被剔除，更新本地存储记录
+        if (prunedIds.length !== savedIdsForCategory.length) {
+          const nextStore = { ...savedStore, [sectorFilter]: prunedIds };
+          storageStore.setItem(SECTOR_FLOW_LS_KEY, JSON.stringify(nextStore));
+        }
+      } else {
+        // 若剔除后变成空列表，则清除该分类在 localStorage 中的记录，并恢复默认推荐（前5+倒数5名）
+        const nextStore = { ...savedStore };
+        delete nextStore[sectorFilter];
+        storageStore.setItem(SECTOR_FLOW_LS_KEY, JSON.stringify(nextStore));
+        setSelectedSectorIds(getDefaultSectorIds(allSectors));
+      }
+    } else {
+      // 本地无记录，使用默认推荐（前5+倒数5名）
       setSelectedSectorIds(getDefaultSectorIds(allSectors));
     }
-  }, [sectorFilter, allSectors, getDefaultSectorIds]);
+  }, [allSectors, sectorFilter, getDefaultSectorIds]);
 
   const handleToggleSector = (sectorId) => {
     setSelectedSectorIds((prev) => {
+      let next;
       if (prev.includes(sectorId)) {
         if (prev.length <= 1) {
           return prev; // 至少保留一个对比板块，最后一个不能被删除
         }
-        return prev.filter((id) => id !== sectorId);
+        next = prev.filter((id) => id !== sectorId);
+      } else {
+        if (prev.length >= 20) {
+          return prev; // 最多选择 20 条折线
+        }
+        next = [...prev, sectorId];
       }
-      if (prev.length >= 20) {
-        return prev; // 最多选择 20 条折线
-      }
-      return [...prev, sectorId];
+
+      // 用户主动勾选/取消勾选，写入 localStorage
+      const savedStore = storageStore.getItem(SECTOR_FLOW_LS_KEY, {}) || {};
+      const nextStore = { ...savedStore, [sectorFilter]: next };
+      storageStore.setItem(SECTOR_FLOW_LS_KEY, JSON.stringify(nextStore));
+
+      return next;
     });
   };
 
   const handleResetTop5 = () => {
     setSelectedSectorIds(getDefaultSectorIds(allSectors));
+    // 点击一键复位，清除当前分类的本地记录，恢复自动算法推荐模式
+    const savedStore = storageStore.getItem(SECTOR_FLOW_LS_KEY, {}) || {};
+    if (savedStore?.[sectorFilter]) {
+      const nextStore = { ...savedStore };
+      delete nextStore[sectorFilter];
+      storageStore.setItem(SECTOR_FLOW_LS_KEY, JSON.stringify(nextStore));
+    }
+    sonnerToast.info('已重置板块对比选择', { id: 'reset-sector-flow-toast' });
   };
 
   // 为选中板块映射颜色（随当前亮暗主题自动匹配专用高对比配色盘）
@@ -706,13 +743,21 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
                 当前对比板块 ({selectedSectorIds.length}/20)：
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleResetTop5}
-                  title="默认选择前5名与倒数前5名"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
-                >
-                  <RotateCcw className="size-3" /> 一键复位
-                </button>
+                <TooltipProvider>
+                  <UITooltip delayDuration={150}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleResetTop5}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
+                      >
+                        <RotateCcw className="size-3" /> 一键复位
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>恢复默认选择前5名与倒数前5名</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
               </div>
             </div>
 
