@@ -2864,13 +2864,18 @@ export default function HomePage() {
       });
     };
 
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error) {
+    supabase.auth
+      .getSession()
+      .then(async ({ data, error }) => {
+        if (error) {
+          clearAuthState();
+          return;
+        }
+        await handleSession(data?.session ?? null, 'INITIAL_SESSION');
+      })
+      .catch(() => {
         clearAuthState();
-        return;
-      }
-      await handleSession(data?.session ?? null, 'INITIAL_SESSION');
-    });
+      });
 
     const {
       data: { subscription }

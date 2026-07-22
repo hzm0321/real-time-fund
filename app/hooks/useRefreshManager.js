@@ -227,10 +227,12 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
         let bestSourcesMap = {};
         try {
           const currentFunds = useStorageStore.getState().funds || [];
-          const user = useUserStore.getState().user;
+          const userState = useUserStore.getState();
+          const user = userState.user;
+          const authInitialized = userState.authInitialized;
 
           let isVip = false;
-          let vipCheckSuccess = false;
+          let isConfirmedNonVip = false;
           if (user?.id) {
             try {
               const qc = getQueryClient();
@@ -241,63 +243,60 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
               });
               if (memStatus && memStatus.success !== false) {
                 isVip = Boolean(memStatus.isVip);
-                vipCheckSuccess = true;
-              } else {
-                vipCheckSuccess = false;
+                isConfirmedNonVip = !isVip;
               }
             } catch {
-              vipCheckSuccess = false;
               isVip = false;
+              isConfirmedNonVip = false;
             }
-          } else {
-            vipCheckSuccess = true;
-            isVip = false;
+          } else if (authInitialized) {
+            // 当 Auth 初始化已完成且用户确实未登录（如显式退出登录或游客状态）
+            // 此时确认为非 VIP 用户，需清洗 PRO 专属配置（如 autoSource）
+            isConfirmedNonVip = true;
           }
 
-          if (vipCheckSuccess) {
-            if (!isVip) {
-              const hasRestricted = currentFunds.some((f) => f.autoSource || String(f.dataSource) === '4');
-              if (hasRestricted) {
-                useStorageStore.getState().setFunds((prev) =>
-                  prev.map((f) => {
-                    const isDs4 = String(f.dataSource) === '4';
-                    if (f.autoSource || isDs4) {
-                      return {
-                        ...f,
-                        autoSource: false,
-                        dataSource: isDs4 ? (typeof f.dataSource === 'number' ? 1 : '1') : f.dataSource,
-                        gsz: isDs4 ? null : f.gsz,
-                        gszzl: isDs4 ? null : f.gszzl,
-                        gztime: isDs4 ? null : f.gztime,
-                        valuationSource: isDs4 ? null : f.valuationSource,
-                        noValuation: isDs4 ? false : f.noValuation
-                      };
-                    }
-                    return f;
-                  })
-                );
-              }
-            } else {
-              const autoSourceCodes = currentFunds
-                .filter((f) => f.autoSource && uniqueCodes.includes(f.code))
-                .map((f) => f.code);
+          if (isConfirmedNonVip) {
+            const hasRestricted = currentFunds.some((f) => f.autoSource || String(f.dataSource) === '4');
+            if (hasRestricted) {
+              useStorageStore.getState().setFunds((prev) =>
+                prev.map((f) => {
+                  const isDs4 = String(f.dataSource) === '4';
+                  if (f.autoSource || isDs4) {
+                    return {
+                      ...f,
+                      autoSource: false,
+                      dataSource: isDs4 ? (typeof f.dataSource === 'number' ? 1 : '1') : f.dataSource,
+                      gsz: isDs4 ? null : f.gsz,
+                      gszzl: isDs4 ? null : f.gszzl,
+                      gztime: isDs4 ? null : f.gztime,
+                      valuationSource: isDs4 ? null : f.valuationSource,
+                      noValuation: isDs4 ? false : f.noValuation
+                    };
+                  }
+                  return f;
+                })
+              );
+            }
+          }
 
-              if (autoSourceCodes.length > 0) {
-                bestSourcesMap = await fetchFundsBestSources(autoSourceCodes);
-                if (Object.keys(bestSourcesMap).length > 0) {
-                  useStorageStore.getState().setFunds((prev) => {
-                    let changed = false;
-                    const next = prev.map((f) => {
-                      if (f.autoSource && bestSourcesMap[f.code] && f.dataSource !== bestSourcesMap[f.code]) {
-                        changed = true;
-                        return { ...f, dataSource: bestSourcesMap[f.code] };
-                      }
-                      return f;
-                    });
-                    return changed ? next : prev;
-                  });
-                }
-              }
+          const autoSourceCodes = currentFunds
+            .filter((f) => f.autoSource && uniqueCodes.includes(f.code))
+            .map((f) => f.code);
+
+          if (autoSourceCodes.length > 0) {
+            bestSourcesMap = await fetchFundsBestSources(autoSourceCodes);
+            if (Object.keys(bestSourcesMap).length > 0) {
+              useStorageStore.getState().setFunds((prev) => {
+                let changed = false;
+                const next = prev.map((f) => {
+                  if (f.autoSource && bestSourcesMap[f.code] && f.dataSource !== bestSourcesMap[f.code]) {
+                    changed = true;
+                    return { ...f, dataSource: bestSourcesMap[f.code] };
+                  }
+                  return f;
+                });
+                return changed ? next : prev;
+              });
             }
           }
         } catch (e) {

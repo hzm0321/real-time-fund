@@ -6,11 +6,12 @@ import { create } from 'zustand';
  */
 export const useUserStore = create((set) => ({
   user: null,
+  authInitialized: false,
 
   /** @param {import('@supabase/supabase-js').User | null} next */
-  setUser: (next) => set({ user: next }),
+  setUser: (next) => set({ user: next, authInitialized: true }),
 
-  clearUser: () => set({ user: null })
+  clearUser: () => set({ user: null, authInitialized: true })
 }));
 
 /** 在非 React 代码（如异步回调）中读取当前用户 */
