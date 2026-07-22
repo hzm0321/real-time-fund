@@ -3,10 +3,10 @@
 import React from 'react';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import PullToRefresh from 'react-simple-pull-to-refresh';
 
 import PcSideNav from './PcSideNav';
 import MobileBottomNav from './MobileBottomNav';
+import PullToRefresh from './PullToRefresh';
 
 export default function NavLayout({
   children,
@@ -59,8 +59,7 @@ export default function NavLayout({
           onRefresh={onRefresh}
           isPullable={isPullable}
           pullDownThreshold={67}
-          maxPullDownDistance={95}
-          resistance={1.5}
+          resistance={1}
           className="ptr-wrapper"
           pullingContent={<div />}
           refreshingContent={

@@ -5710,51 +5710,140 @@ html::-webkit-scrollbar-thumb:active,
 
 /* =============================================
    下拉刷新 Pull-to-Refresh 样式（仅移动端）
+   自定义组件，不再依赖库注入的 CSS
    ============================================= */
 
 @media (max-width: 640px) {
-  /* 覆盖库默认样式，适配窗口级滚动 */
+  /* === 容器 === */
   .ptr.ptr-wrapper {
-    height: auto !important;
-    overflow: visible !important;
+    position: relative;
+    overflow: visible;
   }
 
+  /* === 被下拉的内容 === */
   .ptr.ptr-wrapper .ptr__children {
-    height: auto !important;
-    overflow-x: clip !important;
-    overflow-y: visible !important;
-    /* 回弹动画：仅在手势结束后生效 */
-    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    position: relative;
+    overflow-x: clip;
+    overflow-y: visible;
+    /* 默认：平滑回弹 / 刷新保持 */
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* ① 正在拖拽 — 禁用 transition，内容 1:1 跟随手指 */
+  /* 拖拽中：禁用 transition，弹性公式 1:1 驱动 */
   .ptr.ptr-wrapper.ptr--dragging .ptr__children {
-    transition: none !important;
+    transition: none;
     will-change: transform;
   }
 
-  /* ② 拖拽超过阈值但仍持有手指 — 极短 transition 避免跳变 */
-  .ptr.ptr-wrapper.ptr--pull-down-treshold-breached .ptr__children {
-    transition: transform 0.05s linear !important;
+  /* 刷新中：启用 transition，平滑吸附到阈值位置 */
+  .ptr.ptr-wrapper.ptr--refreshing .ptr__children {
     will-change: transform;
   }
 
-  /* 指示器固定在视口最顶部，位于导航栏（z-index: 50）之上 */
+  /* === 下拉指示器 — 固定在视口最顶部，位于导航栏之上 === */
   .ptr.ptr-wrapper .ptr__pull-down {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 60 !important;
-    overflow: visible !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    overflow: visible;
     display: flex;
     align-items: center;
     justify-content: center;
     padding-top: env(safe-area-inset-top, 0px);
+    visibility: hidden;
   }
 
-  /* 库自带 lds-ellipsis 加载动画配色适配 */
-  .ptr.ptr-wrapper .lds-ellipsis div {
-    background: var(--primary);
+  /* 指示器子元素默认隐藏 */
+  .ptr.ptr-wrapper .ptr__pull-down > div {
+    display: none;
+  }
+
+  /* 拖拽中（未达阈值）：显示 pulling 内容 */
+  .ptr.ptr-wrapper.ptr--dragging .ptr__pull-down--pull-more {
+    display: block;
+  }
+
+  /* 达到阈值后隐藏 pulling 内容 */
+  .ptr.ptr-wrapper.ptr--dragging.ptr--pull-down-treshold-breached .ptr__pull-down--pull-more {
+    display: none;
+  }
+
+  /* 达到阈值 / 刷新中：显示 loading 内容（lds-ellipsis） */
+  .ptr.ptr-wrapper.ptr--pull-down-treshold-breached .ptr__pull-down--loading,
+  .ptr.ptr-wrapper.ptr--refreshing .ptr__pull-down--loading {
+    display: block;
+  }
+
+  /* 达到阈值 / 刷新中：强制指示器可见 */
+  .ptr.ptr-wrapper.ptr--pull-down-treshold-breached .ptr__pull-down,
+  .ptr.ptr-wrapper.ptr--refreshing .ptr__pull-down {
+    opacity: 1 !important;
+  }
+
+  .ptr__loader {
+    margin: 0 auto;
+    text-align: center;
+  }
+}
+
+/* === lds-ellipsis 加载动画（还原 react-simple-pull-to-refresh 原版，全局注入） === */
+.lds-ellipsis {
+  display: inline-block;
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.lds-ellipsis div {
+  position: absolute;
+  top: 27px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation-timing-function: cubic-bezier(0, 1, 1, 0);
+}
+
+.lds-ellipsis div:nth-child(1) {
+  left: 6px;
+  animation: lds-ellipsis1 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(2) {
+  left: 6px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(3) {
+  left: 26px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(4) {
+  left: 45px;
+  animation: lds-ellipsis3 0.6s infinite;
+}
+
+@keyframes lds-ellipsis1 {
+  0% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes lds-ellipsis3 {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+@keyframes lds-ellipsis2 {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(19px, 0);
   }
 }
