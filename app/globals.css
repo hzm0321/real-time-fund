@@ -5723,6 +5723,20 @@ html::-webkit-scrollbar-thumb:active,
     height: auto !important;
     overflow-x: clip !important;
     overflow-y: visible !important;
+    /* 回弹动画：仅在手势结束后生效 */
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+
+  /* ① 正在拖拽 — 禁用 transition，内容 1:1 跟随手指 */
+  .ptr.ptr-wrapper.ptr--dragging .ptr__children {
+    transition: none !important;
+    will-change: transform;
+  }
+
+  /* ② 拖拽超过阈值但仍持有手指 — 极短 transition 避免跳变 */
+  .ptr.ptr-wrapper.ptr--pull-down-treshold-breached .ptr__children {
+    transition: transform 0.05s linear !important;
+    will-change: transform;
   }
 
   /* 指示器固定在视口最顶部，位于导航栏（z-index: 50）之上 */

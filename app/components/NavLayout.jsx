@@ -58,9 +58,9 @@ export default function NavLayout({
         <PullToRefresh
           onRefresh={onRefresh}
           isPullable={isPullable}
-          pullDownThreshold={60}
-          maxPullDownDistance={90}
-          resistance={2}
+          pullDownThreshold={67}
+          maxPullDownDistance={95}
+          resistance={1.5}
           className="ptr-wrapper"
           pullingContent={<div />}
           refreshingContent={
