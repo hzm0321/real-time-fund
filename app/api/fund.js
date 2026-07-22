@@ -2722,6 +2722,15 @@ export const fetchFundData = async (c, overrideDataSource) => {
       }
     }
 
+    // 自动计算 zzl（最新涨幅）：若 dwjz 与 lastNav 均存在且有限，且 zzl 仍为空/未定义，则自动根据 (dwjz / lastNav - 1) * 100 推算
+    if (isNil(baseData.zzl)) {
+      const navNum = Number(baseData.dwjz);
+      const lastNavNum = Number(baseData.lastNav);
+      if (Number.isFinite(navNum) && navNum > 0 && Number.isFinite(lastNavNum) && lastNavNum > 0) {
+        baseData.zzl = (navNum / lastNavNum - 1) * 100;
+      }
+    }
+
     // 针对 supabase_qdii 等仅提供 gszzl 的数据源，使用最新的 dwjz 计算 gsz
     if (baseData.valuationSource === 'supabase_qdii' || (baseData.gsz == null && baseData.gszzl != null)) {
       const nav = Number(baseData.dwjz);

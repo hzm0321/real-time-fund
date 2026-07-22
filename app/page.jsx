@@ -940,8 +940,19 @@ export default function HomePage() {
         return sortOrder === 'asc' ? amountA - amountB : amountB - amountA;
       }
       if (sortBy === 'yesterdayIncrease') {
-        const valA = Number(a.zzl);
-        const valB = Number(b.zzl);
+        const getZzl = (item) => {
+          if (!isNil(item?.zzl) && item.zzl !== '' && Number.isFinite(Number(item.zzl))) {
+            return Number(item.zzl);
+          }
+          const nav = Number(item?.dwjz);
+          const lastNav = Number(item?.lastNav);
+          if (Number.isFinite(nav) && nav > 0 && Number.isFinite(lastNav) && lastNav > 0) {
+            return (nav / lastNav - 1) * 100;
+          }
+          return NaN;
+        };
+        const valA = getZzl(a);
+        const valB = getZzl(b);
         const hasA = Number.isFinite(valA);
         const hasB = Number.isFinite(valB);
 
@@ -1205,9 +1216,16 @@ export default function HomePage() {
             : String(f.gsz)
           : '—';
 
+      const yesterdayChangeValue =
+        !isNil(f.zzl) && f.zzl !== '' && Number.isFinite(Number(f.zzl))
+          ? Number(f.zzl)
+          : !isNil(f.dwjz) && f.dwjz !== '' && !isNil(f.lastNav) && f.lastNav !== '' && Number(f.lastNav) > 0
+            ? (Number(f.dwjz) / Number(f.lastNav) - 1) * 100
+            : null;
       const yesterdayChangePercent =
-        f.zzl != null && f.zzl !== '' ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : '—';
-      const yesterdayChangeValue = f.zzl != null && f.zzl !== '' ? Number(f.zzl) : null;
+        yesterdayChangeValue != null
+          ? `${yesterdayChangeValue > 0 ? '+' : ''}${yesterdayChangeValue.toFixed(2)}%`
+          : '—';
       const yesterdayDate = f.jzrq || '-';
 
       const estimateChangePercent = f.noValuation
