@@ -2,9 +2,9 @@
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import Image from 'next/image';
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { MailIcon } from './Icons';
+import { CloseIcon, MailIcon } from './Icons';
 import githubImg from '../assets/github.svg';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -15,6 +15,13 @@ export default function LoginModal({ onClose, showToast, isExplicitLoginRef, ini
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState(initialError);
   const [loginSuccess, setLoginSuccess] = useState('');
+  const [isGithubIo, setIsGithubIo] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes('github.io')) {
+      setIsGithubIo(true);
+    }
+  }, []);
 
   const loginModalCardRef = useRef(null);
   const otpTouchWrapRef = useRef(null);
@@ -173,12 +180,23 @@ export default function LoginModal({ onClose, showToast, isExplicitLoginRef, ini
           pointerEvents: 'none'
         }}
       />
-      <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="登录" onClick={onClose}>
+      <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="登录">
         <div ref={loginModalCardRef} className="glass card modal login-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="title" style={{ marginBottom: 16 }}>
-            <MailIcon width="20" height="20" />
-            <span>邮箱登录</span>
-            <span className="muted">使用邮箱验证登录</span>
+          <div className="title" style={{ marginBottom: 16, justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <MailIcon width="20" height="20" />
+              <span>邮箱登录</span>
+              <span className="muted">使用邮箱验证登录</span>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={onClose}
+              aria-label="关闭"
+              style={{ border: 'none', background: 'transparent' }}
+            >
+              <CloseIcon width="20" height="20" />
+            </button>
           </div>
 
           <form onSubmit={handleSendOtp}>
@@ -254,7 +272,7 @@ export default function LoginModal({ onClose, showToast, isExplicitLoginRef, ini
             </div>
           </form>
 
-          {!loginSuccess && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' && (
+          {!loginSuccess && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' && !isGithubIo && (
             <>
               <div
                 className="login-divider"
