@@ -92,6 +92,30 @@ real-time-fund/
      - `ModalsLayer.jsx` 中添加 `<AnimatePresence> + modal component + onClose/onConfirm` 渲染
      - 如需 page 级回调 → 先在 `modalCbRef` 注册，再在 ModalsLayer 中用 `cb.current.xxx` 调用
 - **Safari Input Zoom 防治规范** — 开发 `<input>`、`<Input>` 或任何可聚焦的输入组件时，务必确保其在移动端（或全局）的 `font-size` 计算值不小于 `16px`。由于项目使用了 `postcss-pxtorem`，若使用 `text-xs` 或 `text-sm` 等较小字体类名，会导致在 Safari（尤其是 iOS）下因字体小于 16px 而触发输入框聚焦时自动放大页面的问题。应使用 `text-[16PX]`（大写 PX 以避免被插件转换为 rem）来强制规定字体大小，从而禁用 Safari 的自动缩放行为。
+- **Import 语句引入顺序规范** — 所有 JavaScript/JSX 文件中的 `import` 语句须严格按照以下层级结构进行分类与排序，且**各分组之间必须使用一个空行分隔**：
+  1. **React / Next.js 核心框架包**（如 `react`, `react-dom`, `next/dynamic`, `next/navigation` 等）
+  2. **第三方 npm 包**（如 `lodash`, `framer-motion`, `lucide-react`, `@tanstack/*`, `@dnd-kit/*` 等）
+  3. **项目路径别名引用 (`@/`)**（如 `@/components/ui/button`, `@/lib/utils` 等）
+  4. **相对路径引用 (`./` 与 `../`)**（如 `./ConfirmModal`, `../stores/modalStore` 等）
+  5. **CSS 与静态资源引用**（如 `./globals.css`, `@/assets/logo.svg` 等，统一置于文件头部 import 区域的最底部）
+
+  _正确示例_：
+
+  ```javascript
+  import { useState, useMemo } from 'react';
+  import dynamic from 'next/dynamic';
+
+  import { isFunction } from 'lodash';
+  import { AnimatePresence } from 'framer-motion';
+
+  import { Button } from '@/components/ui/button';
+  import { cn } from '@/lib/utils';
+
+  import { useModalStore } from '../stores';
+  import ConfirmModal from './ConfirmModal';
+
+  import './globals.css';
+  ```
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
