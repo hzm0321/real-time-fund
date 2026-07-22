@@ -5707,3 +5707,40 @@ html::-webkit-scrollbar-thumb:active,
 [data-theme='light'] .ad-badge-close:hover {
   background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
+
+/* =============================================
+   下拉刷新 Pull-to-Refresh 样式（仅移动端）
+   ============================================= */
+
+@media (max-width: 640px) {
+  /* 覆盖库默认样式，适配窗口级滚动 */
+  .ptr.ptr-wrapper {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .ptr.ptr-wrapper .ptr__children {
+    height: auto !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+  }
+
+  /* 指示器固定在视口最顶部，位于导航栏（z-index: 50）之上 */
+  .ptr.ptr-wrapper .ptr__pull-down {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 60 !important;
+    overflow: visible !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* 库自带 lds-ellipsis 加载动画配色适配 */
+  .ptr.ptr-wrapper .lds-ellipsis div {
+    background: var(--primary);
+  }
+}

@@ -4556,6 +4556,8 @@ export default function HomePage() {
       showThemeTransition={showThemeTransition}
       setShowThemeTransition={setShowThemeTransition}
       mobileBottomNavHidden={mobileBottomNavHidden}
+      onRefresh={manualRefresh}
+      isPullable={mainTab === 'home' || mainTab === 'market'}
     >
       <div
         className="mobile-main-tab-panel mobile-main-tab-panel--home"
