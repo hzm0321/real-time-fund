@@ -4,12 +4,12 @@
  */
 
 const OCR_SPACE_API_KEY = 'K89995261788957';
-const DEFAULT_TIMEOUT = 25000; // 默认 25 秒超时
+const DEFAULT_TIMEOUT = 12000; // 默认 12 秒超时
 
 /**
  * 调用 ocr.space 识别图片文字
  * @param {string} base64Image - data URL 格式图片 (data:image/jpeg;base64,...)
- * @param {number} [timeoutMs=25000] - 超时毫秒数
+ * @param {number} [timeoutMs=12000] - 超时毫秒数
  * @returns {Promise<string>} - 识别出来的文字，按行分割
  */
 export async function recognizeWithOcrSpace(base64Image, timeoutMs = DEFAULT_TIMEOUT) {

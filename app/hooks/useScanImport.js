@@ -288,89 +288,77 @@ export function useScanImport({
     setScanProgress({ stage: 'ocr', current: 0, total: files.length });
 
     try {
-      // PRO 用户：前端直接调云端 OCR (ocr.space) 提取文字，再提交大模型解析（彻底避免 150s 超时及传输大图）
-      if (isVip) {
-        const { compressImageToBase64 } = await import('../lib/imageCompress');
-        const { recognizeWithOcrSpace } = await import('../lib/ocrSpace');
-        const extractedTexts = [];
-        for (let i = 0; i < files.length; i++) {
-          if (abortScanRef.current) break;
-          const f = files[i];
-          setScanProgress((prev) => ({ ...prev, current: i + 1 }));
-          let text = '';
-          try {
-            const base64 = await compressImageToBase64(f);
-            text = await recognizeWithOcrSpace(base64);
-          } catch (e) {
-            // 如果只有一个文件，或是超时异常，直接向上抛出在前端展示具体错误信息
-            if (files.length === 1 || String(e?.message || '').includes('超时')) {
-              throw e;
-            }
-            console.error(`第 ${i + 1} 张图片云端 OCR 识别报错:`, e);
-            text = '';
-          }
-          if (text) extractedTexts.push(text);
+      const { compressImageToBase64 } = await import('../lib/imageCompress');
+      const { recognizeWithOcrSpace } = await import('../lib/ocrSpace');
+
+      let useLocalOnly = false;
+      const extractedTexts = [];
+
+      // 本地 Tesseract Worker 实例准备函数（懒加载）
+      const getLocalWorker = async () => {
+        let worker = ocrWorkerRef.current;
+        if (!worker) {
+          const { getOcrWorker } = await import('../lib/ocr');
+          worker = await getOcrWorker('chi_sim+eng');
+          ocrWorkerRef.current = worker;
         }
+        return worker;
+      };
 
-        if (abortScanRef.current) return;
-
-        setLastOcrTexts(extractedTexts);
-        setLastIsImage(false);
-
-        if (extractedTexts.length > 0) {
-          setScanProgress({ stage: 'ocr', current: 0, total: extractedTexts.length });
-          await processTextsInternal(extractedTexts, false);
-        } else {
-          setScannedFunds([]);
-          setSelectedScannedCodes(new Set());
-          setIsOcrScan(true);
-          setScanConfirmModalOpen(true);
-        }
-        return;
-      }
-
-      // 普通用户：走原有 Tesseract OCR 流程
-      let worker = ocrWorkerRef.current;
-      if (!worker) {
-        const { getOcrWorker } = await import('../lib/ocr');
-        worker = await getOcrWorker('chi_sim+eng');
-        ocrWorkerRef.current = worker;
-      }
-
-      const recognizeWithTimeout = async (file, ms) => {
+      const recognizeLocalWithTimeout = async (file, ms = 30000) => {
+        const worker = await getLocalWorker();
         let timer = null;
         const timeout = new Promise((_, reject) => {
           timer = setTimeout(() => reject(new Error('OCR_TIMEOUT')), ms);
         });
         try {
-          return await Promise.race([worker.recognize(file), timeout]);
+          const res = await Promise.race([worker.recognize(file), timeout]);
+          return res?.data?.text || '';
         } finally {
           if (timer) clearTimeout(timer);
         }
       };
 
-      const extractedTexts = [];
       for (let i = 0; i < files.length; i++) {
         if (abortScanRef.current) break;
-
         const f = files[i];
         setScanProgress((prev) => ({ ...prev, current: i + 1 }));
 
         let text = '';
-        try {
-          const res = await recognizeWithTimeout(f, 30000);
-          text = res?.data?.text || '';
-        } catch (e) {
-          if (String(e?.message || '').includes('OCR_TIMEOUT')) {
-            if (worker) {
-              const { terminateOcrWorker } = await import('../lib/ocr');
-              await terminateOcrWorker();
-              ocrWorkerRef.current = null;
+        let cloudSuccess = false;
+
+        // 优先尝试云端 OCR（若未触发熔断）
+        if (!useLocalOnly) {
+          try {
+            const base64 = await compressImageToBase64(f);
+            text = await recognizeWithOcrSpace(base64, 12000);
+            if (text) {
+              cloudSuccess = true;
             }
-            throw e;
+          } catch (cloudErr) {
+            console.warn(`第 ${i + 1} 张图片云端 OCR 识别失败/超时，静默降级为本地 OCR 识别:`, cloudErr);
+            useLocalOnly = true; // 熔断机制：本批次后续图片直接走本地 OCR
           }
-          text = '';
         }
+
+        // 云端识别失败或已触发熔断时，静默降级调用本地 Tesseract.js
+        if (!cloudSuccess) {
+          try {
+            text = await recognizeLocalWithTimeout(f, 30000);
+          } catch (localErr) {
+            if (String(localErr?.message || '').includes('OCR_TIMEOUT')) {
+              if (ocrWorkerRef.current) {
+                const { terminateOcrWorker } = await import('../lib/ocr');
+                await terminateOcrWorker();
+                ocrWorkerRef.current = null;
+              }
+              throw localErr;
+            }
+            console.error(`第 ${i + 1} 张图片本地 OCR 识别报错:`, localErr);
+            text = '';
+          }
+        }
+
         if (text) {
           extractedTexts.push(text);
         }
@@ -383,7 +371,7 @@ export function useScanImport({
 
       if (extractedTexts.length > 0) {
         setScanProgress({ stage: 'ocr', current: 0, total: extractedTexts.length });
-        await processTextsInternal(extractedTexts);
+        await processTextsInternal(extractedTexts, false);
       } else {
         setScannedFunds([]);
         setSelectedScannedCodes(new Set());
