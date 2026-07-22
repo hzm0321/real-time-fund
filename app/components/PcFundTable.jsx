@@ -211,10 +211,17 @@ const MemoizedTableRow = memo(
     columnVisibility,
     columnSizing
   }) => {
+    // 显式依赖 columnOrder / columnVisibility / columnSizing，确保 React Compiler
+    // 在列顺序等变化时不会缓存 row.getVisibleCells() 的旧结果。
+    const visibleCells = useMemo(
+      () => row.getVisibleCells(),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [row, columnOrder, columnVisibility, columnSizing]
+    );
     return (
       <SortableRow row={row} disabled={sortBy !== 'default'} enableAnimation={enableAnimation}>
         <div className={`table-row table-row-scroll ${index % 2 === 1 ? 'row-even' : ''}`} data-masked={masked}>
-          {row.getVisibleCells().map((cell) => {
+          {visibleCells.map((cell) => {
             const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
             const isNameColumn = columnId === 'fundName';
             const align = isNameColumn ? '' : NON_FROZEN_COLUMN_IDS.includes(columnId) ? 'text-right' : 'text-center';
