@@ -1,6 +1,6 @@
 {
   "name": "real-time-fund",
-  "version": "2.5.3",
+  "version": "2.5.4",
   "private": true,
   "scripts": {
     "dev": "next dev",
