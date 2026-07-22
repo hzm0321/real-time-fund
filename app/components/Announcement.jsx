@@ -112,7 +112,7 @@ export default function Announcement() {
               <p>v2.5.4 Pro 版本更新内容：</p>
               <p>因数据源1原接口被关闭，现启用备用方案，做如下调整：</p>
               <p>1. 数据源1需登录才可访问。</p>
-              <p>2. 部分基金时间最小单位仅可获取到日。</p>
+              <p>2. 部分基金估值时间最小单位仅可获取到日。</p>
               <p>如在使用过程遇到任何问题或建议，可加入用户支持群或问题反馈留言。</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
