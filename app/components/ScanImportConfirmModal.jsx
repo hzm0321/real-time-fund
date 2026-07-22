@@ -7,9 +7,18 @@ import { CloseIcon } from './Icons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { formatMoney } from '@/lib/utils';
-import { useUserStore } from '@/app/stores';
+import { isBoolean, isObject } from 'lodash';
+import { storageStore, useUserStore } from '@/app/stores';
 import { useMembership } from '@/app/hooks/useMembership';
 import { useFundFuzzyMatcher } from '@/app/hooks/useFundFuzzyMatcher';
+
+const SCAN_IMPORT_SETTINGS_KEY = 'scanImportConfirmSettings';
+
+const DEFAULT_SETTINGS = {
+  expandAfterAdd: true,
+  autoDataSource: true,
+  autoImportTags: true
+};
 
 export default function ScanImportConfirmModal({
   scannedFunds,
@@ -29,9 +38,73 @@ export default function ScanImportConfirmModal({
   const user = useUserStore((s) => s.user);
   const { isVip, loading: membershipLoading } = useMembership();
   const [selectedGroupId, setSelectedGroupId] = useState(currentGroup);
-  const [expandAfterAdd, setExpandAfterAdd] = useState(true);
-  const [autoDataSource, setAutoDataSource] = useState(!!user);
-  const [autoImportTags, setAutoImportTags] = useState(true);
+
+  const savedSettings = useMemo(() => {
+    const item = storageStore.getItem(SCAN_IMPORT_SETTINGS_KEY, null);
+    return isObject(item) ? item : null;
+  }, []);
+
+  const [expandAfterAdd, setExpandAfterAdd] = useState(() => {
+    if (savedSettings && isBoolean(savedSettings.expandAfterAdd)) {
+      return savedSettings.expandAfterAdd;
+    }
+    return DEFAULT_SETTINGS.expandAfterAdd;
+  });
+
+  const [autoDataSource, setAutoDataSource] = useState(() => {
+    if (savedSettings && isBoolean(savedSettings.autoDataSource)) {
+      return savedSettings.autoDataSource;
+    }
+    return !!user;
+  });
+
+  const [autoImportTags, setAutoImportTags] = useState(() => {
+    if (savedSettings && isBoolean(savedSettings.autoImportTags)) {
+      return savedSettings.autoImportTags;
+    }
+    return DEFAULT_SETTINGS.autoImportTags;
+  });
+
+  const saveSettings = (patch) => {
+    const currentSaved = storageStore.getItem(SCAN_IMPORT_SETTINGS_KEY, null);
+    const validSaved = isObject(currentSaved) ? currentSaved : {};
+    const nextSettings = {
+      ...DEFAULT_SETTINGS,
+      ...validSaved,
+      ...patch
+    };
+    storageStore.setItem(SCAN_IMPORT_SETTINGS_KEY, JSON.stringify(nextSettings));
+  };
+
+  const handleToggleExpandAfterAdd = (checked) => {
+    const val = !!checked;
+    setExpandAfterAdd(val);
+    saveSettings({
+      expandAfterAdd: val,
+      autoDataSource,
+      autoImportTags
+    });
+  };
+
+  const handleToggleAutoDataSource = (checked) => {
+    const val = !!checked;
+    setAutoDataSource(val);
+    saveSettings({
+      expandAfterAdd,
+      autoDataSource: val,
+      autoImportTags
+    });
+  };
+
+  const handleToggleAutoImportTags = (checked) => {
+    const val = !!checked;
+    setAutoImportTags(val);
+    saveSettings({
+      expandAfterAdd,
+      autoDataSource,
+      autoImportTags: val
+    });
+  };
 
   // 非 PRO 会员不展示自动数据源选项，且强制关闭状态以确保传值正确
   useEffect(() => {
@@ -495,7 +568,7 @@ export default function ScanImportConfirmModal({
               <span className="muted" style={{ fontSize: 13 }}>
                 添加后展开详情
               </span>
-              <Switch checked={expandAfterAdd} onCheckedChange={(checked) => setExpandAfterAdd(!!checked)} />
+              <Switch checked={expandAfterAdd} onCheckedChange={handleToggleExpandAfterAdd} />
             </div>
             {user && isVip && (
               <div
@@ -510,7 +583,7 @@ export default function ScanImportConfirmModal({
                 <span className="muted" style={{ fontSize: 13 }}>
                   自动数据源
                 </span>
-                <Switch checked={autoDataSource} onCheckedChange={(checked) => setAutoDataSource(!!checked)} />
+                <Switch checked={autoDataSource} onCheckedChange={handleToggleAutoDataSource} />
               </div>
             )}
             <div
@@ -525,7 +598,7 @@ export default function ScanImportConfirmModal({
               <span className="muted" style={{ fontSize: 13 }}>
                 导入基金标签
               </span>
-              <Switch checked={autoImportTags} onCheckedChange={(checked) => setAutoImportTags(!!checked)} />
+              <Switch checked={autoImportTags} onCheckedChange={handleToggleAutoImportTags} />
             </div>
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>

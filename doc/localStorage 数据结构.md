@@ -698,6 +698,31 @@ groupId; // 分组ID，如 'group_xxx'
 
 ---
 
+### 23. scanImportConfirmSettings
+
+**类型**: `Object`
+**默认值**: `{}`
+**说明**: 存储用户在确认导入基金弹框（`ScanImportConfirmModal`）中主动调整的开关偏好设置
+**云端同步**: 否（本地设备专用）
+**导入/导出**: 否（仅存本地设备）
+
+**数据结构**:
+
+```javascript
+{
+  expandAfterAdd: boolean,  // 添加后是否自动展开详情（默认: true）
+  autoDataSource: boolean,  // 是否开启自动数据源（仅 PRO 用户，默认: true）
+  autoImportTags: boolean   // 是否自动导入基金标签（默认: true）
+}
+```
+
+**使用场景**:
+
+- 用户在确认导入基金弹框中手动切换开关时保存设置
+- 重新打开确认导入基金弹框时恢复用户上一次调整的开关偏好
+
+---
+
 ## 数据同步机制
 
 ### 云端同步
@@ -733,6 +758,7 @@ groupId; // 分组ID，如 'group_xxx'
 - fundValuationTimeseries（测试中功能）
 - marketIndexSelected（通过 customSettings 同步）
 - viewMode（通过 customSettings 同步）
+- scanImportConfirmSettings（本地专用，确认导入弹框开关偏好）
 
 **同步流程**:
 
