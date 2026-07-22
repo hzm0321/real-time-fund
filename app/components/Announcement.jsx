@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { storageStore } from '../stores';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.5.4';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v2.6.0';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -109,11 +109,13 @@ export default function Announcement() {
                 paddingRight: '4px'
               }}
             >
-              <p>v2.5.4 Pro 版本更新内容：</p>
-              <p>因数据源1原接口被关闭，现启用备用方案，做如下调整：</p>
-              <p>1. 数据源1需登录才可访问。</p>
-              <p>2. 部分基金估值时间最小单位仅可获取到日。</p>
-              <p>如在使用过程遇到任何问题或建议，可加入用户支持群或问题反馈留言。</p>
+              <p>v2.6.0 Pro 版本更新内容：</p>
+              <p>1. 移动端支持下拉刷新。</p>
+              <p>2. 实时板块追踪支持本地记录手动选择的板块。</p>
+              <p>3. 优化登录弹框点击遮罩隐藏问题。</p>
+              <p>4. 确认导入基金弹框选项值支持本地记录。</p>
+              <p>5. 修复 PC 端列个性化排序问题。</p>
+              <p>6. 修复最新涨幅显示问题。</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button
