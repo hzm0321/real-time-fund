@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { CloseIcon } from './Icons';
-import { Info } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePicker, NumericInput } from './Common';
 import { fetchSmartFundNetValueBackward } from '../api/fund';
@@ -165,8 +165,8 @@ export default function FundConvertModal({
           </button>
         </div>
 
-        <Alert style={{ marginBottom: 16, flexShrink: 0 }} variant="info">
-          <Info className="h-4 w-4" />
+        <Alert style={{ marginBottom: 16, flexShrink: 0 }} variant="warning">
+          <AlertTriangle className="h-4 w-4" />
           <AlertDescription>需要基金转换完成后再添加</AlertDescription>
         </Alert>
 
