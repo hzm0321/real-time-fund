@@ -3733,15 +3733,16 @@ export const fetchFundHistory = async (code, range = '1m', options = {}) => {
 
 export const fetchFundValuationTrend = async (code, range = '3m') => {
   if (!isSupabaseConfigured) return [];
-  if (!supabase?.functions?.invoke) return [];
+  if (!supabase?.rpc) return [];
 
   const { data, error } = await withRetrySmart(() =>
-    supabase.functions.invoke('get-fund-valuation-trend', {
-      body: { fund_code: code, range }
+    supabase.rpc('get_fund_valuation_trend', {
+      p_fund_code: code,
+      p_range: range
     })
   );
 
-  if (error || !data || data.error) return [];
+  if (error || !data || data.success === false) return [];
   return isArray(data.data) ? data.data : [];
 };
 
