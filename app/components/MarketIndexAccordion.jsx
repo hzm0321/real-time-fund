@@ -2,7 +2,7 @@
 import { isArray, isObject } from 'lodash';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { fetchMarketIndices } from '@/app/api/fund';
 import { ChevronRightIcon } from 'lucide-react';
@@ -177,12 +177,23 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
   const rootRef = useRef(null);
   const hasInitializedSelectedCodes = useRef(false);
 
-  useEffect(() => {
+  // 使用 useLayoutEffect 确保在浏览器绘制前同步更新高度变量，避免视觉闪烁
+  // 依赖项为空数组：ResizeObserver 已能自动追踪所有高度变化（展开/收起、数据加载等），
+  // 无需因 loading/indices 变化而重新创建 observer——否则 cleanup 会先将高度置 0，
+  // 造成 filter-bar 的 sticky top 短暂错位
+  useLayoutEffect(() => {
     const el = rootRef.current;
     if (!el) return;
 
+    let lastGoodHeight = 0;
+
     const updateCssVar = (val) => {
-      document.documentElement.style.setProperty('--market-index-height', `${val}px`);
+      // 当元素因父级 display:none 而高度为 0 时，保留上一次的有效高度，
+      // 防止切换页面回来时 filter-bar 位置短暂错位
+      if (val > 0) {
+        lastGoodHeight = val;
+      }
+      document.documentElement.style.setProperty('--market-index-height', `${val > 0 ? val : lastGoodHeight}px`);
     };
 
     const ro = new ResizeObserver((entries) => {
@@ -199,7 +210,7 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
       ro.disconnect();
       document.documentElement.style.setProperty('--market-index-height', '0px');
     };
-  }, [loading, indices.length]);
+  }, []);
 
   const loadIndices = () => {
     let cancelled = false;
