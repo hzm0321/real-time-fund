@@ -3247,7 +3247,7 @@ const MARKET_INDEX_KEYS = [
   { code: 'sh000903', varKey: 'v_sh000903', name: '中证A100' },
 
   // 行 5：等权 / 国证 / 纳指
-  { code: 'sh000932', varKey: 'v_sh000932', name: '500等权' },
+  { code: 'sh000932', varKey: 'v_sh000932', name: '中证消费' },
   { code: 'sz399303', varKey: 'v_sz399303', name: '国证2000' },
   { code: 'usIXIC', varKey: 'v_usIXIC', name: '纳斯达克' },
   { code: 'usNDX', varKey: 'v_usNDX', name: '纳斯达克100' },
@@ -3306,9 +3306,25 @@ function parseGlobalIndexRaw(data) {
   };
 }
 
+const fetchTopixFromWorker = async () => {
+  try {
+    const res = await fetch('https://getgztpx.934585316.workers.dev/');
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && json?.data) {
+        return json.data;
+      }
+    }
+  } catch (e) {
+    console.warn('Fetch TOPIX from Cloudflare Worker failed:', e);
+  }
+  return null;
+};
+
 export const fetchMarketIndices = async () => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return [];
-  return new Promise((resolve, reject) => {
+
+  const fetchTencentIndices = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const codes = MARKET_INDEX_KEYS.map((item) => item.code).join(',');
     script.src = `https://qt.gtimg.cn/q=${codes}&_t=${Date.now()}`;
@@ -3343,6 +3359,26 @@ export const fetchMarketIndices = async () => {
     };
     document.body.appendChild(script);
   });
+
+  const [indicesResult, topixResult] = await Promise.allSettled([fetchTencentIndices, fetchTopixFromWorker()]);
+
+  const list = indicesResult.status === 'fulfilled' ? indicesResult.value : [];
+  const topixData = topixResult.status === 'fulfilled' ? topixResult.value : null;
+
+  if (topixData && list.length > 0) {
+    const idx = list.findIndex((item) => item.code === 'gzTPX');
+    if (idx !== -1) {
+      list[idx] = {
+        name: '东证指数',
+        code: 'gzTPX',
+        price: topixData.price,
+        change: topixData.change,
+        changePercent: topixData.changePercent
+      };
+    }
+  }
+
+  return list;
 };
 
 export const fetchLatestRelease = async () => {
