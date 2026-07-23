@@ -143,6 +143,8 @@ export default function HomePage() {
     setCustomSettings,
     fundDailyEarnings,
     setFundDailyEarnings,
+    fundDividends,
+    setFundDividends,
     valuationSeries,
     setValuationSeries,
     initCollapsed,
@@ -3494,6 +3496,18 @@ export default function HomePage() {
       storageHelper.setItem('tags', JSON.stringify(next));
       return next;
     });
+
+    // 同步删除该基金的分红记录
+    try {
+      setFundDividends((prev) => {
+        if (!isPlainObject(prev) || !(removeCode in prev)) return prev;
+        const next = { ...prev };
+        delete next[removeCode];
+        return next;
+      });
+    } catch {
+      /* empty */
+    }
   };
 
   /** 批量从「全部」逻辑删除多支基金（单次合并更新） */
@@ -3648,39 +3662,6 @@ export default function HomePage() {
       return changed ? next : prev;
     });
 
-    try {
-      setFundDailyEarnings((prev) => {
-        if (!isPlainObject(prev)) return prev;
-        const next = { ...prev };
-        let changed = false;
-        Object.keys(next).forEach((scopeKey) => {
-          const bucket = next[scopeKey];
-          if (!isPlainObject(bucket)) return;
-          let nb = bucket;
-          let innerChanged = false;
-          for (const c of set) {
-            if (c in nb) {
-              if (!innerChanged) {
-                nb = { ...bucket };
-                innerChanged = true;
-              }
-              delete nb[c];
-            }
-          }
-          if (innerChanged) {
-            next[scopeKey] = nb;
-            changed = true;
-          }
-        });
-        if (changed) {
-          // storageHelper.setItem handled by setFundDailyEarnings
-        }
-        return changed ? next : prev;
-      });
-    } catch {
-      /* empty */
-    }
-
     setDcaPlans((prev) => {
       const scoped = migrateDcaPlansToScoped(prev);
       let changed = false;
@@ -3711,6 +3692,27 @@ export default function HomePage() {
       storageHelper.setItem('tags', JSON.stringify(next));
       return next;
     });
+
+    // 同步删除这些基金的分红记录
+    try {
+      setFundDividends((prev) => {
+        if (!isPlainObject(prev)) return prev;
+        let next = prev;
+        let changed = false;
+        for (const c of set) {
+          if (c in next) {
+            if (!changed) {
+              next = { ...prev };
+              changed = true;
+            }
+            delete next[c];
+          }
+        }
+        return changed ? next : prev;
+      });
+    } catch {
+      /* empty */
+    }
   };
 
   const saveSettings = (
@@ -3973,24 +3975,39 @@ export default function HomePage() {
         }
 
         if (isPlainObject(data.holdings)) {
-          const mergedHoldings = { ...storageStore.getItem('holdings', {}), ...data.holdings };
+          const mergedFundCodes = new Set(mergedFunds.map((f) => f?.code).filter(Boolean));
+          const importHoldings = Object.entries(data.holdings).reduce((acc, [code, value]) => {
+            if (mergedFundCodes.has(code) && isPlainObject(value)) {
+              acc[code] = value;
+            }
+            return acc;
+          }, {});
+          const mergedHoldings = { ...storageStore.getItem('holdings', {}), ...importHoldings };
           setHoldings(mergedHoldings);
         }
 
         if (isPlainObject(data.groupHoldings)) {
+          const mergedFundCodes = new Set(mergedFunds.map((f) => f?.code).filter(Boolean));
           const mergedGH = { ...(isPlainObject(currentGroupHoldings) ? currentGroupHoldings : {}) };
           Object.entries(data.groupHoldings).forEach(([gid, bucket]) => {
             if (!isPlainObject(bucket)) return;
-            mergedGH[gid] = { ...(mergedGH[gid] || {}), ...bucket };
+            const filteredBucket = Object.entries(bucket).reduce((acc, [code, value]) => {
+              if (mergedFundCodes.has(code)) {
+                acc[code] = value;
+              }
+              return acc;
+            }, {});
+            mergedGH[gid] = { ...(mergedGH[gid] || {}), ...filteredBucket };
           });
           setGroupHoldings(mergedGH);
         }
 
         if (isPlainObject(data.transactions)) {
+          const mergedFundCodes = new Set(mergedFunds.map((f) => f?.code).filter(Boolean));
           const currentTransactions = storageStore.getItem('transactions', {});
           const mergedTransactions = { ...currentTransactions };
           Object.entries(data.transactions).forEach(([code, txs]) => {
-            if (!isArray(txs)) return;
+            if (!mergedFundCodes.has(code) || !isArray(txs)) return;
             const existing = mergedTransactions[code] || [];
             const existingIds = new Set(existing.map((t) => t.id));
             const newTxs = txs.filter((t) => !existingIds.has(t.id));

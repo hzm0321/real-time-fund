@@ -443,6 +443,9 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
       if (!keys || keys.has('fundDailyEarnings')) {
         all.fundDailyEarnings = storageStore.getItem('fundDailyEarnings', {});
       }
+      if (!keys || keys.has('fundDividends')) {
+        all.fundDividends = storageStore.getItem('fundDividends', {});
+      }
       if (!keys || keys.has('tags')) {
         all.tags = storageStore.getItem('tags', []);
       }
@@ -593,6 +596,15 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
               .filter(Boolean)
           : [];
 
+        const cleanedFundDividends = isPlainObject(all.fundDividends)
+          ? Object.entries(all.fundDividends).reduce((acc, [code, value]) => {
+              if (fundCodes.has(code)) {
+                acc[code] = value;
+              }
+              return acc;
+            }, {})
+          : {};
+
         // 合并所有 scope 的收益数据和 holdings 来计算 YTD 收益率
         const mergedEarningsForYtd = mergeAllScopedDailyEarnings(cleanedFundDailyEarnings);
         const mergedHoldingsForYtd = mergeAllHoldings(cleanedHoldings, cleanedGroupHoldings);
@@ -615,6 +627,7 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
           dcaPlans: cleanedDcaPlans,
           customSettings: isPlainObject(all.customSettings) ? all.customSettings : {},
           fundDailyEarnings: cleanedFundDailyEarnings,
+          fundDividends: cleanedFundDividends,
           fundValuationTimeseries: isPlainObject(all.fundValuationTimeseries) ? all.fundValuationTimeseries : {},
           ytdReturnRate
         };
@@ -1023,12 +1036,33 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
         useStorageStore.getState().setRefreshMs(nextRefreshMs);
         setTempSeconds(Math.round(nextRefreshMs / 1000));
 
-        const nextHoldings = isPlainObject(cloudData.holdings) ? cloudData.holdings : {};
+        const nextHoldings = isPlainObject(cloudData.holdings)
+          ? Object.entries(cloudData.holdings).reduce((acc, [code, value]) => {
+              if (nextFundCodes.has(code) && isPlainObject(value)) {
+                acc[code] = value;
+              }
+              return acc;
+            }, {})
+          : {};
         useStorageStore.getState().setHoldings(nextHoldings);
 
         const cloudGroupIds = new Set(nextGroups.map((g) => g?.id).filter(Boolean));
 
-        let nextGroupHoldings = isPlainObject(cloudData.groupHoldings) ? cloudData.groupHoldings : {};
+        let nextGroupHoldings = isPlainObject(cloudData.groupHoldings)
+          ? Object.entries(cloudData.groupHoldings).reduce((acc, [gid, bucket]) => {
+              if (!cloudGroupIds.has(gid) || !isPlainObject(bucket)) return acc;
+              const filteredBucket = Object.entries(bucket).reduce((bacc, [code, value]) => {
+                if (nextFundCodes.has(code)) {
+                  bacc[code] = value;
+                }
+                return bacc;
+              }, {});
+              if (Object.keys(filteredBucket).length > 0) {
+                acc[gid] = filteredBucket;
+              }
+              return acc;
+            }, {})
+          : {};
         useStorageStore.getState().setGroupHoldings(nextGroupHoldings);
 
         if (hasOwn(cloudData, 'pendingTrades')) {
@@ -1048,7 +1082,13 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
         }
 
         if (hasOwn(cloudData, 'transactions')) {
-          const nextTransactions = isPlainObject(cloudData.transactions) ? cloudData.transactions : {};
+          const cloudTransactions = isPlainObject(cloudData.transactions) ? cloudData.transactions : {};
+          const nextTransactions = Object.entries(cloudTransactions).reduce((acc, [code, txs]) => {
+            if (nextFundCodes.has(code) && isArray(txs)) {
+              acc[code] = txs;
+            }
+            return acc;
+          }, {});
           useStorageStore.getState().setTransactions(nextTransactions);
         } else {
           try {
@@ -1118,6 +1158,18 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
           return acc;
         }, {});
         useStorageStore.getState().setFundDailyEarnings(nextFundDailyEarnings);
+
+        // 同步分红记录（按基金代码过滤）
+        if (hasOwn(cloudData, 'fundDividends')) {
+          const cloudDividends = isPlainObject(cloudData.fundDividends) ? cloudData.fundDividends : {};
+          const nextFundDividends = Object.entries(cloudDividends).reduce((acc, [code, value]) => {
+            if (nextFundCodes.has(code)) {
+              acc[code] = value;
+            }
+            return acc;
+          }, {});
+          useStorageStore.getState().setFundDividends(nextFundDividends);
+        }
 
         if (hasOwn(cloudData, 'fundValuationTimeseries')) {
           const nextTimeseries = isPlainObject(cloudData.fundValuationTimeseries)
