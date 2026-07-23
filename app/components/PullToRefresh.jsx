@@ -57,6 +57,9 @@ export default function PullToRefresh({
 
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
+  const startXRef = useRef(0);
+  const directionLockedRef = useRef(false); // 是否已确定手势方向
+  const isHorizontalRef = useRef(false); // 已锁定为横向手势
   const thresholdBreachedRef = useRef(false);
   const isRefreshingRef = useRef(false);
 
@@ -132,6 +135,8 @@ export default function PullToRefresh({
       if (isRefreshingRef.current || !isPullable) return;
 
       isDraggingRef.current = false;
+      directionLockedRef.current = false;
+      isHorizontalRef.current = false;
 
       // 内部可滚动元素仍可向上滚动时不拦截
       if (isTreeScrollable(e.target, DIRECTION.UP)) return;
@@ -140,6 +145,7 @@ export default function PullToRefresh({
       if (window.scrollY > 0) return;
 
       startYRef.current = e.touches[0].pageY;
+      startXRef.current = e.touches[0].pageX;
       isDraggingRef.current = true;
     },
     [isPullable]
@@ -149,7 +155,28 @@ export default function PullToRefresh({
     (e) => {
       if (!isDraggingRef.current) return;
 
-      const rawDelta = e.touches[0].pageY - startYRef.current;
+      const deltaX = e.touches[0].pageX - startXRef.current;
+      const deltaY = e.touches[0].pageY - startYRef.current;
+
+      // 方向锁定：首次移动时判断手势方向
+      if (!directionLockedRef.current) {
+        if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return; // 位移太小，等待
+        directionLockedRef.current = true;
+        isHorizontalRef.current = Math.abs(deltaX) > Math.abs(deltaY);
+      }
+
+      // 横向手势：放行，不触发下拉刷新
+      if (isHorizontalRef.current) {
+        isDraggingRef.current = false;
+        thresholdBreachedRef.current = false;
+        if (containerRef.current) {
+          containerRef.current.classList.remove('ptr--dragging', 'ptr--pull-down-treshold-breached');
+        }
+        applyTransform(0);
+        return;
+      }
+
+      const rawDelta = deltaY;
 
       // 向上滑动，取消拖拽并回弹
       if (rawDelta <= 0) {
