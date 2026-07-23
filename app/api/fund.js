@@ -2357,6 +2357,28 @@ export async function fetchFundBestSource(fundCode) {
 }
 
 /**
+ * 尝试为单只基金获取并应用最佳自动数据源
+ * 与 FundDataSourceSelector 中自动切源的逻辑保持一致
+ * @param {string} fundCode - 基金代码
+ * @returns {Promise<{ success: boolean, bestSource?: number, reason?: string }>}
+ */
+export async function applyFundAutoSource(fundCode) {
+  const code = fundCode != null ? String(fundCode).trim() : '';
+  if (!code) {
+    return { success: false, reason: '无效的基金代码' };
+  }
+  try {
+    const bestId = await fetchFundBestSource(code);
+    if (bestId != null) {
+      return { success: true, bestSource: bestId };
+    }
+    return { success: false, reason: '未找到最佳数据源' };
+  } catch (err) {
+    return { success: false, reason: err?.message || '获取最佳数据源异常' };
+  }
+}
+
+/**
  * 批量获取多个基金的最佳数据源
  * @param {string[]} fundCodes - 基金编码数组
  * @returns {Promise<Record<string, number>>} 返回对象格式 { "110022": 1, "000001": 2 }

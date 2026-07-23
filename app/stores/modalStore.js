@@ -22,10 +22,22 @@ const DEFAULTS = {
   cloudConfigModal: { open: false, userId: null, type: null, cloudData: null },
   deviceConflictModal: { open: false, message: '', userId: null, payload: null, isPartial: false },
   successModal: { open: false, message: '' },
-  sectorSelectDialog: { open: false, fundCode: null, fundName: '', currentSector: null }
+  sectorSelectDialog: { open: false, fundCode: null, fundName: '', currentSector: null },
+  batchAutoSourceProgress: { isRunning: false, current: 0, total: 0, success: 0, failed: 0 },
+  batchAutoSourceResultModal: {
+    open: false,
+    total: 0,
+    successCount: 0,
+    failedCount: 0,
+    failedList: [],
+    isAborted: false
+  }
 };
 
 const getClosedModalState = () => ({
+  batchAutoSourceConfirmOpen: false,
+  batchAutoSourceProgress: { ...DEFAULTS.batchAutoSourceProgress },
+  batchAutoSourceResultModal: { ...DEFAULTS.batchAutoSourceResultModal },
   settingsOpen: false,
   feedbackOpen: false,
   weChatOpen: false,
@@ -76,6 +88,11 @@ const getClosedModalState = () => ({
 });
 
 export const useModalStore = create((set, get) => ({
+  // ---- Batch auto source modals ----
+  batchAutoSourceConfirmOpen: false,
+  batchAutoSourceProgress: { ...DEFAULTS.batchAutoSourceProgress },
+  batchAutoSourceResultModal: { ...DEFAULTS.batchAutoSourceResultModal },
+
   // ---- Simple boolean modals ----
   settingsOpen: false,
   feedbackOpen: false,

@@ -1,15 +1,18 @@
 'use client';
-import { useIsMobile } from '@/app/hooks/useIsMobile';
 
 import { useEffect, useRef, useState } from 'react';
-import dayjs from 'dayjs';
 import Image from 'next/image';
+
+import dayjs from 'dayjs';
 import { AnimatePresence, motion } from 'framer-motion';
-import ConfirmModal from './ConfirmModal';
-import { HelpCircle, Crown } from 'lucide-react';
+import { HelpCircle, Crown, Sparkles } from 'lucide-react';
+
 import { useMembership } from '@/app/hooks/useMembership';
-import { CalendarIcon, LoginIcon, LogoutIcon, SettingsIcon, UserIcon, ListIcon } from './Icons';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
+import ConfirmModal from './ConfirmModal';
+import { CalendarIcon, LoginIcon, LogoutIcon, SettingsIcon, UserIcon, ListIcon } from './Icons';
 
 export default function UserMenu({
   user,
@@ -18,6 +21,7 @@ export default function UserMenu({
   lastSyncTime,
   isSyncing,
   onSync,
+  onOpenBatchAutoSource,
   onOpenSettings,
   onOpenPortfolioEarnings,
   onOpenLogin,
@@ -228,6 +232,18 @@ export default function UserMenu({
                       <p>手动同步配置到云端</p>
                     </TooltipContent>
                   </Tooltip>
+                  {isVip && (
+                    <button
+                      className="user-menu-item"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        onOpenBatchAutoSource?.();
+                      }}
+                    >
+                      <Sparkles width="16" height="16" style={{ color: '#f59e0b', flexShrink: 0 }} />
+                      <span style={{ color: '#f59e0b', fontWeight: 500 }}>一键自动源</span>
+                    </button>
+                  )}
                   <button
                     className="user-menu-item"
                     onClick={() => {

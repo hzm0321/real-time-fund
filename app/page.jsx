@@ -44,7 +44,8 @@ import {
   fetchSmartFundNetValue,
   fetchSmartFundNetValueBackward,
   fetchFundPeriodReturns,
-  searchFunds
+  searchFunds,
+  applyFundAutoSource
 } from './api/fund';
 import MobileBottomNav from './components/MobileBottomNav';
 import MineTab from './components/MineTab';
@@ -370,6 +371,7 @@ export default function HomePage() {
 
   const isSchedulingDcaRef = useRef(false);
   const isProcessingPendingRef = useRef(false);
+  const isBatchAutoSourceAbortedRef = useRef(false);
 
   const todayStr = formatDate();
 
@@ -4318,6 +4320,117 @@ export default function HomePage() {
     [setFunds]
   ); // refreshAll is omitted from deps to avoid loop, it's stable enough in page scope
 
+  const handleBatchAutoSourceCancel = useCallback(() => {
+    isBatchAutoSourceAbortedRef.current = true;
+  }, []);
+
+  const handleBatchAutoSourceStart = useCallback(async () => {
+    const allFunds = useStorageStore.getState().funds || [];
+    if (!isArray(allFunds) || allFunds.length === 0) {
+      showToast?.('当前暂无基金可设置自动源', 'warning');
+      return;
+    }
+
+    isBatchAutoSourceAbortedRef.current = false;
+    const total = allFunds.length;
+
+    useModalStore.setState({
+      batchAutoSourceProgress: {
+        isRunning: true,
+        current: 0,
+        total,
+        success: 0,
+        failed: 0
+      }
+    });
+
+    let successCount = 0;
+    let failedCount = 0;
+    const failedList = [];
+    const updatedFundMap = {};
+
+    const BATCH_SIZE = 4;
+
+    for (let i = 0; i < allFunds.length; i += BATCH_SIZE) {
+      if (isBatchAutoSourceAbortedRef.current) {
+        break;
+      }
+
+      const chunk = allFunds.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        chunk.map(async (fund) => {
+          if (isBatchAutoSourceAbortedRef.current) return null;
+          const res = await applyFundAutoSource(fund.code);
+          return { fund, ...res };
+        })
+      );
+
+      for (const item of results) {
+        if (!item || isBatchAutoSourceAbortedRef.current) break;
+        if (item.success && item.bestSource != null) {
+          successCount++;
+          updatedFundMap[item.fund.code] = item.bestSource;
+        } else {
+          failedCount++;
+          failedList.push({
+            code: item.fund.code,
+            name: item.fund.name || item.fund.code,
+            reason: item.reason || '未找到最佳数据源'
+          });
+        }
+      }
+
+      const processedCount = Math.min(total, i + chunk.length);
+      useModalStore.setState({
+        batchAutoSourceProgress: {
+          isRunning: !isBatchAutoSourceAbortedRef.current,
+          current: processedCount,
+          total,
+          success: successCount,
+          failed: failedCount
+        }
+      });
+    }
+
+    const isAborted = isBatchAutoSourceAbortedRef.current;
+
+    const updatedCodes = Object.keys(updatedFundMap);
+    if (updatedCodes.length > 0) {
+      setFunds((prev) => {
+        if (!isArray(prev)) return prev;
+        return prev.map((f) => {
+          if (updatedFundMap[f.code] != null) {
+            return {
+              ...f,
+              dataSource: updatedFundMap[f.code],
+              autoSource: true,
+              gsz: null,
+              gszzl: null,
+              gztime: null,
+              valuationSource: null,
+              noValuation: false
+            };
+          }
+          return f;
+        });
+      });
+
+      refreshAll?.(updatedCodes);
+    }
+
+    useModalStore.setState({
+      batchAutoSourceProgress: { isRunning: false, current: 0, total: 0, success: 0, failed: 0 },
+      batchAutoSourceResultModal: {
+        open: true,
+        total: isAborted ? successCount + failedCount : total,
+        successCount,
+        failedCount,
+        failedList,
+        isAborted
+      }
+    });
+  }, [setFunds, refreshAll, showToast]);
+
   const openActionModal = useCallback(
     (fund) => {
       const code = fund?.code;
@@ -4453,6 +4566,8 @@ export default function HomePage() {
     handleUpdateGroups,
     handleAddFundsToGroup,
     handleDataSourceSelect,
+    handleBatchAutoSourceStart,
+    handleBatchAutoSourceCancel,
     handleSyncLocalConfig,
     handleSaveFundTags,
     handleAddPoolTag,
@@ -4741,6 +4856,7 @@ export default function HomePage() {
                 lastSyncTime={lastSyncTime}
                 isSyncing={isSyncing}
                 onSync={() => user?.id && syncUserConfig(user.id)}
+                onOpenBatchAutoSource={() => useModalStore.setState({ batchAutoSourceConfirmOpen: true })}
                 onOpenSettings={() => setSettingsOpen(true)}
                 onOpenPortfolioEarnings={() => setPortfolioEarningsOpen(true)}
                 onOpenLogin={handleOpenLogin}

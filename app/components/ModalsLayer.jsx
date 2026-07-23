@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence } from 'framer-motion';
-import { RefreshCw, FolderPlusIcon } from 'lucide-react';
+import { RefreshCw, FolderPlusIcon, Sparkles } from 'lucide-react';
 import { isFunction, isPlainObject } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
@@ -23,6 +23,8 @@ const ScanProgressModal = dynamic(() => import('./ScanProgressModal'), { ssr: fa
 const AddHistoryModal = dynamic(() => import('./AddHistoryModal'), { ssr: false });
 const AllSectorsModal = dynamic(() => import('./AllSectorsModal'), { ssr: false });
 const DividendMethodModal = dynamic(() => import('./DividendMethodModal'), { ssr: false });
+const BatchAutoSourceProgressModal = dynamic(() => import('./BatchAutoSourceProgressModal'), { ssr: false });
+const BatchAutoSourceResultModal = dynamic(() => import('./BatchAutoSourceResultModal'), { ssr: false });
 
 // 高频组件：同步加载
 import ConfirmModal from './ConfirmModal';
@@ -133,6 +135,11 @@ function ModalsLayerContent({ callbacksRef }) {
   const scanProgress = useModalStore((s) => s.scanProgress);
   const scanImportProgress = useModalStore((s) => s.scanImportProgress);
   const isOcrScan = useModalStore((s) => s.isOcrScan);
+
+  // Batch auto source
+  const batchAutoSourceConfirmOpen = useModalStore((s) => s.batchAutoSourceConfirmOpen);
+  const batchAutoSourceProgress = useModalStore((s) => s.batchAutoSourceProgress);
+  const batchAutoSourceResultModal = useModalStore((s) => s.batchAutoSourceResultModal);
 
   // ---- Modal setter 兼容层（直接操作 Zustand，不订阅）----
   const _ms = useModalStore.setState;
@@ -982,6 +989,57 @@ function ModalsLayerContent({ callbacksRef }) {
           showToast={cb.current.showToast}
         />
       )}
+
+      {/* ===== Modal: 一键自动源二次确认 ===== */}
+      <AnimatePresence>
+        {batchAutoSourceConfirmOpen && (
+          <ConfirmModal
+            open={batchAutoSourceConfirmOpen}
+            onCancel={() => _ms({ batchAutoSourceConfirmOpen: false })}
+            onConfirm={() => {
+              _ms({ batchAutoSourceConfirmOpen: false });
+              cb.current.handleBatchAutoSourceStart?.();
+            }}
+            title="一键自动源确认"
+            icon={<Sparkles width="20" height="20" className="shrink-0 text-[var(--primary)]" />}
+            message="是否将所有基金的数据源设置为自动？系统将为您全部列表中的每只基金算法匹配最佳数据源。"
+            confirmText="确认设置"
+            cancelText="取消"
+            confirmVariant="primary"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Modal: 一键自动源进度 ===== */}
+      <AnimatePresence>
+        {batchAutoSourceProgress?.isRunning && (
+          <BatchAutoSourceProgressModal
+            progress={batchAutoSourceProgress}
+            onCancel={() => cb.current.handleBatchAutoSourceCancel?.()}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Modal: 一键自动源结果汇总 ===== */}
+      <AnimatePresence>
+        {batchAutoSourceResultModal?.open && (
+          <BatchAutoSourceResultModal
+            result={batchAutoSourceResultModal}
+            onClose={() =>
+              _ms({
+                batchAutoSourceResultModal: {
+                  open: false,
+                  total: 0,
+                  successCount: 0,
+                  failedCount: 0,
+                  failedList: [],
+                  isAborted: false
+                }
+              })
+            }
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }
