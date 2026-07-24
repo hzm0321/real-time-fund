@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { isArray, isBoolean, isEqual, isFunction, isObject, isString } from 'lodash';
-import { getFundCodesFromTagRecord } from '@/app/lib/fundHelpers';
+
 import { DEFAULT_SORT_RULES, SORT_DISPLAY_MODES } from '@/app/constants';
+import { getFundCodesFromTagRecord } from '@/app/lib/fundHelpers';
+import { localForageStorage, storageReady } from '@/app/lib/localForageStorage';
 
 /**
  * 签名函数：用于检测 funds 列表是否发生实质性变更（jzrq, dwjz 等核心字段）
@@ -134,7 +136,9 @@ const normalizeStorageValue = (key, value) => {
 };
 
 /**
- * 管理 localStorage 数据的 Zustand Store
+ * 管理本地存储数据的 Zustand Store
+ * 底层由 localForageStorage 适配器驱动：内存 Map 同步读写 + localForage (IndexedDB) 异步持久化
+ * 对外 API 与原 localStorage 方案完全一致，不影响任何现有逻辑
  */
 export const useStorageStore = create((set, get) => ({
   // 云端同步回调，由 Page 组件注入
@@ -276,7 +280,7 @@ export const useStorageStore = create((set, get) => ({
   },
 
   /**
-   * 初始化排序相关状态，从 localStorage 恢复持久化的排序偏好
+   * 初始化排序相关状态，从本地存储恢复持久化的排序偏好
    */
   initSort: () => {
     if (typeof window === 'undefined') return;
@@ -504,13 +508,13 @@ export const useStorageStore = create((set, get) => ({
   },
 
   /**
-   * 核心写入方法：同步更新 localStorage 和 Store 状态，并触发同步
+   * 核心写入方法：同步更新本地存储和 Store 状态，并触发同步
    * @param {string} key
    * @param {string} value JSON 字符串或普通字符串
    */
   setItem: (key, value) => {
     const normalizedValue = normalizeStorageValue(key, value);
-    const prevValue = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+    const prevValue = typeof window !== 'undefined' ? localForageStorage.getItem(key) : null;
     let skipStorageWrite = false;
 
     // 检查内容是否真的发生了变化 (使用 lodash isEqual 进行深对比)
@@ -527,7 +531,7 @@ export const useStorageStore = create((set, get) => ({
 
     // 更新本地存储
     if (!skipStorageWrite && typeof window !== 'undefined') {
-      window.localStorage.setItem(key, normalizedValue);
+      localForageStorage.setItem(key, normalizedValue);
     }
 
     // 同步更新 Store 状态，确保 UI 响应
@@ -582,11 +586,11 @@ export const useStorageStore = create((set, get) => ({
   },
 
   /**
-   * 删除 key
+   * 删除 key（同步更新内存 + 异步删除 localForage）
    */
   removeItem: (key) => {
-    const prevValue = key === 'funds' || key === 'tags' ? window.localStorage.getItem(key) : null;
-    window.localStorage.removeItem(key);
+    const prevValue = key === 'funds' || key === 'tags' ? localForageStorage.getItem(key) : null;
+    localForageStorage.removeItem(key);
 
     const { onSync } = get();
     if (onSync && SYNC_KEYS.has(key)) {
@@ -595,10 +599,10 @@ export const useStorageStore = create((set, get) => ({
   },
 
   /**
-   * 清空所有存储
+   * 清空所有存储（同步清空内存 + 异步清空 localForage）
    */
   clear: () => {
-    window.localStorage.clear();
+    localForageStorage.clear();
     const { onSync } = get();
     if (onSync) {
       onSync('__clear__', null, null);
@@ -606,10 +610,10 @@ export const useStorageStore = create((set, get) => ({
   },
 
   /**
-   * 获取数据（封装 JSON 解析）
+   * 获取数据（从内存同步读取，封装 JSON 解析）
    */
   getItem: (key, defaultValue = null) => {
-    const val = window.localStorage.getItem(key);
+    const val = localForageStorage.getItem(key);
     if (val === null) return defaultValue;
     try {
       return JSON.parse(val);
@@ -624,5 +628,14 @@ export const storageStore = {
   setItem: (key, val) => useStorageStore.getState().setItem(key, val),
   getItem: (key, def) => useStorageStore.getState().getItem(key, def),
   removeItem: (key) => useStorageStore.getState().removeItem(key),
-  clear: () => useStorageStore.getState().clear()
+  clear: () => useStorageStore.getState().clear(),
+  /** 缓存中 key 的数量（用于遍历，与 localStorage.length 兼容） */
+  get length() {
+    return localForageStorage.length;
+  },
+  /** 根据索引获取 key（用于遍历，与 localStorage.key 兼容） */
+  key: (index) => localForageStorage.key(index)
 };
+
+/** 重新导出 storageReady，供页面初始化时 await */
+export { storageReady } from '@/app/lib/localForageStorage';

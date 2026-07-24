@@ -68,6 +68,7 @@ import {
   setAuthUser,
   useStorageStore,
   storageStore,
+  storageReady,
   normalizePendingTrades,
   useModalStore,
   useSettingsStore
@@ -237,10 +238,9 @@ export default function HomePage() {
   const [, startTransition] = useTransition();
   const hasLocalTabInitRef = useRef(false);
 
-  // 调用 store 的 initSort，在 mount 时恢复持久化的排序偏好，并在闲置时后台预热 OCR 引擎
+  // mount 时在闲置后台预热 OCR 引擎（initSort 已在主 init useEffect 中 await storageReady() 后调用）
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      initSort();
       if (typeof window.requestIdleCallback === 'function') {
         window.requestIdleCallback(() => {
           import('@/app/lib/ocr').then((m) => m.warmupOcrWorker());
@@ -251,7 +251,6 @@ export default function HomePage() {
         }, 3000);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 当用户关闭某个排序规则时，如果当前 sortBy 不再可用，则自动切换到第一个启用的规则
@@ -2674,6 +2673,8 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      // 等待 localForage 数据加载到内存缓存，确保 init* 调用时同步读取到最新数据
+      await storageReady();
       initFunds();
       initGroups();
       initFavorites();
@@ -4323,9 +4324,9 @@ export default function HomePage() {
 
       if (typeof window !== 'undefined') {
         try {
-          const saved = JSON.parse(localStorage.getItem('rtf_unadded_ds') || '{}');
+          const saved = storageStore.getItem('rtf_unadded_ds', {});
           saved[fundCode] = sourceId;
-          localStorage.setItem('rtf_unadded_ds', JSON.stringify(saved));
+          storageStore.setItem('rtf_unadded_ds', JSON.stringify(saved));
         } catch {}
         window.dispatchEvent(new CustomEvent('rtf_unadded_datasource_change', { detail: { fundCode, sourceId } }));
       }

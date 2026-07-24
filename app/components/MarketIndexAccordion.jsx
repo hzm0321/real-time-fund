@@ -9,7 +9,7 @@ import { ChevronRightIcon } from 'lucide-react';
 import { SettingsIcon } from './Icons';
 import { cn } from '@/lib/utils';
 import MarketSettingModal from './MarketSettingModal';
-import { storageStore } from '../stores';
+import { storageStore, storageReady } from '../stores';
 
 /** 迷你走势：只展示当日分时数据，不支持时不展示 */
 function MiniTrendLine({ changePercent, code, className }) {
@@ -247,24 +247,35 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
   useEffect(() => {
     if (!indices.length || typeof window === 'undefined') return;
     if (hasInitializedSelectedCodes.current) return;
-    try {
-      const parsed = storageStore.getItem('marketIndexSelected');
-      const availableCodes = new Set(indices.map((it) => it.code));
-      if (parsed) {
-        if (isArray(parsed)) {
-          const filtered = parsed.filter((c) => availableCodes.has(c));
-          if (filtered.length) {
-            setSelectedCodes(filtered);
-            hasInitializedSelectedCodes.current = true;
-            return;
+    let cancelled = false;
+
+    (async () => {
+      // 等待 localForage 数据加载到内存缓存，确保读取到最新数据
+      await storageReady();
+      if (cancelled || hasInitializedSelectedCodes.current) return;
+      try {
+        const parsed = storageStore.getItem('marketIndexSelected');
+        const availableCodes = new Set(indices.map((it) => it.code));
+        if (parsed) {
+          if (isArray(parsed)) {
+            const filtered = parsed.filter((c) => availableCodes.has(c));
+            if (filtered.length) {
+              setSelectedCodes(filtered);
+              hasInitializedSelectedCodes.current = true;
+              return;
+            }
           }
         }
+        const defaults = DEFAULT_SELECTED_CODES.filter((c) => availableCodes.has(c));
+        setSelectedCodes(defaults.length ? defaults : indices.map((it) => it.code).slice(0, 3));
+      } catch {
+        setSelectedCodes(indices.map((it) => it.code).slice(0, 3));
       }
-      const defaults = DEFAULT_SELECTED_CODES.filter((c) => availableCodes.has(c));
-      setSelectedCodes(defaults.length ? defaults : indices.map((it) => it.code).slice(0, 3));
-    } catch {
-      setSelectedCodes(indices.map((it) => it.code).slice(0, 3));
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [indices]);
 
   // 持久化用户选择

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   useStorageStore,
   storageStore,
+  storageReady,
   useUserStore,
   useModalStore,
   getFundCodesSignature,
@@ -83,29 +84,45 @@ export function useSyncManager({ showToast, refreshAllRef, setTempSeconds, setFu
   const dirtyKeysRef = useRef(new Set());
   const syncUserConfigRef = useRef(null);
 
-  // deviceId init
+  // deviceId init — 等待 localForage 数据加载到内存缓存后再读取
   useEffect(() => {
-    try {
-      const key = 'rtfDeviceId';
-      let id = storageStore.getItem(key);
-      if (!id) {
-        id = uuidv4();
-        storageStore.setItem(key, id);
+    let cancelled = false;
+    (async () => {
+      await storageReady();
+      if (cancelled) return;
+      try {
+        const key = 'rtfDeviceId';
+        let id = storageStore.getItem(key);
+        if (!id) {
+          id = uuidv4();
+          storageStore.setItem(key, id);
+        }
+        deviceIdRef.current = id;
+      } catch {
+        deviceIdRef.current = uuidv4();
       }
-      deviceIdRef.current = id;
-    } catch {
-      deviceIdRef.current = uuidv4();
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // lastSyncTime init
+  // lastSyncTime init — 等待 localForage 数据加载到内存缓存后再读取
   useEffect(() => {
-    const stored = storageStore.getItem('localUpdatedAt');
-    if (stored) {
-      setLastSyncTime(stored);
-    } else {
-      setLastSyncTime(null);
-    }
+    let cancelled = false;
+    (async () => {
+      await storageReady();
+      if (cancelled) return;
+      const stored = storageStore.getItem('localUpdatedAt');
+      if (stored) {
+        setLastSyncTime(stored);
+      } else {
+        setLastSyncTime(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // user → userIdRef

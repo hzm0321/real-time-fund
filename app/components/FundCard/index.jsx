@@ -13,7 +13,7 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn, formatMoney } from '@/lib/utils';
-import { useStorageStore } from '@/app/stores';
+import { useStorageStore, storageStore } from '@/app/stores';
 import { fetchFundHoldings, fetchFundData } from '@/app/api/fund';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 import { Stat, ConsecutiveTrendBadge } from '../Common';
@@ -267,7 +267,7 @@ export default function Index({
     let ds = fallbackFund?.dataSource || 1;
     if (typeof window !== 'undefined') {
       try {
-        const saved = JSON.parse(localStorage.getItem('rtf_unadded_ds') || '{}');
+        const saved = storageStore.getItem('rtf_unadded_ds', {});
         if (saved[fundCode]) {
           ds = saved[fundCode];
         }

@@ -166,7 +166,7 @@ export default function RealtimeSectorFlowChart({ sectorFilter = 'industry', sec
   useEffect(() => {
     const updateTheme = () => {
       if (typeof document !== 'undefined') {
-        const t = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'dark';
+        const t = document.documentElement.getAttribute('data-theme') || storageStore.getItem('theme') || 'dark';
         setTheme(t);
       }
     };

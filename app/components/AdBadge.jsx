@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle } from 'lucide-react';
-import { storageStore, useModalStore } from '../stores';
+import { storageStore, storageReady, useModalStore } from '../stores';
 import { CloseIcon } from './Icons';
 
 /**
@@ -24,23 +24,34 @@ export default function AdBadge({ isMobile }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    let cancelled = false;
 
-    const currentKey = `${STORAGE_PREFIX}${AD_CONFIG.id}`;
-    const hasClosed = storageStore.getItem(currentKey);
+    (async () => {
+      // 等待 localForage 数据加载到内存缓存，确保读取到最新数据
+      await storageReady();
+      if (cancelled) return;
 
-    if (!hasClosed) {
-      setIsVisible(true);
-    }
+      const currentKey = `${STORAGE_PREFIX}${AD_CONFIG.id}`;
+      const hasClosed = storageStore.getItem(currentKey);
 
-    // 自动扫描并清理历史版本的已废弃 storage 键
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(STORAGE_PREFIX) && key !== currentKey) {
-        keysToRemove.push(key);
+      if (!hasClosed) {
+        setIsVisible(true);
       }
-    }
-    keysToRemove.forEach((k) => storageStore.removeItem(k));
+
+      // 自动扫描并清理历史版本的已废弃 storage 键
+      const keysToRemove = [];
+      for (let i = 0; i < storageStore.length; i++) {
+        const key = storageStore.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX) && key !== currentKey) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => storageStore.removeItem(k));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (isMobile || !isVisible) {
