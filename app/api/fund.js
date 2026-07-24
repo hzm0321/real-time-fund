@@ -3308,7 +3308,7 @@ function parseGlobalIndexRaw(data) {
 
 const fetchTopixFromWorker = async () => {
   try {
-    const res = await fetch('https://getgztpx.934585316.workers.dev/');
+    const res = await fetch('https://api.fund.cc.cd/getgztpx');
     if (res.ok) {
       const json = await res.json();
       if (json?.success && json?.data) {
@@ -3838,7 +3838,11 @@ export const parseFundTextWithLLM = async (text, imageBase64 = null) => {
 };
 
 /**
- * 通过 Supabase Edge Function 获取天天基金估值排行
+ * 获取天天基金估值排行
+ *
+ * 优先通过 Cloudflare Worker 代理（减少 Supabase Edge Function 调用），
+ * Worker 不可用时回退到 Supabase Edge Function。
+ *
  * @param {string|number} sort 排序字段 (3:估值涨幅, 4:成交热度, 5:实际涨幅)
  * @param {string} order 排序方向 (desc | asc)
  * @param {number} page 页码
@@ -3846,6 +3850,22 @@ export const parseFundTextWithLLM = async (text, imageBase64 = null) => {
  * @returns {Promise<{Data: {list: Array, allRecords: number}} | null>}
  */
 export const fetchFundValuationRanking = async (sort = 3, order = 'desc', page = 1, pageSize = 20) => {
+  // ✅ 优先：通过 Cloudflare Worker 代理（无鉴权，减少 Edge Function 调用）
+  try {
+    const res = await fetch(
+      `https://api.fund.cc.cd/fundgzrank?sort=${sort}&order=${order}&page=${page}&pageSize=${pageSize}`
+    );
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && json?.data) {
+        return { Data: json.data };
+      }
+    }
+  } catch (e) {
+    console.warn('Fetch fund valuation ranking from Cloudflare Worker failed:', e);
+  }
+
+  // ⬇️ 回退：通过 Supabase Edge Function
   if (!isSupabaseConfigured) return null;
   if (!supabase?.functions?.invoke) return null;
 

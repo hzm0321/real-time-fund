@@ -2864,8 +2864,10 @@ export default function HomePage() {
         setLoginInitialError('');
       }
       // 仅在明确的登录动作（SIGNED_IN）时检查冲突；INITIAL_SESSION（刷新页面等）不检查，直接以云端为准
+      // INITIAL_SESSION 和 TOKEN_REFRESHED 都需要刷新：前者是首次加载，后者是 token 过期后自动续期
+      // 续期时会重新拉取云端配置，若不刷新则本地刚获取的最新估值会被云端旧数据覆盖
       fetchCloudConfig(session.user.id, isExplicitLogin, {
-        refreshAfterApply: event === 'INITIAL_SESSION'
+        refreshAfterApply: event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED'
       });
     };
 

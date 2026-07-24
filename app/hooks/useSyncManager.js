@@ -46,18 +46,58 @@ const mergeValuationFieldsByGztime = (localFund, cloudFund) => {
   const localGzRaw = localFund.gztime;
   const cloudGzRaw = cloudFund.gztime;
 
-  if (!isString(localGzRaw) || !isString(cloudGzRaw)) return cloudFund;
+  // 判断本地估值数据是否比云端更新
+  // 优先用 gztime（盘中估值时间）比较，其次用 jzrq（净值日期）兜底
+  let localIsNewer = false;
+  let gztimeDetermined = false; // 标记是否已通过 gztime 完成明确判定
 
-  const localGz = toTz(localGzRaw);
-  const cloudGz = toTz(cloudGzRaw);
-  if (!localGz?.isValid?.() || !cloudGz?.isValid?.()) return cloudFund;
+  if (isString(localGzRaw) && isString(cloudGzRaw)) {
+    const localGz = toTz(localGzRaw);
+    const cloudGz = toTz(cloudGzRaw);
+    if (localGz?.isValid?.() && cloudGz?.isValid?.()) {
+      gztimeDetermined = true;
+      if (localGz.isAfter(cloudGz)) {
+        localIsNewer = true;
+      } else if (cloudGz.isAfter(localGz)) {
+        localIsNewer = false; // 云端明确更新，不应被后续 jzrq 颠覆
+      } else {
+        gztimeDetermined = false; // 两者时间相同，交给 jzrq 兜底
+      }
+    }
+  } else if (isString(localGzRaw) && !isString(cloudGzRaw)) {
+    // 本地有盘中估值时间而云端没有 → 本地更新
+    localIsNewer = true;
+    gztimeDetermined = true;
+  }
 
-  if (!localGz.isAfter(cloudGz)) return cloudFund;
+  // 仅在 gztime 无法判定新旧时（无 gztime 或两者时间相等），使用 jzrq（净值日期）兜底比较
+  if (!gztimeDetermined) {
+    const localJzrq = localFund.jzrq;
+    const cloudJzrq = cloudFund.jzrq;
+    if (isString(localJzrq) && isString(cloudJzrq) && localJzrq > cloudJzrq) {
+      localIsNewer = true;
+    } else if (isString(localJzrq) && !isString(cloudJzrq)) {
+      localIsNewer = true;
+    }
+  }
 
+  if (!localIsNewer) return cloudFund;
+
+  // 本地更新时，保留所有估值相关字段，避免云端旧数据覆盖本地新数据
   const patch = {};
+  // 盘中估值字段
   if (!isNil(localFund.gsz)) patch.gsz = localFund.gsz;
   if (!isNil(localFund.gszzl)) patch.gszzl = localFund.gszzl;
   if (!isNil(localFund.gztime)) patch.gztime = localFund.gztime;
+  // 净值字段
+  if (!isNil(localFund.dwjz)) patch.dwjz = localFund.dwjz;
+  if (!isNil(localFund.jzrq)) patch.jzrq = localFund.jzrq;
+  if (!isNil(localFund.zzl)) patch.zzl = localFund.zzl;
+  // 昨日净值相关字段
+  if (!isNil(localFund.yesterdayZzl)) patch.yesterdayZzl = localFund.yesterdayZzl;
+  if (!isNil(localFund.yesterdayNavDelta)) patch.yesterdayNavDelta = localFund.yesterdayNavDelta;
+  // 净值更新标记
+  if (!isNil(localFund.navUpdatedAt)) patch.navUpdatedAt = localFund.navUpdatedAt;
 
   return { ...cloudFund, ...patch };
 };
