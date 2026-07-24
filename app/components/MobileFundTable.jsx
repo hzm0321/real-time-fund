@@ -2536,10 +2536,11 @@ const MobileFundTable = memo(function MobileFundTable({
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.yesterdayProfitValue;
-          const hasProfit = value != null;
+          const hasHolding = original.holdingAmountValue != null;
+          const hasProfit = value != null && hasHolding;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
           const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
-          const percentStr = original.yesterdayProfitPercent ?? '';
+          const percentStr = hasProfit ? (original.yesterdayProfitPercent ?? '') : '';
           const pctVal = original.yesterdaySecondLinePctValue;
           const pctCls =
             pctVal != null && Number.isFinite(pctVal) ? (pctVal > 0 ? 'up' : pctVal < 0 ? 'down' : '') : 'muted';
