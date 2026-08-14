@@ -2,22 +2,22 @@
 
 ## OVERVIEW
 
-Single file (`fund.js`, ~954 lines) containing ALL external data fetching for the entire application. Pure client-side: JSONP + script tag injection to bypass CORS.
+Single file (`fund.js`) containing ALL external data fetching for the entire application. Mix of `fetch()` (CORS-enabled APIs) and JSONP/script tag injection (CORS-restricted APIs).
 
 ## WHERE TO LOOK
 
-| Function | Purpose |
-|----------|---------|
-| `fetchFundData(code)` | Main fund data (valuation + NAV + holdings). Uses 天天基金 JSONP |
-| `fetchFundDataFallback(code)` | Backup data source when primary fails |
-| `fetchSmartFundNetValue(code, date)` | Smart NAV lookup with date fallback |
-| `searchFunds(val)` | Fund search by name/code (东方财富) |
-| `fetchFundHistory(code, range)` | Historical NAV data via pingzhongdata |
-| `fetchFundPingzhongdata(code)` | Raw eastmoney pingzhongdata (trend, grand total) |
-| `fetchMarketIndices()` | 24 A-share/HK/US indices via 腾讯财经 |
-| `fetchShanghaiIndexDate()` | Shanghai index date for trading day check |
-| `parseFundTextWithLLM(text)` | OCR text → fund codes via LLM (apis.iflow.cn) |
-| `loadScript(url)` | JSONP helper — creates script tag, waits for global var |
+| Function                             | Purpose                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `fetchFundData(code)`                | Main fund data (valuation + NAV + holdings). Uses 天天基金 FundValuationLast (fetch, batch) |
+| `fetchFundDataFallback(code)`        | Backup data source when primary fails                                                       |
+| `fetchSmartFundNetValue(code, date)` | Smart NAV lookup with date fallback                                                         |
+| `searchFunds(val)`                   | Fund search by name/code (东方财富)                                                         |
+| `fetchFundHistory(code, range)`      | Historical NAV data via pingzhongdata                                                       |
+| `fetchFundPingzhongdata(code)`       | Raw eastmoney pingzhongdata (trend, grand total)                                            |
+| `fetchMarketIndices()`               | 24 A-share/HK/US indices via 腾讯财经                                                       |
+| `fetchShanghaiIndexDate()`           | Shanghai index date for trading day check                                                   |
+| `parseFundTextWithLLM(text)`         | OCR text → fund codes via LLM (apis.iflow.cn)                                               |
+| `loadScript(url)`                    | JSONP helper — creates script tag, waits for global var                                     |
 
 ## CONVENTIONS
 
@@ -32,6 +32,6 @@ Single file (`fund.js`, ~954 lines) containing ALL external data fetching for th
 
 - **Hardcoded API keys** (lines 911-914) — plaintext LLM service keys in source
 - **Empty catch blocks** — several `catch (e) {}` silently swallowing errors
-- **Global window pollution** — JSONP callbacks assigned to `window.jsonpgz`, `window.SuggestData_*`, etc.
+- **Global window pollution** — JSONP callbacks assigned to `window.SuggestData_*` (search), `window.v_*` (market indices), etc.
 - **No retry logic** — failed requests return null, no exponential backoff
 - **Script cleanup race conditions** — scripts removed from DOM after onload/onerror, but timeout may trigger after removal

@@ -1,5 +1,5 @@
 'use client';
-import { isNumber } from 'lodash';
+import { isNil, isNumber } from 'lodash';
 
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import { useStorageStore, useUserStore } from '@/app/stores';
 import DataSourceAccuracyBadge from './DataSourceAccuracyBadge';
 
 function formatGszzlEstimate(gszzl) {
+  if (isNil(gszzl)) return '--';
   const n = isNumber(gszzl) ? gszzl : Number(gszzl);
   if (!Number.isFinite(n)) return '--';
   return `${n > 0 ? '+' : ''}${n.toFixed(2)}%`;

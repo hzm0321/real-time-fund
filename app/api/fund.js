@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { isArray, isNumber, isObject, isString } from 'lodash';
+import { isArray, isNil, isNumber, isObject, isString } from 'lodash';
 import { storageStore } from '../stores';
 import { withRetry } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
@@ -894,8 +894,6 @@ export const fetchFundDataFallback = async (c) => {
   });
 };
 
-// fundgz JSONP 固定回调名为 window.jsonpgz；这里做成“常驻分发器”以支持并发请求，避免覆盖全局回调导致串数据/悬挂。
-const JSONPGZ_DISPATCHER_KEY = '__rtf_jsonpgz_dispatcher_v1__';
 const RTF_FUND_DEBUG_LS_KEY = 'rtf_debug_fund';
 function fundDebugEnabled() {
   try {
@@ -915,93 +913,143 @@ function fundDebugLog(...args) {
     console.debug('[fund][debug]', ...args);
   } catch (e) {}
 }
-function ensureJsonpgzDispatcher() {
-  if (typeof window === 'undefined') return null;
-  if (window[JSONPGZ_DISPATCHER_KEY]) return window[JSONPGZ_DISPATCHER_KEY];
 
-  const previous = typeof window.jsonpgz === 'function' ? window.jsonpgz : null;
-  const pendingByCode = new Map(); // code -> Set(entry)
+// ============================================================================
+// FundValuationLast 批量微任务合并加载器 (DataLoader Pattern)
+// 替代原 fundgz.1234567.com.cn 单只 JSONP 接口，支持批量获取
+// 接口：https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast
+// ============================================================================
 
-  const dispatcher = (json) => {
-    try {
-      if (!json || !isObject(json)) {
-        fundDebugLog('jsonpgz called with invalid payload', json);
-        // 部分情况下接口会回调 jsonpgz() 但不给参数（undefined）。
-        // 若当前只有 1 个 pending，可视为该请求失败信号，直接触发其 fallback，避免一直等到超时。
-        if (pendingByCode.size === 1) {
-          const onlyKey = Array.from(pendingByCode.keys())[0];
-          const set = pendingByCode.get(onlyKey);
-          if (set && set.size > 0) {
-            fundDebugLog('jsonpgz invalid payload -> fail single pending', { fundcode: onlyKey, listeners: set.size });
-            pendingByCode.delete(onlyKey);
-            for (const entry of set) {
-              try {
-                entry?.cleanup?.();
-              } catch (e) {}
-              try {
-                entry?.onError?.(new Error('jsonpgz invalid payload'));
-              } catch (e) {}
-            }
-            return;
+const fundValuationLastInflight = new Map(); // code -> { promise, resolve, reject }
+const fundValuationLastQueue = new Set(); // Set(code)
+let fundValuationLastTimeout = null;
+
+const FUND_VALUATION_LAST_FIELDS = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE';
+const FUND_VALUATION_LAST_BATCH_SIZE = 50;
+const FUND_VALUATION_LAST_STALE_TIME = 10 * 1000; // 10s
+const FUND_VALUATION_LAST_TIMEOUT_MS = 8000;
+
+const processFundValuationLastQueue = async () => {
+  if (fundValuationLastQueue.size === 0) return;
+
+  const currentQueue = Array.from(fundValuationLastQueue);
+  fundValuationLastQueue.clear();
+  fundValuationLastTimeout = null;
+
+  // 按 BATCH_SIZE 分块请求
+  const chunks = [];
+  for (let i = 0; i < currentQueue.length; i += FUND_VALUATION_LAST_BATCH_SIZE) {
+    chunks.push(currentQueue.slice(i, i + FUND_VALUATION_LAST_BATCH_SIZE));
+  }
+
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FUND_VALUATION_LAST_TIMEOUT_MS);
+      try {
+        const url = `https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast?FCODES=${encodeURIComponent(chunk.join(','))}&FIELDS=${encodeURIComponent(FUND_VALUATION_LAST_FIELDS)}`;
+        fundDebugLog('processFundValuationLastQueue', { count: chunk.length, codes: chunk });
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`FundValuationLast HTTP ${res.status}`);
+        const json = await res.json();
+        if (!json?.success) throw new Error('FundValuationLast API returned failure');
+        const items = isArray(json.data) ? json.data : [];
+
+        const qc = getQueryClient();
+        const foundMap = new Map();
+        for (const item of items) {
+          const code = item.FCODE != null ? String(item.FCODE).trim() : '';
+          if (!code) continue;
+          // 注意：Number(null) === 0，必须先用 isNil 排除 null/undefined 再转换
+          const gszNum = !isNil(item.GSZ) ? Number(item.GSZ) : NaN;
+          const gszzlNum = !isNil(item.GSZZL) ? Number(item.GSZZL) : NaN;
+          const navNum = !isNil(item.NAV) ? Number(item.NAV) : NaN;
+          const valuation = {
+            code,
+            gsz: Number.isFinite(gszNum) ? gszNum : null,
+            gztime: !isNil(item.GZTIME) ? String(item.GZTIME).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
+            gszzl: Number.isFinite(gszzlNum) ? gszzlNum : null,
+            valuationSource: 'fundgz'
+          };
+          // 附带字段（新接口比旧 fundgz JSONP 多提供净值与名称，供 fetchFundData 直接使用）
+          if (!isNil(item.SHORTNAME)) valuation.name = String(item.SHORTNAME);
+          if (Number.isFinite(navNum)) valuation.dwjz = String(navNum);
+          if (!isNil(item.PDATE)) valuation.jzrq = String(item.PDATE);
+
+          foundMap.set(code, valuation);
+          qc.setQueryData(qk.fundValuationLast(code), valuation, { staleTime: FUND_VALUATION_LAST_STALE_TIME });
+        }
+
+        // 分发结果
+        for (const code of chunk) {
+          const resolver = fundValuationLastInflight.get(code);
+          if (!resolver) continue;
+          const val = foundMap.get(code);
+          if (val) {
+            resolver.resolve(val);
+          } else {
+            resolver.reject(new Error(`FundValuationLast no data for ${code}`));
           }
+          fundValuationLastInflight.delete(code);
         }
-        if (previous) previous(json);
-        return;
-      }
-      const code = json.fundcode != null ? String(json.fundcode).trim() : '';
-      const set = code ? pendingByCode.get(code) : null;
-      if (!set || set.size === 0) {
-        fundDebugLog('jsonpgz no pending match', { fundcode: code, pendingKeys: Array.from(pendingByCode.keys()) });
-        if (previous) previous(json);
-        return;
-      }
-
-      fundDebugLog('jsonpgz dispatch', { fundcode: code, listeners: set.size });
-      pendingByCode.delete(code);
-      for (const entry of set) {
-        try {
-          entry?.cleanup?.();
-        } catch (e) {}
-        try {
-          entry?.onJson?.(json);
-        } catch (e) {
-          try {
-            entry?.onError?.(e);
-          } catch (e2) {}
+      } catch (e) {
+        clearTimeout(timer);
+        fundDebugLog('processFundValuationLastQueue error', { error: e?.message, codes: chunk });
+        // 该分片内所有 code 统一 reject
+        for (const code of chunk) {
+          const resolver = fundValuationLastInflight.get(code);
+          if (!resolver) continue;
+          resolver.reject(e);
+          fundValuationLastInflight.delete(code);
         }
       }
-    } catch (e) {
-      if (previous) previous(json);
-    }
-  };
+    })
+  );
+};
 
-  const api = {
-    add(code, entry) {
-      const k = code != null ? String(code).trim() : '';
-      if (!k) return () => {};
-      let set = pendingByCode.get(k);
-      if (!set) {
-        set = new Set();
-        pendingByCode.set(k, set);
-      }
-      set.add(entry);
-      fundDebugLog('jsonpgz add pending', { fundcode: k, pendingCount: set.size });
-      return () => {
-        const cur = pendingByCode.get(k);
-        if (!cur) return;
-        cur.delete(entry);
-        if (cur.size === 0) pendingByCode.delete(k);
-        fundDebugLog('jsonpgz remove pending', { fundcode: k, remaining: cur.size });
-      };
-    },
-    previous
-  };
+/**
+ * 批量获取基金估值（FundValuationLast API）
+ * 内部使用微任务合并（setTimeout 0），将同一事件循环内的并发单只请求合并为一次批量 API 调用。
+ * @param {string} code - 基金编码
+ * @returns {Promise<UnifiedFundValuation>}
+ */
+const fetchFundValuationLastBatched = (code) => {
+  const c = code != null ? String(code).trim() : '';
+  if (!c) return Promise.reject(new Error('基金编码无效'));
 
-  window.jsonpgz = dispatcher;
-  window[JSONPGZ_DISPATCHER_KEY] = api;
-  fundDebugLog('jsonpgz dispatcher installed', { hadPrevious: Boolean(previous) });
-  return api;
-}
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') {
+    return Promise.reject(new Error('无浏览器环境'));
+  }
+
+  // 优先读 TanStack Query 缓存
+  const qc = getQueryClient();
+  const cached = qc.getQueryData(qk.fundValuationLast(c));
+  if (cached !== undefined) {
+    return Promise.resolve(cached);
+  }
+
+  // 去重：已有相同 code 的 inflight 请求时直接复用
+  const existing = fundValuationLastInflight.get(c);
+  if (existing) return existing.promise;
+
+  // 新增 inflight + 入队
+  let resolveFn;
+  let rejectFn;
+  const promise = new Promise((resolve, reject) => {
+    resolveFn = resolve;
+    rejectFn = reject;
+  });
+  fundValuationLastInflight.set(c, { promise, resolve: resolveFn, reject: rejectFn });
+  fundValuationLastQueue.add(c);
+
+  // 触发微任务合并
+  if (fundValuationLastQueue.size > 0 && !fundValuationLastTimeout) {
+    fundValuationLastTimeout = setTimeout(processFundValuationLastQueue, 0);
+  }
+
+  return promise;
+};
 
 /** 同一基金代码并发的新浪估值 JSONP 去重，避免数据源 2/3 各打一遍 */
 const sinaEstimateNetworthInflight = new Map();
@@ -1324,82 +1372,9 @@ export async function fetchFundValuationBySource(code, dataSource = 1) {
     };
   }
 
-  const dispatcher = ensureJsonpgzDispatcher();
-  if (!dispatcher) throw new Error('无浏览器环境');
-
-  fundDebugLog('fetchFundValuationBySource fundgz', { code: c });
-  const gzUrl = `https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`;
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const settleOnce = (fn) => (arg) => {
-      if (settled) return;
-      settled = true;
-      fn(arg);
-    };
-    const safeResolve = settleOnce(resolve);
-    const safeReject = settleOnce(reject);
-
-    const scriptGz = document.createElement('script');
-    scriptGz.src = gzUrl;
-    scriptGz.async = true;
-
-    const cleanupScript = () => {
-      try {
-        if (timer) clearTimeout(timer);
-      } catch (e) {}
-      try {
-        if (document.body && document.body.contains(scriptGz)) document.body.removeChild(scriptGz);
-      } catch (e) {}
-      try {
-        if (removePending) removePending();
-      } catch (e) {}
-    };
-
-    const onTimeout = () => {
-      fundDebugLog('fetchFundValuationBySource gz timeout', { code: c, timeoutMs: 5000 });
-      cleanupScript();
-      safeReject(new Error('gz timeout'));
-    };
-
-    const timer = setTimeout(onTimeout, 5000);
-
-    let removePending = null;
-    removePending = dispatcher.add(c, {
-      cleanup: cleanupScript,
-      onJson: (json) => {
-        fundDebugLog('fetchFundValuationBySource jsonpgz', { code: c, fundcode: json?.fundcode });
-        cleanupScript();
-
-        if (!json || !isObject(json)) {
-          safeReject(new Error('invalid json'));
-          return;
-        }
-
-        const gszzlNum = Number(json.gszzl);
-        const gszNum = Number(json.gsz);
-        safeResolve({
-          code: json.fundcode != null ? String(json.fundcode).trim() : c,
-          gsz: Number.isFinite(gszNum) ? gszNum : json.gsz,
-          gztime: json.gztime != null ? String(json.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
-          gszzl: Number.isFinite(gszzlNum) ? gszzlNum : json.gszzl,
-          valuationSource: 'fundgz'
-        });
-      },
-      onError: (e) => {
-        cleanupScript();
-        safeReject(e || new Error('gz error callback'));
-      }
-    });
-
-    scriptGz.onerror = () => {
-      fundDebugLog('fetchFundValuationBySource gz script error', { code: c, url: gzUrl });
-      cleanupScript();
-      safeReject(new Error('gz script error'));
-    };
-
-    document.body.appendChild(scriptGz);
-  });
+  // 数据源 1：天天基金 FundValuationLast API（支持批量，内部自动合并并发请求）
+  fundDebugLog('fetchFundValuationBySource fundvaluationlast', { code: c });
+  return fetchFundValuationLastBatched(c);
 }
 
 /**
@@ -1853,7 +1828,7 @@ const MARKET_INDEX_KEYS = [
   { code: 'sh000903', varKey: 'v_sh000903', name: '中证A100' },
 
   // 行 5：等权 / 国证 / 纳指
-  { code: 'sh000932', varKey: 'v_sh000932', name: '500等权' },
+  { code: 'sh000932', varKey: 'v_sh000932', name: '中证消费' },
   { code: 'sz399303', varKey: 'v_sz399303', name: '国证2000' },
   { code: 'usIXIC', varKey: 'v_usIXIC', name: '纳斯达克' },
   { code: 'usNDX', varKey: 'v_usNDX', name: '纳斯达克100' },
@@ -1912,9 +1887,25 @@ function parseGlobalIndexRaw(data) {
   };
 }
 
+const fetchTopixFromWorker = async () => {
+  try {
+    const res = await fetch('https://getgztpx.934585316.workers.dev/');
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.success && json?.data) {
+        return json.data;
+      }
+    }
+  } catch (e) {
+    console.warn('Fetch TOPIX from Cloudflare Worker failed:', e);
+  }
+  return null;
+};
+
 export const fetchMarketIndices = async () => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return [];
-  return new Promise((resolve, reject) => {
+
+  const fetchTencentIndices = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const codes = MARKET_INDEX_KEYS.map((item) => item.code).join(',');
     script.src = `https://qt.gtimg.cn/q=${codes}&_t=${Date.now()}`;
@@ -1949,6 +1940,26 @@ export const fetchMarketIndices = async () => {
     };
     document.body.appendChild(script);
   });
+
+  const [indicesResult, topixResult] = await Promise.allSettled([fetchTencentIndices, fetchTopixFromWorker()]);
+
+  const list = indicesResult.status === 'fulfilled' ? indicesResult.value : [];
+  const topixData = topixResult.status === 'fulfilled' ? topixResult.value : null;
+
+  if (topixData && list.length > 0) {
+    const idx = list.findIndex((item) => item.code === 'gzTPX');
+    if (idx !== -1) {
+      list[idx] = {
+        name: '东证指数',
+        code: 'gzTPX',
+        price: topixData.price,
+        change: topixData.change,
+        changePercent: topixData.changePercent
+      };
+    }
+  }
+
+  return list;
 };
 
 export const fetchLatestRelease = async () => {
