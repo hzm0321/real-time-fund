@@ -172,7 +172,13 @@ export default function TransactionHistoryModal({
                           color: item.type === 'buy' ? 'var(--primary)' : 'var(--danger)'
                         }}
                       >
-                        {item.type === 'buy' ? '买入' : '卖出'}
+                        {item.conversionRole === 'in'
+                          ? '转换转入'
+                          : item.conversionRole === 'out'
+                            ? '转换转出'
+                            : item.type === 'buy'
+                              ? '买入'
+                              : '卖出'}
                       </span>
                       {item.type === 'buy' && item.isDca && <span className="tx-history-dca-badge">定投</span>}
                     </div>
@@ -182,7 +188,13 @@ export default function TransactionHistoryModal({
                   </div>
                   <div className="row" style={{ justifyContent: 'space-between', fontSize: '12px' }}>
                     <span className="muted">份额/金额</span>
-                    <span>{item.share ? `${Number(item.share).toFixed(2)} 份` : `${formatMoney(item.amount)}`}</span>
+                    <span>
+                      {item.share
+                        ? `${Number(item.share).toFixed(2)} 份`
+                        : item.conversionRole === 'in'
+                          ? '按转出确认金额计算'
+                          : `${formatMoney(item.amount)}`}
+                    </span>
                   </div>
                   <div className="row" style={{ justifyContent: 'space-between', fontSize: '12px', marginTop: 8 }}>
                     <span className="tx-history-pending-status">等待净值更新...</span>
@@ -223,7 +235,13 @@ export default function TransactionHistoryModal({
                           color: item.type === 'buy' ? 'var(--primary)' : 'var(--danger)'
                         }}
                       >
-                        {item.type === 'buy' ? '买入' : '卖出'}
+                        {item.conversionRole === 'in'
+                          ? '转换转入'
+                          : item.conversionRole === 'out'
+                            ? '转换转出'
+                            : item.type === 'buy'
+                              ? '买入'
+                              : '卖出'}
                       </span>
                       {item.type === 'buy' && item.isDca && <span className="tx-history-dca-badge">定投</span>}
                     </div>

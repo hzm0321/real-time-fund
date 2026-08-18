@@ -77,6 +77,15 @@ export default function ModalsLayer({ callbacksRef }) {
 function ModalsLayerContent({ callbacksRef }) {
   const cb = callbacksRef;
 
+  const revokePendingTrade = (id) => {
+    cb.current.setPendingTrades?.((prev) => {
+      const target = (prev || []).find((trade) => trade.id === id);
+      if (!target?.conversionId) return (prev || []).filter((trade) => trade.id !== id);
+      return (prev || []).filter((trade) => trade.conversionId !== target.conversionId);
+    });
+    cb.current.showToast?.('已撤销待处理交易', 'success');
+  };
+
   // ========== Modal 开关状态订阅 ==========
   const settingsOpen = useModalStore((s) => s.settingsOpen);
   const feedbackOpen = useModalStore((s) => s.feedbackOpen);
@@ -407,11 +416,7 @@ function ModalsLayerContent({ callbacksRef }) {
                   : t.groupId === cb.current.getScopedGroupId?.(tradeModal.groupId))
             )}
             onDeletePending={(id) => {
-              cb.current.setPendingTrades?.((prev) => {
-                const next = prev.filter((t) => t.id !== id);
-                return next;
-              });
-              cb.current.showToast?.('已撤销待处理交易', 'success');
+              revokePendingTrade(id);
             }}
           />
         )}
@@ -487,17 +492,23 @@ function ModalsLayerContent({ callbacksRef }) {
         {convertModal.open && (
           <FundConvertModal
             fund={convertModal.fund}
-            allFunds={cb.current.funds}
             nestedModalOpen={selectFundSingleModal.open}
-            maxOutAmount={(() => {
+            maxOutShare={(() => {
               const f = convertModal.fund;
               const code = f?.code;
               if (!code) return 0;
               const holding = cb.current.getScopedHolding?.(code, convertModal.groupId);
               const share = Number(holding?.share) || 0;
-              const nav = Number(f?.dwjz) || Number(f?.gsz) || 0;
-              if (!share || !nav) return 0;
-              return share * nav;
+              const tradeGid = cb.current.getScopedGroupId?.(convertModal.groupId);
+              const frozenShare = (cb.current.pendingTrades || [])
+                .filter(
+                  (trade) =>
+                    trade.fundCode === code &&
+                    trade.type === 'sell' &&
+                    (tradeGid ? trade.groupId === tradeGid : !trade.groupId)
+                )
+                .reduce((total, trade) => total + (Number(trade.share) || 0), 0);
+              return Math.max(0, share - frozenShare);
             })()}
             onClose={() => setConvertModal({ open: false, fund: null })}
             onPickInFund={({ excludeCodes, initialSelectedCode }) => {
@@ -513,22 +524,25 @@ function ModalsLayerContent({ callbacksRef }) {
             onConfirm={(payload) => {
               const tradeGid = cb.current.getScopedGroupId?.(convertModal.groupId);
               const nowTs = Date.now();
+              const conversionId = uuidv4();
 
               const outPending = {
                 id: uuidv4(),
                 fundCode: payload.outFundCode,
                 fundName: payload.outFundName,
                 type: 'sell',
-                share: null,
-                amount: payload.outAmount,
+                share: payload.outShare,
+                amount: null,
                 feeRate: 0,
                 feeMode: 'none',
                 feeValue: 0,
                 date: payload.date,
-                navOffsetDays: -1,
-                netValueSearch: 'backward',
-                isAfter3pm: false,
+                isAfter3pm: payload.isAfter3pm,
                 isDca: false,
+                conversionId,
+                conversionRole: 'out',
+                conversionPeerFundCode: payload.inFundCode,
+                conversionPeerFundName: payload.inFundName,
                 timestamp: nowTs,
                 ...(tradeGid ? { groupId: tradeGid } : {})
               };
@@ -539,15 +553,18 @@ function ModalsLayerContent({ callbacksRef }) {
                 fundName: payload.inFundName,
                 type: 'buy',
                 share: null,
-                amount: payload.inAmount,
+                amount: null,
                 feeRate: 0,
                 feeMode: 'none',
                 feeValue: 0,
                 date: payload.date,
-                navOffsetDays: -1,
-                netValueSearch: 'backward',
-                isAfter3pm: false,
+                isAfter3pm: payload.isAfter3pm,
                 isDca: false,
+                conversionId,
+                conversionRole: 'in',
+                conversionOutShare: payload.outShare,
+                conversionPeerFundCode: payload.outFundCode,
+                conversionPeerFundName: payload.outFundName,
                 timestamp: nowTs + 1,
                 ...(tradeGid ? { groupId: tradeGid } : {})
               };
@@ -683,11 +700,7 @@ function ModalsLayerContent({ callbacksRef }) {
               cb.current.handleMergeAllGroupTransactionsToCurrent?.(historyModal.fund?.code, historyModal.groupId)
             }
             onDeletePending={(id) => {
-              cb.current.setPendingTrades?.((prev) => {
-                const next = prev.filter((t) => t.id !== id);
-                return next;
-              });
-              cb.current.showToast?.('已撤销待处理交易', 'success');
+              revokePendingTrade(id);
             }}
           />
         )}
