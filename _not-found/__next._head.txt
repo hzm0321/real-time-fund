@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+2:I[897367,["/real-time-fund/_next/static/chunks/6275721fbd6d348e.js"],"ViewportBoundary"]
+3:I[897367,["/real-time-fund/_next/static/chunks/6275721fbd6d348e.js"],"MetadataBoundary"]
+4:"$Sreact.suspense"
+5:I[27201,["/real-time-fund/_next/static/chunks/6275721fbd6d348e.js"],"IconMark"]
+0:{"buildId":"sSBW6-JGmgyIe5jbTQrkv","rsc":["$","$1","h",{"children":[["$","meta",null,{"name":"robots","content":"noindex"}],["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"基估宝 V2.8.1"}],["$","meta","1",{"name":"description","content":"输入基金编号添加基金，实时显示估值与前10重仓"}],["$","link","2",{"rel":"icon","href":"/real-time-fund/icon.svg?icon.3929e17b.svg","sizes":"any","type":"image/svg+xml"}],["$","$L5","3",{}]]}]}]}],null]}],"loading":null,"isPartial":false}
