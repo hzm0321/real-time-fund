@@ -1,14 +1,21 @@
-name: Build Next.js site (Open Source Check)
+# 文件名: nextjs.yml
+name: Build and Deploy Next.js site to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: ["main"]
   workflow_dispatch:
 
+# 设置 GITHUB_TOKEN 的权限，以允许部署到 GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
+
+# 只允许同时运行一个部署任务
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -20,7 +27,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
           cache: 'npm'
 
       - name: Setup Pages
