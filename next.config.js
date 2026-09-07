@@ -1,8 +1,14 @@
 /** @type {import('next').NextConfig} */
+const isGithubActions = process.env.GITHUB_ACTIONS === 'true';
+const githubRepo = process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/').pop() : '';
+const githubPagesBasePath = isGithubActions && githubRepo ? `/${githubRepo}` : '';
+
 const nextConfig = {
   reactStrictMode: true,
   reactCompiler: true,
   output: 'export',
+  basePath: githubPagesBasePath,
+  assetPrefix: githubPagesBasePath ? `${githubPagesBasePath}/` : '',
   images: {
     unoptimized: true
   }

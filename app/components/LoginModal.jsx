@@ -21,6 +21,10 @@ export default function LoginModal({ onClose, showToast, isExplicitLoginRef, ini
   // iOS 代理 input：在用户手势中同步 focus，保持键盘弹起状态
   const proxyInputRef = useRef(null);
 
+  const getAuthRedirectUrl = () => {
+    return `${window.location.origin}${window.location.pathname}`;
+  };
+
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setLoginError('');
@@ -49,7 +53,8 @@ export default function LoginModal({ onClose, showToast, isExplicitLoginRef, ini
       const { error } = await supabase.auth.signInWithOtp({
         email: loginEmail.trim(),
         options: {
-          shouldCreateUser: true
+          shouldCreateUser: true,
+          emailRedirectTo: getAuthRedirectUrl()
         }
       });
       if (error) throw error;
@@ -112,7 +117,7 @@ export default function LoginModal({ onClose, showToast, isExplicitLoginRef, ini
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: getAuthRedirectUrl()
         }
       });
       if (error) throw error;
