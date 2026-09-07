@@ -3,7 +3,7 @@ name: Docker CI
 on:
   push:
     branches:
-      - main
+      - gh-pages
       - pro
   pull_request:
 

@@ -3,7 +3,7 @@ name: Build and Deploy Next.js site to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["gh-pages"]
   workflow_dispatch:
 
 # 设置 GITHUB_TOKEN 的权限，以允许部署到 GitHub Pages

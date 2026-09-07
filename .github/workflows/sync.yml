@@ -16,7 +16,7 @@ jobs:
       - name: Sync with upstream
         uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
         with:
-          target_sync_branch: main
+          target_sync_branch: gh-pages
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-          upstream_sync_branch: main
+          upstream_sync_branch: gh-pages
           upstream_sync_repo: hzm0321/real-time-fund
