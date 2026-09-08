@@ -1621,6 +1621,15 @@ export default function HomePage() {
       const newTransactions = [];
 
       const handledIds = new Set();
+      const conversionPairs = new Map();
+      currentPending.forEach((trade) => {
+        if (!trade?.conversionId) return;
+        const pair = conversionPairs.get(trade.conversionId) || {};
+        if (trade.conversionRole === 'out') pair.out = trade;
+        if (trade.conversionRole === 'in') pair.in = trade;
+        conversionPairs.set(trade.conversionId, pair);
+      });
+
       const readCurrent = (fundCode, tradeGid) => {
         if (!tradeGid) {
           return tempHoldings[fundCode] || { share: 0, cost: 0 };
@@ -1638,25 +1647,108 @@ export default function HomePage() {
         }
       };
 
-      for (const trade of currentPending) {
-        if (trade?.id && handledIds.has(trade.id)) continue;
-        if (trade?.id) handledIds.add(trade.id);
-
-        const tradeGid = trade.groupId || null;
+      const fetchPendingNetValue = async (trade) => {
         let queryDate = trade.date;
         if (trade.isAfter3pm) {
           queryDate = toTz(trade.date).add(1, 'day').format('YYYY-MM-DD');
         }
 
-        // 尝试获取智能净值
         const navOffsetDays = Number(trade.navOffsetDays);
         if (Number.isFinite(navOffsetDays) && navOffsetDays) {
           queryDate = toTz(queryDate).add(navOffsetDays, 'day').format('YYYY-MM-DD');
         }
-        const result =
-          trade.netValueSearch === 'backward'
-            ? await fetchSmartFundNetValueBackward(trade.fundCode, queryDate)
-            : await fetchSmartFundNetValue(trade.fundCode, queryDate);
+
+        return trade.netValueSearch === 'backward'
+          ? fetchSmartFundNetValueBackward(trade.fundCode, queryDate)
+          : fetchSmartFundNetValue(trade.fundCode, queryDate);
+      };
+
+      for (const trade of currentPending) {
+        if (trade?.id && handledIds.has(trade.id)) continue;
+
+        if (trade?.conversionId) {
+          const pair = conversionPairs.get(trade.conversionId);
+          if (!pair?.out || !pair?.in) continue;
+
+          handledIds.add(pair.out.id);
+          handledIds.add(pair.in.id);
+
+          const [outResult, inResult] = await Promise.all([
+            fetchPendingNetValue(pair.out),
+            fetchPendingNetValue(pair.in)
+          ]);
+          if (!outResult?.value || !inResult?.value) continue;
+
+          const tradeGid = pair.out.groupId || null;
+          const outCurrent = readCurrent(pair.out.fundCode, tradeGid);
+          const inCurrent = readCurrent(pair.in.fundCode, tradeGid);
+          const outShare = Number(pair.out.share) || 0;
+          if (outShare <= 0 || outShare > outCurrent.share) continue;
+
+          const transferAmount = outShare * Number(outResult.value);
+          const inShare = transferAmount / Number(inResult.value);
+          const outNewShare = Math.max(0, outCurrent.share - outShare);
+          const inNewShare = inCurrent.share + inShare;
+          const inNewCost = (inCurrent.cost * inCurrent.share + transferAmount) / inNewShare;
+
+          writeCurrent(pair.out.fundCode, tradeGid, outNewShare, outNewShare === 0 ? 0 : outCurrent.cost, {
+            ...(outCurrent.firstPurchaseDate ? { firstPurchaseDate: outCurrent.firstPurchaseDate } : {})
+          });
+          writeCurrent(pair.in.fundCode, tradeGid, inNewShare, inNewCost, {
+            ...(inCurrent.firstPurchaseDate
+              ? { firstPurchaseDate: inCurrent.firstPurchaseDate }
+              : { firstPurchaseDate: inResult.date })
+          });
+
+          stateChanged = true;
+          processedIds.add(pair.out.id);
+          processedIds.add(pair.in.id);
+
+          newTransactions.push(
+            {
+              id: pair.out.id,
+              fundCode: pair.out.fundCode,
+              type: 'sell',
+              share: outShare,
+              amount: transferAmount,
+              price: outResult.value,
+              date: outResult.date,
+              isAfter3pm: pair.out.isAfter3pm,
+              isDca: false,
+              isConversion: true,
+              conversionId: trade.conversionId,
+              conversionRole: 'out',
+              conversionPeerFundCode: pair.in.fundCode,
+              conversionPeerFundName: pair.in.fundName,
+              timestamp: pair.out.timestamp || Date.now(),
+              ...(tradeGid ? { groupId: tradeGid } : {})
+            },
+            {
+              id: pair.in.id,
+              fundCode: pair.in.fundCode,
+              type: 'buy',
+              share: inShare,
+              amount: transferAmount,
+              price: inResult.value,
+              date: inResult.date,
+              isAfter3pm: pair.in.isAfter3pm,
+              isDca: false,
+              isConversion: true,
+              conversionId: trade.conversionId,
+              conversionRole: 'in',
+              conversionPeerFundCode: pair.out.fundCode,
+              conversionPeerFundName: pair.out.fundName,
+              timestamp: pair.in.timestamp || Date.now(),
+              ...(tradeGid ? { groupId: tradeGid } : {})
+            }
+          );
+          continue;
+        }
+
+        if (trade?.id) handledIds.add(trade.id);
+
+        const tradeGid = trade.groupId || null;
+        const result = await fetchPendingNetValue(trade);
 
         if (result && result.value > 0) {
           // 成功获取，执行交易
@@ -1733,7 +1825,16 @@ export default function HomePage() {
               date: tx.date,
               isAfter3pm: tx.isAfter3pm,
               isDca: tx.isDca,
-              timestamp: tx.timestamp
+              timestamp: tx.timestamp,
+              ...(tx.isConversion
+                ? {
+                    isConversion: true,
+                    conversionId: tx.conversionId,
+                    conversionRole: tx.conversionRole,
+                    conversionPeerFundCode: tx.conversionPeerFundCode,
+                    conversionPeerFundName: tx.conversionPeerFundName
+                  }
+                : {})
             };
             if (tx.groupId) row.groupId = tx.groupId;
             nextTransactions[tx.fundCode] = [row, ...current].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
