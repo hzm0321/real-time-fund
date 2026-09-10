@@ -1,0 +1,10 @@
+1:"$Sreact.fragment"
+2:I[347257,["/real-time-fund/_next/static/chunks/6275721fbd6d348e.js"],"ClientPageRoot"]
+3:I[39913,["/real-time-fund/_next/static/chunks/6626ba22dde2ae49.js","/real-time-fund/_next/static/chunks/4216db438cb90f20.js","/real-time-fund/_next/static/chunks/ac691ac48f756c04.js","/real-time-fund/_next/static/chunks/93ce0f6e1391c651.js","/real-time-fund/_next/static/chunks/5899d0973549836a.js","/real-time-fund/_next/static/chunks/22ad5b64f3d11180.js","/real-time-fund/_next/static/chunks/3dc5bb2bb580ab3b.js","/real-time-fund/_next/static/chunks/eaba83757247732b.js","/real-time-fund/_next/static/chunks/5b93ef8b49627af8.js","/real-time-fund/_next/static/chunks/071702ba8325c4eb.js","/real-time-fund/_next/static/chunks/d3420fe90b685fb1.js","/real-time-fund/_next/static/chunks/4c8cbbda5c35eb62.js","/real-time-fund/_next/static/chunks/0baefcab30d7c113.js"],"default"]
+6:I[897367,["/real-time-fund/_next/static/chunks/6275721fbd6d348e.js"],"OutletBoundary"]
+7:"$Sreact.suspense"
+:HL["/real-time-fund/_next/static/chunks/86c1d5dd596f44e1.css","style"]
+0:{"buildId":"RZ5ehSjHKZQdq6-yDfkcy","rsc":["$","$1","c",{"children":[["$","$L2",null,{"Component":"$3","serverProvidedParams":{"searchParams":{},"params":{},"promises":["$@4","$@5"]}}],[["$","link","0",{"rel":"stylesheet","href":"/real-time-fund/_next/static/chunks/86c1d5dd596f44e1.css","precedence":"next"}],["$","script","script-0",{"src":"/real-time-fund/_next/static/chunks/5b93ef8b49627af8.js","async":true}],["$","script","script-1",{"src":"/real-time-fund/_next/static/chunks/071702ba8325c4eb.js","async":true}],["$","script","script-2",{"src":"/real-time-fund/_next/static/chunks/d3420fe90b685fb1.js","async":true}],["$","script","script-3",{"src":"/real-time-fund/_next/static/chunks/4c8cbbda5c35eb62.js","async":true}],["$","script","script-4",{"src":"/real-time-fund/_next/static/chunks/0baefcab30d7c113.js","async":true}]],["$","$L6",null,{"children":["$","$7",null,{"name":"Next.MetadataOutlet","children":"$@8"}]}]]}],"loading":null,"isPartial":false}
+4:{}
+5:"$0:rsc:props:children:0:props:serverProvidedParams:params"
+8:null
