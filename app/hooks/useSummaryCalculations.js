@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useEffect } from 'react';
-import { isArray, isNumber, isPlainObject } from 'lodash';
+import { useMemo, useEffect, useState } from 'react';
+import { isArray, isNumber, isPlainObject, isString } from 'lodash';
 import { useStorageStore } from '../stores';
-import { SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL } from '@/app/constants';
+import { SUMMARY_TAB_ID, SUMMARY_SOURCE_GLOBAL, DAILY_EARNINGS_SCOPE_ALL } from '@/app/constants';
 import { aggregatePortfolioDailyEarnings, mergeAllScopedDailyEarnings } from '../lib/dailyEarnings';
+import { fetchRelatedSectorsBatch } from '@/app/api/fund';
 
 /**
  * 虚拟 Summary Tab 收益/汇总资产计算 Hook
@@ -16,6 +17,8 @@ import { aggregatePortfolioDailyEarnings, mergeAllScopedDailyEarnings } from '..
  */
 export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingProfit }) {
   const { funds, holdings, groupHoldings, groups, fundDailyEarnings } = useStorageStore();
+
+  const [sectorByCode, setSectorByCode] = useState({});
 
   // 1. 过滤出当前含有持仓的自定义分组
   const groupsWithHoldings = useMemo(() => {
@@ -32,6 +35,20 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
       });
     });
   }, [groups, groupHoldings, funds, getHoldingProfit]);
+
+  // 1.1 拉取分组中的基金所属板块信息
+  useEffect(() => {
+    const codes = groupsWithHoldings.flatMap((g) => g.codes || []);
+    if (codes.length > 0) {
+      fetchRelatedSectorsBatch(codes, { authSegment: 'anon' })
+        .then((result) => {
+          setSectorByCode(result);
+        })
+        .catch(() => {
+          // silently ignore
+        });
+    }
+  }, [groupsWithHoldings]);
 
   // 2. 计算「全部」全局 + 各自定义分组账本的累加数据
   const summaryTabPortfolioTotals = useMemo(() => {
@@ -87,7 +104,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
       todayReturnRate,
       hasAnyTodayData
     };
-  }, [funds, holdings, groupHoldings, groups, getHoldingProfit]);
+  }, [funds, holdings, groupHoldings, groups, getHoldingProfit, sectorByCode]);
 
   // 3. 全局持仓在 Summary 中是否有持仓占比
   const hasGlobalPortfolioForSummary = useMemo(() => {
@@ -174,6 +191,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
       let hasAnyTodayData = false;
       let upCount = 0;
       let downCount = 0;
+      const sectorMap = {};
 
       for (const fund of funds || []) {
         const holding = holdings[fund.code];
@@ -197,7 +215,16 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
           if (ev > 0) upCount += 1;
           else if (ev < 0) downCount += 1;
         }
+        const sectorName = sectorByCode[fund.code];
+        if (isString(sectorName) && sectorName.trim()) {
+          if (!sectorMap[sectorName]) sectorMap[sectorName] = 0;
+          sectorMap[sectorName] += profit.amount;
+        }
       }
+
+      const sectorHoldings = Object.entries(sectorMap)
+        .map(([sectorName, totalAmount]) => ({ sectorName, totalAmount: Math.round(totalAmount * 100) / 100 }))
+        .sort((a, b) => b.totalAmount - a.totalAmount);
 
       const roundedToday = Math.round(totalProfitToday * 100) / 100;
       const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
@@ -221,7 +248,8 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
         hasAnyTodayData,
         upCount,
         downCount,
-        sparkSeries
+        sparkSeries,
+        sectorHoldings
       });
     }
 
@@ -237,6 +265,7 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
         let hasAnyTodayData = false;
         let upCount = 0;
         let downCount = 0;
+        const sectorMap = {};
 
         for (const fund of groupFunds) {
           const holding = bucket[fund.code];
@@ -254,6 +283,11 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
                 totalCost += holding.cost * holding.share;
               }
             }
+            const sectorName = sectorByCode[fund.code];
+            if (isString(sectorName) && sectorName.trim()) {
+              if (!sectorMap[sectorName]) sectorMap[sectorName] = 0;
+              sectorMap[sectorName] += profit.amount;
+            }
           }
           const ev = fund.noValuation ? null : isNumber(fund.gszzl) ? Number(fund.gszzl) : null;
           if (ev != null && Number.isFinite(ev)) {
@@ -261,6 +295,10 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
             else if (ev < 0) downCount += 1;
           }
         }
+
+        const sectorHoldings = Object.entries(sectorMap)
+          .map(([sectorName, totalAmount]) => ({ sectorName, totalAmount: Math.round(totalAmount * 100) / 100 }))
+          .sort((a, b) => b.totalAmount - a.totalAmount);
 
         const roundedToday = Math.round(totalProfitToday * 100) / 100;
         const returnRate = totalCost > 0 ? (totalHoldingReturn / totalCost) * 100 : 0;
@@ -285,7 +323,8 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
           hasAnyTodayData,
           upCount,
           downCount,
-          sparkSeries
+          sparkSeries,
+          sectorHoldings
         };
       })
     );
@@ -298,7 +337,8 @@ export function useSummaryCalculations({ currentTab, setCurrentTab, getHoldingPr
     holdings,
     getHoldingProfit,
     fundDailyEarnings,
-    hasGlobalPortfolioForSummary
+    hasGlobalPortfolioForSummary,
+    sectorByCode
   ]);
 
   return {
