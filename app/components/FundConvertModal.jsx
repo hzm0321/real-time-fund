@@ -6,29 +6,28 @@ import { CloseIcon } from './Icons';
 import { Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePicker, NumericInput } from './Common';
-import { fetchSmartFundNetValueBackward } from '../api/fund';
+import { fetchSmartFundNetValue } from '../api/fund';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { formatMoney } from '@/lib/utils';
 
-const format2 = (v) => {
+const formatShare = (v) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return '';
-  return n.toFixed(2);
+  return Number(n.toFixed(6)).toString();
 };
 
 export default function FundConvertModal({
   fund,
-  maxOutAmount = 0,
-  allFunds = [],
+  maxOutShare = 0,
   nestedModalOpen = false,
   onClose,
   onPickInFund,
   onConfirm
 }) {
-  const [outAmount, setOutAmount] = useState('');
-  const [inAmount, setInAmount] = useState('');
+  const [outShare, setOutShare] = useState('');
   const [inFund, setInFund] = useState(null);
-  const [confirmDate, setConfirmDate] = useState(() => dayjs().format('YYYY-MM-DD'));
+  const [applyDate, setApplyDate] = useState(() => dayjs().format('YYYY-MM-DD'));
+  const [isAfter3pm, setIsAfter3pm] = useState(() => dayjs().hour() >= 15);
   const [outNetValue, setOutNetValue] = useState(null);
   const [outNetValueDate, setOutNetValueDate] = useState(null);
   const [inNetValue, setInNetValue] = useState(null);
@@ -41,10 +40,10 @@ export default function FundConvertModal({
 
   useEffect(() => {
     // 每次打开/切换 fund 时重置表单（避免上一次残留）
-    setOutAmount('');
-    setInAmount('');
+    setOutShare('');
     setInFund(null);
-    setConfirmDate(dayjs().format('YYYY-MM-DD'));
+    setApplyDate(dayjs().format('YYYY-MM-DD'));
+    setIsAfter3pm(dayjs().hour() >= 15);
     setOutNetValue(null);
     setOutNetValueDate(null);
     setInNetValue(null);
@@ -55,16 +54,14 @@ export default function FundConvertModal({
   }, [fund?.code]);
 
   const maxOut = useMemo(() => {
-    const n = Number(maxOutAmount);
-    return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : 0;
-  }, [maxOutAmount]);
+    const n = Number(maxOutShare);
+    return Number.isFinite(n) && n > 0 ? Number(n.toFixed(6)) : 0;
+  }, [maxOutShare]);
 
-  const outAmt = useMemo(() => Number.parseFloat(outAmount), [outAmount]);
-  const inAmt = useMemo(() => Number.parseFloat(inAmount), [inAmount]);
+  const outShareValue = useMemo(() => Number.parseFloat(outShare), [outShare]);
 
-  const outValid = Number.isFinite(outAmt) && outAmt > 0 && outAmt <= maxOut;
-  const inValid = Number.isFinite(inAmt) && inAmt > 0;
-  const canSubmit = !!fund?.code && !!inFund?.code && outValid && inValid && !!confirmDate;
+  const outValid = Number.isFinite(outShareValue) && outShareValue > 0 && outShareValue <= maxOut;
+  const canSubmit = !!fund?.code && !!inFund?.code && outValid && !!applyDate;
 
   useEffect(() => {
     if (nestedModalOpen) {
@@ -81,15 +78,15 @@ export default function FundConvertModal({
     if (!open) onClose?.();
   };
 
-  const hintMax = maxOut > 0 ? `最多可转出 ${formatMoney(maxOut)}` : '暂无可转出金额';
-  const refStartDate = useMemo(() => {
-    const d = dayjs(confirmDate, 'YYYY-MM-DD', true);
+  const hintMax = maxOut > 0 ? `最多可转出 ${maxOut} 份` : '暂无可转出份额';
+  const navQueryDate = useMemo(() => {
+    const d = dayjs(applyDate, 'YYYY-MM-DD', true);
     if (!d.isValid()) return null;
-    return d.subtract(1, 'day').format('YYYY-MM-DD');
-  }, [confirmDate]);
+    return (isAfter3pm ? d.add(1, 'day') : d).format('YYYY-MM-DD');
+  }, [applyDate, isAfter3pm]);
 
   useEffect(() => {
-    if (!fund?.code || !refStartDate) return;
+    if (!fund?.code || !navQueryDate) return;
 
     const getNetValues = async () => {
       setLoadingNetValue(true);
@@ -102,8 +99,8 @@ export default function FundConvertModal({
 
       try {
         const tasks = [
-          fetchSmartFundNetValueBackward(fund.code, refStartDate),
-          inFund?.code ? fetchSmartFundNetValueBackward(inFund.code, refStartDate) : Promise.resolve(null)
+          fetchSmartFundNetValue(fund.code, navQueryDate),
+          inFund?.code ? fetchSmartFundNetValue(inFund.code, navQueryDate) : Promise.resolve(null)
         ];
         const [outRes, inRes] = await Promise.all(tasks);
         if (outRes && outRes.value) {
@@ -130,7 +127,10 @@ export default function FundConvertModal({
 
     const timer = setTimeout(getNetValues, 500);
     return () => clearTimeout(timer);
-  }, [fund?.code, inFund?.code, refStartDate]);
+  }, [fund?.code, inFund?.code, navQueryDate]);
+
+  const estimatedInAmount = outValid && outNetValue ? outShareValue * Number(outNetValue) : null;
+  const estimatedInShare = estimatedInAmount && inNetValue ? estimatedInAmount / Number(inNetValue) : null;
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
@@ -167,7 +167,7 @@ export default function FundConvertModal({
 
         <Alert style={{ marginBottom: 16, flexShrink: 0 }} variant="info">
           <Info className="h-4 w-4" />
-          <AlertDescription>需要基金转换完成后再添加</AlertDescription>
+          <AlertDescription>提交后将等待两只基金的确认净值，并自动完成转出与转入</AlertDescription>
         </Alert>
 
         <div className="scrollbar-y-styled" style={{ overflowY: 'auto', paddingRight: 4, flex: 1 }}>
@@ -202,15 +202,15 @@ export default function FundConvertModal({
 
           <div className="form-group" style={{ marginBottom: 16 }}>
             <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-              转出金额 <span style={{ color: 'var(--danger)' }}>*</span>
+              转出份额 <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <div
               style={{
-                border: !outAmount || !outValid ? '1px solid var(--danger)' : '1px solid var(--border)',
+                border: !outShare || !outValid ? '1px solid var(--danger)' : '1px solid var(--border)',
                 borderRadius: 12
               }}
             >
-              <NumericInput value={outAmount} onChange={setOutAmount} step={100} min={0} placeholder="请输入转出金额" />
+              <NumericInput value={outShare} onChange={setOutShare} step={1} min={0} placeholder="请输入转出份额" />
             </div>
             {maxOut > 0 && (
               <div className="row" style={{ gap: 8, marginTop: 8 }}>
@@ -224,7 +224,7 @@ export default function FundConvertModal({
                     key={opt.label}
                     type="button"
                     className="trade-amount-btn"
-                    onClick={() => setOutAmount(format2(maxOut * opt.value))}
+                    onClick={() => setOutShare(formatShare(maxOut * opt.value))}
                   >
                     {opt.label}
                   </button>
@@ -268,25 +268,27 @@ export default function FundConvertModal({
             </button>
           </div>
 
-          <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-              转入金额 <span style={{ color: 'var(--danger)' }}>*</span>
-            </label>
-            <div
-              style={{
-                border: !inAmount || !inValid ? '1px solid var(--danger)' : '1px solid var(--border)',
-                borderRadius: 12
-              }}
-            >
-              <NumericInput value={inAmount} onChange={setInAmount} step={100} min={0} placeholder="请输入转入金额" />
-            </div>
-          </div>
-
           <div className="form-group" style={{ marginBottom: 8 }}>
             <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
-              确认转换日期
+              转换申请日期
             </label>
-            <DatePicker value={confirmDate} onChange={setConfirmDate} />
+            <DatePicker value={applyDate} onChange={setApplyDate} />
+            <div className="trade-time-slot row" style={{ gap: 8, marginTop: 10 }}>
+              <button
+                type="button"
+                className={!isAfter3pm ? 'trade-time-btn active' : 'trade-time-btn'}
+                onClick={() => setIsAfter3pm(false)}
+              >
+                15:00前
+              </button>
+              <button
+                type="button"
+                className={isAfter3pm ? 'trade-time-btn active' : 'trade-time-btn'}
+                onClick={() => setIsAfter3pm(true)}
+              >
+                15:00后
+              </button>
+            </div>
             {loadingNetValue && (
               <div className="muted" style={{ fontSize: '12px', marginTop: 4 }}>
                 正在获取净值...
@@ -312,6 +314,21 @@ export default function FundConvertModal({
                 参考净值(转入): {inNetValue} ({inNetValueDate})
               </div>
             )}
+            {estimatedInAmount && estimatedInShare && !loadingNetValue && (
+              <div className="trade-confirm-card" style={{ marginTop: 12, fontSize: 12 }}>
+                <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span className="muted">预计转入金额</span>
+                  <span>{formatMoney(estimatedInAmount)}</span>
+                </div>
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <span className="muted">预计转入份额</span>
+                  <span>{estimatedInShare.toFixed(6)} 份</span>
+                </div>
+              </div>
+            )}
+            <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+              * 按转换费为 0 估算，最终结果以基金公司确认为准
+            </div>
           </div>
         </div>
 
@@ -329,11 +346,11 @@ export default function FundConvertModal({
                 onConfirm?.({
                   outFundCode: fund.code,
                   outFundName: fund.name,
-                  outAmount: outAmt,
+                  outShare: outShareValue,
                   inFundCode: inFund.code,
                   inFundName: inFund.name,
-                  inAmount: inAmt,
-                  date: confirmDate
+                  date: applyDate,
+                  isAfter3pm
                 });
               }}
               style={{ flex: 1, opacity: canSubmit ? 1 : 0.6 }}
