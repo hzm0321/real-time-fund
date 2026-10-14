@@ -132,6 +132,7 @@ export default function GroupAccountSummaryCard({
   upCount = 0,
   downCount = 0,
   sparkSeries = [],
+  sectorHoldings = [],
   masked = false
 }) {
   const isMobile = useIsMobile();
@@ -298,6 +299,46 @@ export default function GroupAccountSummaryCard({
           </div>
         </div>
       </div>
+      {sectorHoldings.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+            关联板块
+          </div>
+          {sectorHoldings.map((item) => (
+            <div
+              key={item.sectorName}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '3px 0',
+                fontSize: 13
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.sectorName}
+              </span>
+              <span
+                style={{
+                  flexShrink: 0,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  marginLeft: 12,
+                  paddingBottom: 2,
+                  borderBottom: '1px dashed rgba(255,255,255,0.15)'
+                }}
+              >
+                {masked ? (
+                  <span className="mask-text">******</span>
+                ) : (
+                  <span style={{ color: 'var(--primary)' }}>{formatAmountPlain(item.totalAmount / 10000, 2)}w</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
