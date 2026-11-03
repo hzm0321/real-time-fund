@@ -44,7 +44,13 @@ export default function PendingTradesModal({ open, trades = [], onClose, onRevok
                       color: trade.type === 'buy' ? 'var(--danger)' : 'var(--success)'
                     }}
                   >
-                    {trade.type === 'buy' ? '买入' : '卖出'}
+                    {trade.conversionRole === 'in'
+                      ? '转换转入'
+                      : trade.conversionRole === 'out'
+                        ? '转换转出'
+                        : trade.type === 'buy'
+                          ? '买入'
+                          : '卖出'}
                   </span>
                   <span className="muted" style={{ fontSize: '12px' }}>
                     {trade.date} {trade.isAfter3pm ? '(15:00后)' : ''}
@@ -52,7 +58,13 @@ export default function PendingTradesModal({ open, trades = [], onClose, onRevok
                 </div>
                 <div className="row" style={{ justifyContent: 'space-between', fontSize: '12px' }}>
                   <span className="muted">份额/金额</span>
-                  <span>{trade.share ? `${trade.share} 份` : `${trade.amount}`}</span>
+                  <span>
+                    {trade.share
+                      ? `${trade.share} 份`
+                      : trade.conversionRole === 'in'
+                        ? '按转出确认金额计算'
+                        : `${trade.amount}`}
+                  </span>
                 </div>
                 <div className="row" style={{ justifyContent: 'space-between', fontSize: '12px', marginTop: 4 }}>
                   <span className="muted">状态</span>
