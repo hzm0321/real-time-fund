@@ -1,0 +1,4 @@
+:HL["/real-time-fund/_next/static/chunks/0v5a17t0-8i2c.css","style"]
+2:[["children",{"s":"__PAGE__","h":160}]]
+1:[["children",{"s":"/_not-found","h":96,"c":"$Q2"}]]
+0:{"b":"ei2rg3TgbmvTJ9wGL0Rwx","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
