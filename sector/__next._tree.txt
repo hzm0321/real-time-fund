@@ -1,0 +1,5 @@
+:HL["/real-time-fund/_next/static/chunks/2bch7278rl4s0.css","style"]
+:HL["/real-time-fund/_next/static/chunks/0us4pl-yzkbt8.css","style"]
+2:[["children",{"s":"__PAGE__","h":160}]]
+1:[["children",{"s":"sector","h":96,"c":"$Q2"}]]
+0:{"b":"_Z27ZJcigsNe2SbsMlP2-","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
