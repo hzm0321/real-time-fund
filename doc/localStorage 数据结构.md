@@ -322,7 +322,12 @@
     isAfter3pm: boolean, // 是否下午3点后
     isDca: boolean,      // 是否为定投交易
     timestamp: number,   // 时间戳
-    groupId?: string     // 可选；存在时表示作用于该分组的 groupHoldings；缺省表示全局 holdings
+    groupId?: string,    // 可选；存在时表示作用于该分组的 groupHoldings；缺省表示全局 holdings
+    conversionId?: string, // 可选；基金转换的成对记录 ID
+    conversionRole?: 'out' | 'in', // 可选；转换转出/转入方向
+    conversionOutShare?: number, // 可选；转入记录关联的转出份额
+    conversionPeerFundCode?: string, // 可选；转换对手基金代码
+    conversionPeerFundName?: string  // 可选；转换对手基金名称
   }
 ]
 ```
@@ -331,6 +336,7 @@
 
 - 净值未更新时暂存交易
 - 净值更新后自动处理待处理交易
+- 基金转换的转出、转入记录按 `conversionId` 成对原子处理；两边净值均确认后才同时更新持仓
 - 导入/导出配置时包含
 
 ---
@@ -566,7 +572,12 @@ groupId; // 分组ID，如 'group_xxx'
       isDca: boolean,        // 是否为定投交易
       isHistoryOnly: boolean, // 是否仅历史记录（不参与持仓计算）
       timestamp: number,      // 时间戳
-      groupId?: string        // 可选；存在时表示该笔记录属于某分组子账本；缺省表示全局
+      groupId?: string,       // 可选；存在时表示该笔记录属于某分组子账本；缺省表示全局
+      isConversion?: boolean, // 是否为基金转换记录
+      conversionId?: string, // 可选；基金转换的成对记录 ID
+      conversionRole?: 'out' | 'in', // 可选；转换转出/转入方向
+      conversionPeerFundCode?: string, // 可选；转换对手基金代码
+      conversionPeerFundName?: string  // 可选；转换对手基金名称
     }
   ],
   "110022": [
