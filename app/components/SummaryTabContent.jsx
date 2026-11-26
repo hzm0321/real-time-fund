@@ -71,6 +71,7 @@ export default function SummaryTabContent({
                 upCount={row.upCount}
                 downCount={row.downCount}
                 sparkSeries={row.sparkSeries}
+                sectorHoldings={row.sectorHoldings}
                 masked={maskAmounts}
               />
             </div>
